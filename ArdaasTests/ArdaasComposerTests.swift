@@ -54,7 +54,7 @@ final class ArdaasComposerTests: XCTestCase {
             return XCTFail("benti must sit between canonical segments")
         }
         XCTAssertEqual(before.id, "nimaniyan-de-maan")
-        XCTAssertEqual(after.id, "ardaas-hai-ji")
+        XCTAssertEqual(after.id, "bhul-chuk-maaf")
         XCTAssertEqual(items.count, bundled.segments.count + 1)
     }
 }
