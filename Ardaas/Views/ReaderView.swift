@@ -76,6 +76,9 @@ struct ReaderView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
+        .safeAreaInset(edge: .bottom) {
+            footerBar
+        }
     }
 
     // MARK: - Rows
@@ -91,7 +94,7 @@ struct ReaderView: View {
                 Text(segment.transliteration)
                     .font(.system(size: 15 * fontScale))
                     .italic()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.teal)
             }
             if showEnglish {
                 Text(segment.english)
@@ -119,6 +122,47 @@ struct ReaderView: View {
             }
     }
 
+    // MARK: - Footer
+
+    /// Quick, independent toggles for the two secondary layers. Gurmukhi's
+    /// toggle stays in the toolbar menu — it's the anchor layer, switched
+    /// rarely.
+    private var footerBar: some View {
+        HStack(spacing: 12) {
+            layerPill("Transliteration", isOn: $showTransliteration)
+            layerPill("Translation", isOn: $showEnglish)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(.bar)
+    }
+
+    private func layerPill(_ title: String, isOn: Binding<Bool>) -> some View {
+        Button {
+            isOn.wrappedValue.toggle()
+        } label: {
+            Text(title)
+                .font(.subheadline.weight(.medium))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(
+                    isOn.wrappedValue ? Color.accentColor.opacity(0.15) : .clear,
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule().strokeBorder(
+                        isOn.wrappedValue ? Color.accentColor : Color.secondary.opacity(0.4),
+                        lineWidth: 1
+                    )
+                )
+                .foregroundStyle(isOn.wrappedValue ? Color.accentColor : Color.secondary)
+        }
+        .buttonStyle(.plain)
+        .disabled(isLastVisibleLayer(isOn.wrappedValue))
+        .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
+    }
+
     // MARK: - Toolbar
 
     private var displayMenu: some View {
@@ -126,10 +170,6 @@ struct ReaderView: View {
             Section("Layers") {
                 Toggle("Gurmukhi", isOn: $showGurmukhi)
                     .disabled(isLastVisibleLayer(showGurmukhi))
-                Toggle("Transliteration", isOn: $showTransliteration)
-                    .disabled(isLastVisibleLayer(showTransliteration))
-                Toggle("English", isOn: $showEnglish)
-                    .disabled(isLastVisibleLayer(showEnglish))
             }
             Section("Text Size") {
                 Button {
