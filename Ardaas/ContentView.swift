@@ -1,21 +1,21 @@
+import SwiftData
 import SwiftUI
 
-/// Placeholder root view. Replaced by the Home screen (issue #4).
+/// Root view: hosts the Home screen in the app's navigation stack.
 struct ContentView: View {
     var body: some View {
-        VStack(spacing: 12) {
-            Text("ੴ")
-                .font(.system(size: 44))
-            Text("ਅਰਦਾਸ")
-                .font(.largeTitle.weight(.semibold))
-            Text("Ardaas")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+        NavigationStack {
+            HomeView()
         }
-        .padding()
     }
 }
 
 #Preview {
     ContentView()
+        .modelContainer(
+            try! ModelContainer(
+                for: SavedArdaas.self,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            )
+        )
 }
