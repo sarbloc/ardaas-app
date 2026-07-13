@@ -18,6 +18,7 @@ struct HomeView: View {
                 list
             }
         }
+        .themedScreen()
         .navigationTitle("Ardaas")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -40,12 +41,14 @@ struct HomeView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(savedArdaas.label)
                             .font(.headline)
+                            .foregroundStyle(Theme.parchment)
                         Text(savedArdaas.createdAt,
                              format: .dateTime.day().month().year())
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.mist)
                     }
                 }
+                .listRowBackground(Theme.raisedFill)
             }
             .onDelete(perform: delete)
         }

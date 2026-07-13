@@ -76,6 +76,7 @@ struct ReaderView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
+        .themedScreen()
         .safeAreaInset(edge: .bottom) {
             footerBar
         }
@@ -89,17 +90,21 @@ struct ReaderView: View {
             if showGurmukhi {
                 Text(segment.gurmukhi)
                     .font(.system(size: 22 * fontScale))
+                    .lineSpacing(8 * fontScale)
+                    .foregroundStyle(Theme.parchment)
             }
             if showTransliteration {
                 Text(segment.transliteration)
                     .font(.system(size: 15 * fontScale))
                     .italic()
-                    .foregroundStyle(.teal)
+                    .lineSpacing(5 * fontScale)
+                    .foregroundStyle(Theme.sand)
             }
             if showEnglish {
                 Text(segment.english)
-                    .font(.system(size: 15 * fontScale))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 15 * fontScale, design: .serif))
+                    .lineSpacing(5 * fontScale)
+                    .foregroundStyle(Theme.mist)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,10 +113,12 @@ struct ReaderView: View {
     private func bentiView(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 17 * fontScale))
+            .lineSpacing(6 * fontScale)
+            .foregroundStyle(Theme.parchment)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
             .background(
-                Color.accentColor.opacity(0.08),
+                Color.accentColor.opacity(0.12),
                 in: RoundedRectangle(cornerRadius: 10)
             )
             .overlay(alignment: .leading) {
