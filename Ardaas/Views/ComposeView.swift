@@ -32,19 +32,23 @@ struct ComposeView: View {
                 Section("Label") {
                     TextField("e.g. Family ardaas", text: $label)
                 }
+                .listRowBackground(Theme.raisedFill)
 
                 Section("Benti") {
                     TextEditor(text: $bentiText)
                         .frame(minHeight: 160)
                         .accessibilityLabel("Benti")
                 }
+                .listRowBackground(Theme.raisedFill)
 
                 if !hasSeenGurmukhiKeyboardTip {
                     Section {
                         gurmukhiKeyboardTip
                     }
+                    .listRowBackground(Theme.raisedFill)
                 }
             }
+            .themedScreen()
             .navigationTitle("New Ardaas")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
