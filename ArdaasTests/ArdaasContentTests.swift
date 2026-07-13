@@ -7,17 +7,20 @@ final class ArdaasContentTests: XCTestCase {
     func testBundledContentLoadsAndValidates() throws {
         let content = try ArdaasContent.loadBundled()
         XCTAssertEqual(content.version, 1)
-        XCTAssertEqual(content.segments.count, 20)
+        XCTAssertEqual(content.segments.count, 19)
         XCTAssertFalse(content.sources.isEmpty)
         XCTAssertEqual(content.bentiSlot.afterSegmentId, "nimaniyan-de-maan")
     }
 
-    func testBundledSlotSegmentPrecedesArdaasHaiJi() throws {
+    func testBundledSlotFollowsIntactSentence() throws {
         let content = try ArdaasContent.loadBundled()
         let ids = content.segments.map(\.id)
         let slotIndex = try XCTUnwrap(ids.firstIndex(of: content.bentiSlot.afterSegmentId))
-        XCTAssertEqual(ids[slotIndex + 1], "ardaas-hai-ji",
-                       "benti must complete 'ਆਪ ਦੇ ਹਜ਼ੂਰ [benti] ਦੀ ਅਰਦਾਸ ਹੈ ਜੀ॥'")
+        // The ਹੇ ਨਿਮਾਣਿਆਂ sentence is recited whole (its ….. names the paath
+        // or occasion); the benti follows as its own passage, before the
+        // forgiveness line. Per SGPC Maryada + documented practice.
+        XCTAssertTrue(content.segments[slotIndex].gurmukhi.hasSuffix("ਦੀ ਅਰਦਾਸ ਹੈ ਜੀ॥"))
+        XCTAssertEqual(ids[slotIndex + 1], "bhul-chuk-maaf")
     }
 
     func testValidateRejectsDuplicateIds() {
