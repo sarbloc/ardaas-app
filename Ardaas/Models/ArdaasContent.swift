@@ -29,10 +29,15 @@ enum ArdaasContentError: Error, Equatable {
     case emptyLayer(segmentId: String)
 }
 
+/// Anchors bundle resolution to whatever binary this file is compiled
+/// into (the app target), independent of the host process — so resource
+/// lookup works identically in the app and in hosted or unhosted tests.
+private final class BundleToken {}
+
 extension ArdaasContent {
     /// Loads and validates the bundled canonical text. Throws — a broken
     /// bundle is a build defect, not a recoverable runtime state.
-    static func loadBundled(from bundle: Bundle = .main) throws -> ArdaasContent {
+    static func loadBundled(from bundle: Bundle = Bundle(for: BundleToken.self)) throws -> ArdaasContent {
         guard let url = bundle.url(forResource: "ardaas", withExtension: "json") else {
             throw ArdaasContentError.resourceMissing
         }
