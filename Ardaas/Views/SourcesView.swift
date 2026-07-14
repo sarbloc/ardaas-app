@@ -7,7 +7,7 @@ struct SourcesView: View {
     @Environment(\.dismiss) private var dismiss
 
     /// Loaded once; a broken bundle shows the failure rather than hiding it.
-    @State private var loadResult: Result<ArdaasContent, Error>?
+    @State private var loadResult: Result<ArdaasLibrary, Error>?
 
     var body: some View {
         NavigationStack {
@@ -29,35 +29,43 @@ struct SourcesView: View {
         }
         .onAppear {
             if loadResult == nil {
-                loadResult = Result { try ArdaasContent.loadBundled() }
+                loadResult = Result { try ArdaasLibrary.loadBundled() }
             }
         }
     }
 
     @ViewBuilder
     private var textSection: some View {
-        Section("Ardaas — Standard (SGPC)") {
-            switch loadResult {
-            case .success(let content):
-                ForEach(content.sources, id: \.self) { source in
-                    if let url = URL(string: source) {
-                        Link(destination: url) {
-                            Text(displayName(for: source))
-                                .foregroundStyle(Color.accentColor)
+        switch loadResult {
+        case .success(let library):
+            ForEach(library.variants) { variant in
+                Section("Ardaas — \(variant.displayName)") {
+                    ForEach(variant.content.sources, id: \.self) { source in
+                        if let url = URL(string: source) {
+                            Link(destination: url) {
+                                Text(displayName(for: source))
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        } else {
+                            Text(source)
+                                .foregroundStyle(Theme.mist)
                         }
-                    } else {
-                        Text(source)
-                            .foregroundStyle(Theme.mist)
                     }
                 }
-            case .failure(let error):
-                Text("Could not load bundled text: \(String(describing: error))")
+                .listRowBackground(Theme.raisedFill)
+            }
+        case .failure(let error):
+            Section("Texts") {
+                Text("Could not load bundled texts: \(String(describing: error))")
                     .foregroundStyle(Theme.mist)
-            case nil:
+            }
+            .listRowBackground(Theme.raisedFill)
+        case nil:
+            Section("Texts") {
                 ProgressView()
             }
+            .listRowBackground(Theme.raisedFill)
         }
-        .listRowBackground(Theme.raisedFill)
     }
 
     private var accuracySection: some View {

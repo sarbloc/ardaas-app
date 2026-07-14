@@ -1,11 +1,13 @@
 import Foundation
 
-/// One canonical segment of the Ardaas, in all three layers.
+/// One canonical segment of the Ardaas. Gurmukhi is always present;
+/// transliteration and translation are optional per variant (some
+/// variants have no attested aligned layers).
 struct ArdaasSegment: Codable, Equatable, Identifiable {
     let id: String
     let gurmukhi: String
-    let transliteration: String
-    let english: String
+    let transliteration: String?
+    let english: String?
 }
 
 /// The single benti insertion point: the benti renders immediately after
@@ -14,7 +16,7 @@ struct BentiSlot: Codable, Equatable {
     let afterSegmentId: String
 }
 
-/// The bundled canonical Ardaas (`Ardaas/Resources/ardaas.json`).
+/// A variant's full text (`Resources/ardaas-<variant>.json`).
 struct ArdaasContent: Codable, Equatable {
     let version: Int
     let sources: [String]
@@ -23,28 +25,18 @@ struct ArdaasContent: Codable, Equatable {
 }
 
 enum ArdaasContentError: Error, Equatable {
-    case resourceMissing
     case duplicateSegmentIds
     case invalidSlot(String)
     case emptyLayer(segmentId: String)
+    case inconsistentLayer(String)
 }
 
-/// Anchors bundle resolution to whatever binary this file is compiled
-/// into (the app target), independent of the host process — so resource
-/// lookup works identically in the app and in hosted or unhosted tests.
-private final class BundleToken {}
-
 extension ArdaasContent {
-    /// Loads and validates the bundled canonical text. Throws — a broken
-    /// bundle is a build defect, not a recoverable runtime state.
-    static func loadBundled(from bundle: Bundle = Bundle(for: BundleToken.self)) throws -> ArdaasContent {
-        guard let url = bundle.url(forResource: "ardaas", withExtension: "json") else {
-            throw ArdaasContentError.resourceMissing
-        }
-        let content = try JSONDecoder().decode(ArdaasContent.self, from: Data(contentsOf: url))
-        try content.validate()
-        return content
-    }
+    /// Whether this variant carries the layer for every segment.
+    /// `validate()` guarantees all-or-none, so checking the first
+    /// segment is sufficient.
+    var hasTransliteration: Bool { segments.first?.transliteration != nil }
+    var hasEnglish: Bool { segments.first?.english != nil }
 
     /// Structural invariants the app relies on. Mirrors the checks CI's
     /// unit tests run against the real bundled JSON.
@@ -57,9 +49,22 @@ extension ArdaasContent {
             throw ArdaasContentError.invalidSlot(bentiSlot.afterSegmentId)
         }
         if let empty = segments.first(where: {
-            $0.gurmukhi.isEmpty || $0.transliteration.isEmpty || $0.english.isEmpty
+            $0.gurmukhi.isEmpty
+                || $0.transliteration?.isEmpty == true
+                || $0.english?.isEmpty == true
         }) {
             throw ArdaasContentError.emptyLayer(segmentId: empty.id)
+        }
+        // Optional layers are all-or-none within a variant: a text either
+        // has a transliteration/translation or it doesn't. Mixed coverage
+        // would render as unexplained gaps mid-recitation.
+        let withTransliteration = segments.filter { $0.transliteration != nil }.count
+        guard withTransliteration == 0 || withTransliteration == segments.count else {
+            throw ArdaasContentError.inconsistentLayer("transliteration")
+        }
+        let withEnglish = segments.filter { $0.english != nil }.count
+        guard withEnglish == 0 || withEnglish == segments.count else {
+            throw ArdaasContentError.inconsistentLayer("english")
         }
     }
 }
