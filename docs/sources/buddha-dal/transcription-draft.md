@@ -4,13 +4,19 @@ Source: Nihung Santhiya app (screenshots supplied by Sarbloc, 2026-07-14,
 `photo_1.jpg`–`photo_7.jpg` in this directory). Header in-app:
 **ਅਰਦਾਸ (ਦਲ ਪੰਥ ਦੀ ਮਰਯਾਦਾ ਅਨੁਸਾਰ)**.
 
-Status: DRAFT — transcribed from screenshots, boundary continuity verified
-(all 6 joins read through mid-sentence). NOT proof-read. Do not bundle
-until Sarbloc's proof-read passes.
+Status: transcribed from screenshots, boundary continuity verified (all 6
+joins read through mid-sentence). This file records the source VERBATIM.
+The proof-read gate is the content PR itself — it must not merge until
+Sarbloc has read the rendered text against the screenshots.
 
-Open questions (Sarbloc): see dev thread — (1) the ਹੇ ਦੀਨ ਦਇਆਲ paragraph
-names ਸੋ ਦਰ ਰਹਰਾਸਿ / ਆਰਤੀ ਆਰਤੇ inline (evening-specific?); (2) benti slot
-position — this text has no ….. placeholder and no ਹੇ ਨਿਮਾਣਿਆਂ sentence.
+Resolved decisions (Sarbloc, 2026-07-14, dev thread):
+1. The bundled `he-deen-dayal` segment intentionally differs from this
+   verbatim draft: the app's inline paath naming (ਸੋ ਦਰ ਰਹਰਾਸਿ, ਆਰਤੀ
+   ਆਰਤੇ ਜੀ — evening-specific) is replaced with the ….. placeholder,
+   matching the SGPC convention. This is an operator-decided edit, not a
+   transcription error.
+2. Benti slot: after the ਹੇ ਦੀਨ ਦਇਆਲ paragraph, before ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ
+   ਖਾਲਸਾ — provisional, to be reviewed in situ after first render.
 
 ---
 
