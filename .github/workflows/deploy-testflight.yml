@@ -48,6 +48,11 @@ jobs:
           mkdir -p private_keys
           printf '%s' "$API_KEY_P8" > "private_keys/AuthKey_${API_KEY_ID}.p8"
 
+      # Build number = commit count on the checked-out ref: monotonic for
+      # main pushes and traceable to a commit. Known constraints, accepted:
+      # re-running after a SUCCESSFUL upload fails on "duplicate build"
+      # (correct — that build is already up), and workflow_dispatch should
+      # only be run from the main tip.
       - name: Archive (build number = commit count)
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
