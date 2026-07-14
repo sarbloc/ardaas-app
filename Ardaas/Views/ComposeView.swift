@@ -13,6 +13,11 @@ struct ComposeView: View {
 
     @State private var label = ""
     @State private var bentiText = ""
+    @State private var variantId = ArdaasLibrary.defaultVariantId
+
+    /// Loaded once; failure hides the picker and saves fall back to the
+    /// default variant (a broken bundle already surfaces in the Reader).
+    @State private var library: ArdaasLibrary?
 
     private var trimmedLabel: String {
         label.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -34,6 +39,19 @@ struct ComposeView: View {
                 }
                 .listRowBackground(Theme.raisedFill)
 
+                if let library {
+                    Section("Ardaas") {
+                        Picker("Ardaas", selection: $variantId) {
+                            ForEach(library.variants) { variant in
+                                Text(variant.displayName).tag(variant.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .accessibilityLabel("Ardaas variant")
+                    }
+                    .listRowBackground(Theme.raisedFill)
+                }
+
                 Section("Benti") {
                     TextEditor(text: $bentiText)
                         .frame(minHeight: 160)
@@ -49,6 +67,11 @@ struct ComposeView: View {
                 }
             }
             .themedScreen()
+            .onAppear {
+                if library == nil {
+                    library = try? ArdaasLibrary.loadBundled()
+                }
+            }
             .navigationTitle("New Ardaas")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -97,7 +120,9 @@ struct ComposeView: View {
 
     private func save() {
         guard canSave else { return }
-        modelContext.insert(SavedArdaas(label: trimmedLabel, bentiText: trimmedBenti))
+        modelContext.insert(
+            SavedArdaas(label: trimmedLabel, bentiText: trimmedBenti, variantId: variantId)
+        )
         dismiss()
     }
 }

@@ -6,7 +6,9 @@ import UIKit
 /// benti composed in at the bundled slot. Pushed inside the Home screen's
 /// NavigationStack.
 struct ReaderView: View {
-    let savedArdaas: SavedArdaas
+    /// Bindable: the Reader's variant picker writes straight back to the
+    /// record (operator decision — the switch persists, not per-session).
+    @Bindable var savedArdaas: SavedArdaas
 
     @AppStorage("reader.showGurmukhi") private var showGurmukhi = true
     @AppStorage("reader.showTransliteration") private var showTransliteration = true
@@ -37,6 +39,13 @@ struct ReaderView: View {
                 UIApplication.shared.isIdleTimerDisabled = true
                 if loadResult == nil {
                     loadResult = Result { try ArdaasLibrary.loadBundled() }
+                }
+                // Heal records whose variant was removed from the bundle:
+                // rewrite to the default so the stored id, the rendered
+                // content, and the picker selection all agree.
+                if case .success(let library) = loadResult,
+                   library.variant(id: savedArdaas.variantId) == nil {
+                    savedArdaas.variantId = library.defaultVariant.id
                 }
             }
             .onDisappear {
@@ -205,6 +214,15 @@ struct ReaderView: View {
 
     private var displayMenu: some View {
         Menu {
+            if case .success(let library) = loadResult, library.variants.count > 1 {
+                Section("Ardaas") {
+                    Picker("Ardaas", selection: $savedArdaas.variantId) {
+                        ForEach(library.variants) { variant in
+                            Text(variant.displayName).tag(variant.id)
+                        }
+                    }
+                }
+            }
             Section("Layers") {
                 Toggle("Gurmukhi", isOn: $showGurmukhi)
                     .disabled(isLastVisibleLayer(showGurmukhi))
