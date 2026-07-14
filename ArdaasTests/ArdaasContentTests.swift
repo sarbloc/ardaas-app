@@ -1,19 +1,31 @@
 import XCTest
 @testable import Ardaas
 
-/// Runs against the real bundled JSON — CI-level protection of the
-/// content invariants the app relies on.
+/// Bundled-content tests run against the real JSON via the library —
+/// CI-level protection of the content invariants the app relies on.
 final class ArdaasContentTests: XCTestCase {
-    func testBundledContentLoadsAndValidates() throws {
-        let content = try ArdaasContent.loadBundled()
+    func testBundledLibraryLoadsAndValidates() throws {
+        let library = try ArdaasLibrary.loadBundled()
+        XCTAssertEqual(library.variants.map(\.id), ["sgpc"])
+        XCTAssertEqual(library.defaultVariant.id, ArdaasLibrary.defaultVariantId)
+    }
+
+    func testBundledSgpcContent() throws {
+        let content = try XCTUnwrap(
+            ArdaasLibrary.loadBundled().variant(id: "sgpc")
+        ).content
         XCTAssertEqual(content.version, 1)
         XCTAssertEqual(content.segments.count, 19)
         XCTAssertFalse(content.sources.isEmpty)
         XCTAssertEqual(content.bentiSlot.afterSegmentId, "nimaniyan-de-maan")
+        XCTAssertTrue(content.hasTransliteration)
+        XCTAssertTrue(content.hasEnglish)
     }
 
     func testBundledSlotFollowsIntactSentence() throws {
-        let content = try ArdaasContent.loadBundled()
+        let content = try XCTUnwrap(
+            ArdaasLibrary.loadBundled().variant(id: "sgpc")
+        ).content
         let ids = content.segments.map(\.id)
         let slotIndex = try XCTUnwrap(ids.firstIndex(of: content.bentiSlot.afterSegmentId))
         // The ਹੇ ਨਿਮਾਣਿਆਂ sentence is recited whole (its ….. names the paath
@@ -21,6 +33,11 @@ final class ArdaasContentTests: XCTestCase {
         // forgiveness line. Per SGPC Maryada + documented practice.
         XCTAssertTrue(content.segments[slotIndex].gurmukhi.hasSuffix("ਦੀ ਅਰਦਾਸ ਹੈ ਜੀ॥"))
         XCTAssertEqual(ids[slotIndex + 1], "bhul-chuk-maaf")
+    }
+
+    func testResolvedVariantFallsBackToDefaultForUnknownId() throws {
+        let library = try ArdaasLibrary.loadBundled()
+        XCTAssertEqual(library.resolvedVariant(id: "no-such-variant").id, "sgpc")
     }
 
     func testValidateRejectsDuplicateIds() {
@@ -46,6 +63,51 @@ final class ArdaasContentTests: XCTestCase {
         ], slotAfter: "a")
         XCTAssertThrowsError(try content.validate()) {
             XCTAssertEqual($0 as? ArdaasContentError, .emptyLayer(segmentId: "b"))
+        }
+    }
+
+    func testValidateRejectsInconsistentLayerCoverage() {
+        let content = ArdaasContent.fixture(segments: [
+            .fixture(id: "a"),
+            ArdaasSegment(id: "b", gurmukhi: "ਬ", transliteration: nil, english: "e"),
+        ], slotAfter: "a")
+        XCTAssertThrowsError(try content.validate()) {
+            XCTAssertEqual($0 as? ArdaasContentError, .inconsistentLayer("transliteration"))
+        }
+    }
+
+    func testGurmukhiOnlyVariantValidates() throws {
+        let content = ArdaasContent.fixture(segments: [
+            ArdaasSegment(id: "a", gurmukhi: "ਗ", transliteration: nil, english: nil),
+            ArdaasSegment(id: "b", gurmukhi: "ਬ", transliteration: nil, english: nil),
+        ], slotAfter: "a")
+        XCTAssertNoThrow(try content.validate())
+        XCTAssertFalse(content.hasTransliteration)
+        XCTAssertFalse(content.hasEnglish)
+    }
+
+    func testLibraryValidateRejectsDuplicateVariantIds() {
+        let variant = ArdaasVariant(
+            id: "sgpc",
+            displayName: "A",
+            content: .fixture(segments: [.fixture(id: "a")], slotAfter: "a")
+        )
+        let library = ArdaasLibrary(variants: [variant, variant])
+        XCTAssertThrowsError(try library.validate()) {
+            XCTAssertEqual($0 as? ArdaasLibraryError, .duplicateVariantIds)
+        }
+    }
+
+    func testLibraryValidateRequiresDefaultVariant() {
+        let library = ArdaasLibrary(variants: [
+            ArdaasVariant(
+                id: "taksali",
+                displayName: "T",
+                content: .fixture(segments: [.fixture(id: "a")], slotAfter: "a")
+            ),
+        ])
+        XCTAssertThrowsError(try library.validate()) {
+            XCTAssertEqual($0 as? ArdaasLibraryError, .missingDefaultVariant)
         }
     }
 }

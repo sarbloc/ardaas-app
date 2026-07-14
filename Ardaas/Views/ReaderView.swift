@@ -15,7 +15,7 @@ struct ReaderView: View {
 
     /// Loaded once on appear; `.failure` means a broken bundle (a build
     /// defect) — surfaced, never swallowed.
-    @State private var loadResult: Result<ArdaasContent, Error>?
+    @State private var loadResult: Result<ArdaasLibrary, Error>?
 
     private static let fontScaleRange = 0.7...1.6
     private static let fontScaleStep = 0.1
@@ -36,7 +36,7 @@ struct ReaderView: View {
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
                 if loadResult == nil {
-                    loadResult = Result { try ArdaasContent.loadBundled() }
+                    loadResult = Result { try ArdaasLibrary.loadBundled() }
                 }
             }
             .onDisappear {
@@ -49,8 +49,8 @@ struct ReaderView: View {
         switch loadResult {
         case nil:
             ProgressView()
-        case .success(let content):
-            reader(for: content)
+        case .success(let library):
+            reader(for: library.resolvedVariant(id: savedArdaas.variantId).content)
         case .failure(let error):
             ContentUnavailableView(
                 "Ardaas Text Unavailable",
@@ -93,15 +93,15 @@ struct ReaderView: View {
                     .lineSpacing(8 * fontScale)
                     .foregroundStyle(Theme.parchment)
             }
-            if showTransliteration {
-                Text(segment.transliteration)
+            if showTransliteration, let transliteration = segment.transliteration {
+                Text(transliteration)
                     .font(.system(size: 15 * fontScale))
                     .italic()
                     .lineSpacing(5 * fontScale)
                     .foregroundStyle(Theme.sand)
             }
-            if showEnglish {
-                Text(segment.english)
+            if showEnglish, let english = segment.english {
+                Text(english)
                     .font(.system(size: 15 * fontScale, design: .serif))
                     .lineSpacing(5 * fontScale)
                     .foregroundStyle(Theme.mist)
