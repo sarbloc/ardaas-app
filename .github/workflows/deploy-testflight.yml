@@ -1,0 +1,87 @@
+name: TestFlight
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Queue uploads, never kill one mid-flight.
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    # macOS minutes bill at 10x — this job costs ~150 billed minutes per
+    # main merge. If the free tier pinches, drop the push trigger and go
+    # workflow_dispatch-only.
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: the build number is the commit count on main.
+          fetch-depth: 0
+
+      - name: Verify App Store Connect secrets exist
+        env:
+          API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          if [ -z "$API_KEY_P8" ] || [ -z "$API_KEY_ID" ] || [ -z "$API_ISSUER_ID" ]; then
+            echo "::error::App Store Connect API secrets are not configured (APP_STORE_CONNECT_API_KEY_P8 / _KEY_ID / _ISSUER_ID)"
+            exit 1
+          fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Write API key
+        env:
+          API_KEY_P8: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8 }}
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+        run: |
+          mkdir -p private_keys
+          printf '%s' "$API_KEY_P8" > "private_keys/AuthKey_${API_KEY_ID}.p8"
+
+      - name: Archive (build number = commit count)
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          BUILD_NUMBER=$(git rev-list --count HEAD)
+          echo "Build number: ${BUILD_NUMBER}"
+          xcodebuild archive \
+            -project Ardaas.xcodeproj \
+            -scheme Ardaas \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/Ardaas.xcarchive \
+            CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${PWD}/private_keys/AuthKey_${API_KEY_ID}.p8" \
+            -authenticationKeyID "${API_KEY_ID}" \
+            -authenticationKeyIssuerID "${API_ISSUER_ID}"
+
+      - name: Export and upload to TestFlight
+        env:
+          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath build/Ardaas.xcarchive \
+            -exportOptionsPlist deploy/ExportOptions.plist \
+            -exportPath build/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "${PWD}/private_keys/AuthKey_${API_KEY_ID}.p8" \
+            -authenticationKeyID "${API_KEY_ID}" \
+            -authenticationKeyIssuerID "${API_ISSUER_ID}"
+
+      - name: Clean up API key
+        if: always()
+        run: rm -rf private_keys
