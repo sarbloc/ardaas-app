@@ -36,6 +36,12 @@ pick it up.
 - `ArdaasTests/` — unit tests (XCTest), test target hosted by the app
 - `project.yml` — XcodeGen project definition
 - `.github/workflows/ci.yml` — build + test on iOS Simulator
+- `.github/workflows/deploy-testflight.yml` — archive + upload to
+  TestFlight on every main merge; build number = commit count on main;
+  signing via App Store Connect API key (repo secrets
+  `APP_STORE_CONNECT_API_KEY_P8` / `_KEY_ID` / `_ISSUER_ID`)
+- `deploy/ExportOptions.plist` — app-store-connect export, upload
+  destination, team UMJLF8TF7J
 
 ## Conventions
 
