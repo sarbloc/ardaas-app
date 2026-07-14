@@ -8,18 +8,22 @@ struct ArdaasVariant: Equatable, Identifiable {
 }
 
 /// The bundled collection of Ardaas variants, driven by
-/// `Resources/variants.json`. Order in the manifest is display order;
-/// the first variant is the default.
+/// `Resources/variants.json`. Manifest order is DISPLAY order only —
+/// the default variant is pinned to `defaultVariantId` by policy, so
+/// reordering the manifest can never silently change what new saves or
+/// unknown-id fallbacks resolve to.
 struct ArdaasLibrary: Equatable {
     let variants: [ArdaasVariant]
 
     /// The id every new SavedArdaas starts with, and the fallback for
-    /// records whose variant has been removed from the bundle.
+    /// records whose variant has been removed from the bundle. Pinned —
+    /// not derived from manifest order (see type comment). `validate()`
+    /// rejects any bundle that omits it.
     static let defaultVariantId = "sgpc"
 
     var defaultVariant: ArdaasVariant {
-        // validate() guarantees the manifest is non-empty and contains
-        // defaultVariantId; first is the manifest's display order default.
+        // validate() guarantees defaultVariantId exists; variants[0] is
+        // unreachable and exists only to keep this non-optional.
         variants.first { $0.id == Self.defaultVariantId } ?? variants[0]
     }
 

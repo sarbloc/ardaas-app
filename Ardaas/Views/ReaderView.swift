@@ -44,13 +44,29 @@ struct ReaderView: View {
             }
     }
 
+    /// The resolved variant's content once loading has succeeded.
+    private var loadedContent: ArdaasContent? {
+        guard case .success(let library) = loadResult else { return nil }
+        return library.resolvedVariant(id: savedArdaas.variantId).content
+    }
+
+    /// Layers visible right now = toggled on AND present in this variant.
+    private var visibleLayerCount: Int {
+        var count = showGurmukhi ? 1 : 0
+        if showTransliteration, loadedContent?.hasTransliteration ?? true { count += 1 }
+        if showEnglish, loadedContent?.hasEnglish ?? true { count += 1 }
+        return count
+    }
+
     @ViewBuilder
     private var content: some View {
         switch loadResult {
         case nil:
             ProgressView()
-        case .success(let library):
-            reader(for: library.resolvedVariant(id: savedArdaas.variantId).content)
+        case .success:
+            if let loadedContent {
+                reader(for: loadedContent)
+            }
         case .failure(let error):
             ContentUnavailableView(
                 "Ardaas Text Unavailable",
@@ -87,7 +103,11 @@ struct ReaderView: View {
     @ViewBuilder
     private func segmentView(_ segment: ArdaasSegment) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            if showGurmukhi {
+            // `|| visibleLayerCount == 0` is the never-blank guard: if the
+            // persisted toggles leave this variant with nothing to show
+            // (e.g. Gurmukhi off + only unavailable layers on), Gurmukhi
+            // renders anyway.
+            if showGurmukhi || visibleLayerCount == 0 {
                 Text(segment.gurmukhi)
                     .font(.system(size: 22 * fontScale))
                     .lineSpacing(8 * fontScale)
@@ -134,15 +154,26 @@ struct ReaderView: View {
     /// Quick, independent toggles for the two secondary layers. Gurmukhi's
     /// toggle stays in the toolbar menu — it's the anchor layer, switched
     /// rarely.
+    @ViewBuilder
     private var footerBar: some View {
-        HStack(spacing: 12) {
-            layerPill("Transliteration", isOn: $showTransliteration)
-            layerPill("Translation", isOn: $showEnglish)
+        let hasTransliteration = loadedContent?.hasTransliteration ?? false
+        let hasEnglish = loadedContent?.hasEnglish ?? false
+        // Pills only for layers this variant actually carries; no footer
+        // at all for a gurmukhi-only variant.
+        if hasTransliteration || hasEnglish {
+            HStack(spacing: 12) {
+                if hasTransliteration {
+                    layerPill("Transliteration", isOn: $showTransliteration)
+                }
+                if hasEnglish {
+                    layerPill("Translation", isOn: $showEnglish)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(.bar)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.bar)
     }
 
     private func layerPill(_ title: String, isOn: Binding<Bool>) -> some View {
@@ -198,10 +229,11 @@ struct ReaderView: View {
         }
     }
 
-    /// True when `layer` is on and the other two are off — unchecking it
+    /// True when `layer` is on and it is the only layer currently
+    /// visible (toggled on AND available in this variant) — unchecking it
     /// would leave nothing visible, so its toggle is disabled.
     private func isLastVisibleLayer(_ layer: Bool) -> Bool {
-        layer && [showGurmukhi, showTransliteration, showEnglish].filter { $0 }.count == 1
+        layer && visibleLayerCount == 1
     }
 
     private func adjustFontScale(by delta: Double) {
