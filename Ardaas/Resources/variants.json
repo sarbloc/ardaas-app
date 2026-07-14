@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "variants": [
+    {
+      "id": "sgpc",
+      "displayName": "Standard (SGPC)",
+      "resource": "ardaas-sgpc"
+    }
+  ]
+}

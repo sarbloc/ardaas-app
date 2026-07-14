@@ -46,7 +46,9 @@ final class ArdaasComposerTests: XCTestCase {
     }
 
     func testBundledContentComposesAtCanonicalPoint() throws {
-        let bundled = try ArdaasContent.loadBundled()
+        let bundled = try XCTUnwrap(
+            ArdaasLibrary.loadBundled().variant(id: "sgpc")
+        ).content
         let items = ArdaasComposer.compose(content: bundled, benti: "ਮੇਰੀ ਬੇਨਤੀ")
         let bentiIndex = try XCTUnwrap(items.firstIndex(of: .benti("ਮੇਰੀ ਬੇਨਤੀ")))
         guard case let .canonical(before) = items[bentiIndex - 1],
