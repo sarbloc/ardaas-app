@@ -40,6 +40,13 @@ struct ReaderView: View {
                 if loadResult == nil {
                     loadResult = Result { try ArdaasLibrary.loadBundled() }
                 }
+                // Heal records whose variant was removed from the bundle:
+                // rewrite to the default so the stored id, the rendered
+                // content, and the picker selection all agree.
+                if case .success(let library) = loadResult,
+                   library.variant(id: savedArdaas.variantId) == nil {
+                    savedArdaas.variantId = library.defaultVariant.id
+                }
             }
             .onDisappear {
                 UIApplication.shared.isIdleTimerDisabled = false
