@@ -12,9 +12,13 @@ concurrency:
 
 jobs:
   upload:
+    # Kill switch: deploys run only while the repo variable
+    # TESTFLIGHT_ENABLED is "true" (repo Settings → Secrets and variables
+    # → Actions → Variables, or `gh variable set TESTFLIGHT_ENABLED
+    # --body true`). Unset/false → the job skips at zero cost.
+    if: vars.TESTFLIGHT_ENABLED == 'true'
     # macOS minutes bill at 10x — this job costs ~150 billed minutes per
-    # main merge. If the free tier pinches, drop the push trigger and go
-    # workflow_dispatch-only.
+    # main merge. Pause with the kill switch when minutes matter.
     runs-on: macos-15
     timeout-minutes: 45
     steps:

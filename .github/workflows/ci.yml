@@ -1,9 +1,10 @@
 name: CI
 
+# PR-only: the squashed main commit is byte-identical to the PR head that
+# already passed, and macOS minutes are 10x — re-building it on push is
+# pure waste. PR green is the pre-merge (and pre-deploy) validation gate.
 on:
   pull_request:
-  push:
-    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
