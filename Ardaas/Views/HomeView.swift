@@ -9,6 +9,7 @@ struct HomeView: View {
     private var savedArdaasList: [SavedArdaas]
 
     @State private var isComposing = false
+    @State private var isShowingSources = false
 
     var body: some View {
         Group {
@@ -21,6 +22,13 @@ struct HomeView: View {
         .themedScreen()
         .navigationTitle("Ardaas")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    isShowingSources = true
+                } label: {
+                    Label("About & Sources", systemImage: "info.circle")
+                }
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     isComposing = true
@@ -31,6 +39,9 @@ struct HomeView: View {
         }
         .sheet(isPresented: $isComposing) {
             ComposeView()
+        }
+        .sheet(isPresented: $isShowingSources) {
+            SourcesView()
         }
     }
 
