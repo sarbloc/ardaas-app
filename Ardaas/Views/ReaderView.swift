@@ -243,7 +243,7 @@ struct ReaderView: View {
                 .disabled(fontScale <= Self.fontScaleRange.lowerBound)
             }
         } label: {
-            Label("Display Options", systemImage: "textformat.size")
+            Label("Display Options", systemImage: "gearshape")
         }
     }
 
