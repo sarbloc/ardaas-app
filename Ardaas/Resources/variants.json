@@ -5,6 +5,11 @@
       "id": "sgpc",
       "displayName": "Standard (SGPC)",
       "resource": "ardaas-sgpc"
+    },
+    {
+      "id": "buddha-dal",
+      "displayName": "Buddha Dal",
+      "resource": "ardaas-buddha-dal"
     }
   ]
 }

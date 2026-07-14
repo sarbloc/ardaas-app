@@ -41,13 +41,18 @@ struct SourcesView: View {
             ForEach(library.variants) { variant in
                 Section("Ardaas — \(variant.displayName)") {
                     ForEach(variant.content.sources, id: \.self) { source in
-                        if let url = URL(string: source) {
+                        // Only real web links render as Link — iOS 17's
+                        // lenient URL(string:) would otherwise turn prose
+                        // source descriptions into broken links.
+                        if let url = URL(string: source),
+                           url.scheme == "https" || url.scheme == "http" {
                             Link(destination: url) {
                                 Text(displayName(for: source))
                                     .foregroundStyle(Color.accentColor)
                             }
                         } else {
                             Text(source)
+                                .font(.footnote)
                                 .foregroundStyle(Theme.mist)
                         }
                     }
