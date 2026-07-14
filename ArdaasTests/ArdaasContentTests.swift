@@ -6,8 +6,26 @@ import XCTest
 final class ArdaasContentTests: XCTestCase {
     func testBundledLibraryLoadsAndValidates() throws {
         let library = try ArdaasLibrary.loadBundled()
-        XCTAssertEqual(library.variants.map(\.id), ["sgpc"])
+        XCTAssertEqual(library.variants.map(\.id), ["sgpc", "buddha-dal"])
         XCTAssertEqual(library.defaultVariant.id, ArdaasLibrary.defaultVariantId)
+    }
+
+    func testBundledBuddhaDalContent() throws {
+        let content = try XCTUnwrap(
+            ArdaasLibrary.loadBundled().variant(id: "buddha-dal")
+        ).content
+        XCTAssertEqual(content.segments.count, 15)
+        // Gurmukhi-only: no attested aligned transliteration/translation.
+        XCTAssertFalse(content.hasTransliteration)
+        XCTAssertFalse(content.hasEnglish)
+        // Benti follows the ਹੇ ਦੀਨ ਦਇਆਲ paragraph (operator-approved,
+        // provisional pending in-situ review); its ….. names the paath.
+        XCTAssertEqual(content.bentiSlot.afterSegmentId, "he-deen-dayal")
+        let ids = content.segments.map(\.id)
+        let slotIndex = try XCTUnwrap(ids.firstIndex(of: "he-deen-dayal"))
+        XCTAssertTrue(content.segments[slotIndex].gurmukhi.contains("ਆਪ ਜੀ ਦੇ ਹਜ਼ੂਰ…..ਦੀ ਅਰਦਾਸ"))
+        XCTAssertEqual(ids[slotIndex + 1], "waheguru-ji-ka-khalsa")
+        XCTAssertEqual(ids.last, "jaikara")
     }
 
     func testBundledSgpcContent() throws {
