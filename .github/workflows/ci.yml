@@ -27,9 +27,18 @@ jobs:
       - name: Build and test (iOS Simulator)
         run: |
           set -o pipefail
+          # Runner images rotate simulator sets (a hardcoded 'iPhone 16'
+          # broke on Xcode 16.4's image) — pick the first available iPhone.
+          DEVICE=$(xcrun simctl list devices available | grep -Eo 'iPhone [^(]+' | head -1 | xargs)
+          if [ -z "$DEVICE" ]; then
+            echo "::error::No available iPhone simulator on this runner image"
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "Using simulator: ${DEVICE}"
           xcodebuild \
             -project Ardaas.xcodeproj \
             -scheme Ardaas \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -destination "platform=iOS Simulator,name=${DEVICE}" \
             CODE_SIGNING_ALLOWED=NO \
             build test
