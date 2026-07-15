@@ -9,8 +9,6 @@ struct ComposeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
-    @AppStorage("hasSeenGurmukhiKeyboardTip") private var hasSeenGurmukhiKeyboardTip = false
-
     @State private var label = ""
     @State private var bentiText = ""
     @State private var variantId = ArdaasLibrary.defaultVariantId
@@ -59,12 +57,10 @@ struct ComposeView: View {
                 }
                 .listRowBackground(Theme.raisedFill)
 
-                if !hasSeenGurmukhiKeyboardTip {
-                    Section {
-                        gurmukhiKeyboardTip
-                    }
-                    .listRowBackground(Theme.raisedFill)
+                Section {
+                    gurmukhiKeyboardTip
                 }
+                .listRowBackground(Theme.raisedFill)
             }
             .themedScreen()
             .onAppear {
@@ -105,15 +101,6 @@ struct ComposeView: View {
             }
 
             Spacer(minLength: 0)
-
-            Button {
-                hasSeenGurmukhiKeyboardTip = true
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.tertiary)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss Gurmukhi keyboard tip")
         }
         .padding(.vertical, 4)
     }
