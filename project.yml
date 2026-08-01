@@ -8,11 +8,20 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     GENERATE_INFOPLIST_FILE: YES
+packages:
+  # On-device translation spike (#35). Official ONNX Runtime SPM package —
+  # each tag wraps a prebuilt binary xcframework, so pin an exact release.
+  onnxruntime:
+    url: https://github.com/microsoft/onnxruntime-swift-package-manager
+    exactVersion: 1.24.2
 targets:
   Ardaas:
     type: application
     platform: iOS
     sources: [Ardaas]
+    dependencies:
+      - package: onnxruntime
+        product: onnxruntime
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.sarbloc.ardaas
