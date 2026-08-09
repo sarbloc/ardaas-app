@@ -30,14 +30,21 @@ final class ModelOptimizerTests: XCTestCase {
         }
     }
 
-    /// Writes placeholder optimized graphs into the cache directory.
+    /// Writes placeholder optimized graphs, each with the `*.onnx.data`
+    /// initializer side-car a real optimized session cannot load without.
     private func makeCachedGraphs() throws -> URL {
         let directory = ModelOptimizer.optimizedDirectory(in: root)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         for name in ModelOptimizer.graphNames {
             try Data(repeating: 0x42, count: 8).write(to: directory.appendingPathComponent(name))
+            try Data(repeating: 0x43, count: 64)
+                .write(to: directory.appendingPathComponent(name + ".data"))
         }
         return directory
+    }
+
+    private func sidecar(_ directory: URL, _ index: Int) -> URL {
+        directory.appendingPathComponent(ModelOptimizer.graphNames[index] + ".data")
     }
 
     // MARK: - Tests
@@ -83,19 +90,48 @@ final class ModelOptimizerTests: XCTestCase {
         XCTAssertFalse(ModelOptimizer.isCacheValid(in: root))
     }
 
-    func testManifestPinsTheRecipeAndRuntimeVersion() throws {
+    /// An optimized graph is worthless without its external initializer file,
+    /// so losing one must rebuild the cache rather than fail every load.
+    func testCacheIsInvalidWhenAnInitializerSidecarIsMissing() throws {
         try makeSources()
-        let manifest = try ModelOptimizer.expectedManifest(for: root)
+        let directory = try makeCachedGraphs()
+        try ModelOptimizer.writeManifest(in: directory, for: root)
+        XCTAssertTrue(ModelOptimizer.isCacheValid(in: root))
+
+        try FileManager.default.removeItem(at: sidecar(directory, 0))
+        XCTAssertFalse(ModelOptimizer.isCacheValid(in: root))
+    }
+
+    func testCacheIsInvalidWhenAnInitializerSidecarIsTruncated() throws {
+        try makeSources()
+        let directory = try makeCachedGraphs()
+        try ModelOptimizer.writeManifest(in: directory, for: root)
+
+        try Data(repeating: 0x43, count: 8).write(to: sidecar(directory, 2))
+        XCTAssertFalse(ModelOptimizer.isCacheValid(in: root))
+    }
+
+    func testManifestPinsTheRecipeRuntimeVersionAndEveryProducedFile() throws {
+        try makeSources()
+        let directory = try makeCachedGraphs()
+        try ModelOptimizer.writeManifest(in: directory, for: root)
+
+        let data = try Data(contentsOf: directory.appendingPathComponent("manifest.json"))
+        let manifest = try JSONDecoder().decode(ModelOptimizer.Manifest.self, from: data)
         XCTAssertEqual(manifest.formatVersion, ModelOptimizer.formatVersion)
         XCTAssertEqual(manifest.ortPackageVersion, ModelOptimizer.ortPackageVersion)
         XCTAssertEqual(Set(manifest.sources.keys), Set(ModelOptimizer.graphNames))
+        // Graphs and side-cars, and never the manifest itself.
+        XCTAssertEqual(
+            Set(manifest.outputs.keys),
+            Set(ModelOptimizer.graphNames + ModelOptimizer.graphNames.map { $0 + ".data" }))
     }
 
-    func testExpectedManifestFailsWhenASourceIsMissing() throws {
+    func testSourceSizesFailWhenASourceIsMissing() throws {
         try makeSources()
         try FileManager.default.removeItem(
             at: root.appendingPathComponent(ModelOptimizer.graphNames[2]))
-        XCTAssertThrowsError(try ModelOptimizer.expectedManifest(for: root))
+        XCTAssertThrowsError(try ModelOptimizer.sourceSizes(for: root))
     }
 
     func testCacheBytesAndRemoval() throws {

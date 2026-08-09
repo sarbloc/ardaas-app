@@ -55,6 +55,10 @@ struct BentiLabView: View {
     @State private var errorMessage: String?
     @State private var memory: MemorySnapshot?
     @State private var cacheBytes: Int64 = 0
+    /// Bumped whenever the selected pipeline changes. A load or translation
+    /// started under an older generation must not publish its numbers — they
+    /// would be attributed to the pipeline the picker now shows.
+    @State private var generation = 0
 
     var body: some View {
         NavigationStack {
@@ -97,9 +101,15 @@ struct BentiLabView: View {
             .pickerStyle(.segmented)
             .onChange(of: mode) { _, _ in
                 // Sessions and the graph directory both differ per mode, so the
-                // translator has to be rebuilt before the next measurement.
+                // translator has to be rebuilt before the next measurement. Any
+                // in-flight work belongs to the previous mode; ORT runs cannot
+                // be cancelled, so orphan them instead of letting them report.
+                generation += 1
                 translator = nil
                 result = nil
+                errorMessage = nil
+                isLoadingModel = false
+                isTranslating = false
             }
             Text(mode.caption)
                 .font(.footnote)
@@ -258,6 +268,7 @@ struct BentiLabView: View {
         let directory = ModelDownloader.modelDirectory
         let options = mode.options
         let progress = loadProgress
+        let token = generation
         Task.detached(priority: .userInitiated) {
             do {
                 let loaded = try BentiTranslator(
@@ -268,6 +279,7 @@ struct BentiLabView: View {
                     }
                 )
                 await MainActor.run {
+                    guard token == generation else { return }
                     translator = loaded
                     isLoadingModel = false
                     memory = MemoryProbe.snapshot()
@@ -275,6 +287,7 @@ struct BentiLabView: View {
                 }
             } catch {
                 await MainActor.run {
+                    guard token == generation else { return }
                     errorMessage = "Model load failed: \(error)"
                     isLoadingModel = false
                 }
@@ -287,16 +300,19 @@ struct BentiLabView: View {
         isTranslating = true
         errorMessage = nil
         let sentence = input
+        let token = generation
         Task.detached(priority: .userInitiated) {
             do {
                 let translation = try translator.translate(sentence)
                 await MainActor.run {
+                    guard token == generation else { return }
                     result = translation
                     isTranslating = false
                     memory = MemoryProbe.snapshot()
                 }
             } catch {
                 await MainActor.run {
+                    guard token == generation else { return }
                     errorMessage = "Translation failed: \(error)"
                     isTranslating = false
                 }

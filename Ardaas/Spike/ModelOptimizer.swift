@@ -61,7 +61,14 @@ enum ModelOptimizer {
         /// Source graph name -> byte size, so an interrupted or superseded
         /// download invalidates the cache.
         let sources: [String: Int64]
+        /// Every file the cache produced -> byte size: the optimized graphs and
+        /// the `*.onnx.data` initializer side-cars they are useless without.
+        /// Checked on load so a partial cleanup, failed restore or truncated
+        /// write rebuilds the cache instead of failing every session creation.
+        let outputs: [String: Int64]
     }
+
+    private static let manifestName = "manifest.json"
 
     /// Matches the `exactVersion` pinned for the onnxruntime package in
     /// project.yml. Part of the cache key so bumping ORT rebuilds the cache.
@@ -72,7 +79,14 @@ enum ModelOptimizer {
     }
 
     private static func manifestURL(in directory: URL) -> URL {
-        directory.appendingPathComponent("manifest.json")
+        directory.appendingPathComponent(manifestName)
+    }
+
+    private static func fileSize(_ url: URL) -> Int64? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = (attributes[.size] as? NSNumber)?.int64Value
+        else { return nil }
+        return size
     }
 
     /// Total bytes held by the optimized cache, for the lab screen's disk row.
@@ -91,37 +105,58 @@ enum ModelOptimizer {
         try? FileManager.default.removeItem(at: optimizedDirectory(in: modelDirectory))
     }
 
-    /// True when a cache matching the current recipe and source files exists.
+    /// True when a cache matching the current recipe and source files exists,
+    /// and every file it recorded is still present at its recorded size.
     static func isCacheValid(in modelDirectory: URL) -> Bool {
         let directory = optimizedDirectory(in: modelDirectory)
-        guard let expected = try? expectedManifest(for: modelDirectory),
+        guard let sources = try? sourceSizes(for: modelDirectory),
               let data = try? Data(contentsOf: manifestURL(in: directory)),
               let stored = try? JSONDecoder().decode(Manifest.self, from: data),
-              stored == expected
+              stored.formatVersion == formatVersion,
+              stored.ortPackageVersion == ortPackageVersion,
+              stored.sources == sources
         else { return false }
-        return graphNames.allSatisfy {
-            FileManager.default.fileExists(atPath: directory.appendingPathComponent($0).path)
+
+        // Every graph must be accounted for, and every recorded file — graphs
+        // and their initializer side-cars alike — must still be intact.
+        guard graphNames.allSatisfy({ stored.outputs[$0] != nil }) else { return false }
+        return stored.outputs.allSatisfy { name, size in
+            fileSize(directory.appendingPathComponent(name)) == size
         }
     }
 
-    /// Records the recipe + source fingerprint that a freshly built cache
-    /// corresponds to. Exposed for tests; `prepare` is the only caller in the app.
+    /// Records the recipe, the source fingerprint and every file the cache
+    /// produced. Must be called once the cache directory is fully written —
+    /// it fingerprints whatever it finds there.
+    ///
+    /// Exposed for tests; `prepare` is the only caller in the app.
     static func writeManifest(in directory: URL, for modelDirectory: URL) throws {
-        let manifest = try expectedManifest(for: modelDirectory)
+        var outputs: [String: Int64] = [:]
+        let names = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        for name in names where name != manifestName {
+            guard let size = fileSize(directory.appendingPathComponent(name)) else { continue }
+            outputs[name] = size
+        }
+        let sources = try sourceSizes(for: modelDirectory)
+        let manifest = Manifest(
+            formatVersion: formatVersion,
+            ortPackageVersion: ortPackageVersion,
+            sources: sources,
+            outputs: outputs
+        )
         try JSONEncoder().encode(manifest).write(to: manifestURL(in: directory), options: .atomic)
     }
 
-    static func expectedManifest(for modelDirectory: URL) throws -> Manifest {
+    /// Fingerprint of the downloaded graphs the cache was derived from.
+    static func sourceSizes(for modelDirectory: URL) throws -> [String: Int64] {
         var sources: [String: Int64] = [:]
         for name in graphNames {
-            let url = modelDirectory.appendingPathComponent(name)
-            guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size],
-                  let bytes = (size as? NSNumber)?.int64Value
-            else { throw ModelOptimizerError.missingSource(name) }
+            guard let bytes = fileSize(modelDirectory.appendingPathComponent(name)) else {
+                throw ModelOptimizerError.missingSource(name)
+            }
             sources[name] = bytes
         }
-        return Manifest(
-            formatVersion: formatVersion, ortPackageVersion: ortPackageVersion, sources: sources)
+        return sources
     }
 
     /// Builds the optimized cache if it is missing or stale, and returns the
