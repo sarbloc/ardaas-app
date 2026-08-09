@@ -127,11 +127,26 @@ final class ModelOptimizerTests: XCTestCase {
             Set(ModelOptimizer.graphNames + ModelOptimizer.graphNames.map { $0 + ".data" }))
     }
 
-    func testSourceSizesFailWhenASourceIsMissing() throws {
+    func testSourceFingerprintsFailWhenASourceIsMissing() throws {
         try makeSources()
         try FileManager.default.removeItem(
             at: root.appendingPathComponent(ModelOptimizer.graphNames[2]))
-        XCTAssertThrowsError(try ModelOptimizer.sourceSizes(for: root))
+        XCTAssertThrowsError(try ModelOptimizer.sourceFingerprints(for: root))
+    }
+
+    /// A repaired or re-downloaded graph can be byte-different at the same
+    /// length; size alone would keep the stale cache alive.
+    func testCacheIsInvalidatedWhenASourceIsRewrittenAtTheSameSize() throws {
+        try makeSources(bytes: 32)
+        let directory = try makeCachedGraphs()
+        try ModelOptimizer.writeManifest(in: directory, for: root)
+        XCTAssertTrue(ModelOptimizer.isCacheValid(in: root))
+
+        let source = root.appendingPathComponent(ModelOptimizer.graphNames[1])
+        try Data(repeating: 0x5A, count: 32).write(to: source)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date().addingTimeInterval(60)], ofItemAtPath: source.path)
+        XCTAssertFalse(ModelOptimizer.isCacheValid(in: root))
     }
 
     func testCacheBytesAndRemoval() throws {

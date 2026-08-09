@@ -55,12 +55,24 @@ enum ModelOptimizer {
     /// loadable by the ORT build that wrote it.
     static let formatVersion = 1
 
+    /// Identity of a downloaded source graph.
+    ///
+    /// Size alone is not enough: a repaired or re-downloaded file of the same
+    /// length would keep the fingerprint stable and the stale cache would be
+    /// reused against different bytes. Modification time closes that, and
+    /// unlike a SHA-256 it does not mean re-hashing 352 MB on every load —
+    /// which `ModelDownloader` already declines to do for the same reason.
+    struct SourceFingerprint: Codable, Equatable {
+        let bytes: Int64
+        let modifiedAt: Double
+    }
+
     struct Manifest: Codable, Equatable {
         let formatVersion: Int
         let ortPackageVersion: String
-        /// Source graph name -> byte size, so an interrupted or superseded
-        /// download invalidates the cache.
-        let sources: [String: Int64]
+        /// Source graph name -> fingerprint, so an interrupted, repaired or
+        /// superseded download invalidates the cache.
+        let sources: [String: SourceFingerprint]
         /// Every file the cache produced -> byte size: the optimized graphs and
         /// the `*.onnx.data` initializer side-cars they are useless without.
         /// Checked on load so a partial cleanup, failed restore or truncated
@@ -109,7 +121,7 @@ enum ModelOptimizer {
     /// and every file it recorded is still present at its recorded size.
     static func isCacheValid(in modelDirectory: URL) -> Bool {
         let directory = optimizedDirectory(in: modelDirectory)
-        guard let sources = try? sourceSizes(for: modelDirectory),
+        guard let sources = try? sourceFingerprints(for: modelDirectory),
               let data = try? Data(contentsOf: manifestURL(in: directory)),
               let stored = try? JSONDecoder().decode(Manifest.self, from: data),
               stored.formatVersion == formatVersion,
@@ -137,7 +149,7 @@ enum ModelOptimizer {
             guard let size = fileSize(directory.appendingPathComponent(name)) else { continue }
             outputs[name] = size
         }
-        let sources = try sourceSizes(for: modelDirectory)
+        let sources = try sourceFingerprints(for: modelDirectory)
         let manifest = Manifest(
             formatVersion: formatVersion,
             ortPackageVersion: ortPackageVersion,
@@ -147,14 +159,17 @@ enum ModelOptimizer {
         try JSONEncoder().encode(manifest).write(to: manifestURL(in: directory), options: .atomic)
     }
 
-    /// Fingerprint of the downloaded graphs the cache was derived from.
-    static func sourceSizes(for modelDirectory: URL) throws -> [String: Int64] {
-        var sources: [String: Int64] = [:]
+    /// Fingerprints of the downloaded graphs the cache was derived from.
+    static func sourceFingerprints(for modelDirectory: URL) throws -> [String: SourceFingerprint] {
+        var sources: [String: SourceFingerprint] = [:]
         for name in graphNames {
-            guard let bytes = fileSize(modelDirectory.appendingPathComponent(name)) else {
-                throw ModelOptimizerError.missingSource(name)
-            }
-            sources[name] = bytes
+            let url = modelDirectory.appendingPathComponent(name)
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let bytes = (attributes[.size] as? NSNumber)?.int64Value,
+                  let modified = attributes[.modificationDate] as? Date
+            else { throw ModelOptimizerError.missingSource(name) }
+            sources[name] = SourceFingerprint(
+                bytes: bytes, modifiedAt: modified.timeIntervalSince1970)
         }
         return sources
     }

@@ -103,13 +103,15 @@ struct BentiLabView: View {
                 // Sessions and the graph directory both differ per mode, so the
                 // translator has to be rebuilt before the next measurement. Any
                 // in-flight work belongs to the previous mode; ORT runs cannot
-                // be cancelled, so orphan them instead of letting them report.
+                // be cancelled, so orphan its results instead of letting them
+                // report. `isLoadingModel`/`isTranslating` are deliberately not
+                // cleared here — that task really is still running, and letting
+                // it clear its own flag is what stops a second, concurrent
+                // `ModelOptimizer.prepare` racing on the cache directories.
                 generation += 1
                 translator = nil
                 result = nil
                 errorMessage = nil
-                isLoadingModel = false
-                isTranslating = false
             }
             Text(mode.caption)
                 .font(.footnote)
@@ -158,11 +160,16 @@ struct BentiLabView: View {
                 if cacheBytes > 0 {
                     row("Optimized cache", Self.mb(cacheBytes))
                     Button("Delete optimized cache", role: .destructive) {
+                        // Same reasoning as the mode picker: orphan whatever is
+                        // in flight rather than let it report against a cache
+                        // that no longer exists.
+                        generation += 1
                         ModelOptimizer.removeCache(in: ModelDownloader.modelDirectory)
                         cacheBytes = 0
                         translator = nil
                     }
                     .font(.footnote)
+                    .disabled(isLoadingModel || isTranslating)
                 }
             }
         }
@@ -262,6 +269,9 @@ struct BentiLabView: View {
     // MARK: - Actions
 
     private func loadModel() {
+        // Two concurrent inits would both run `ModelOptimizer.prepare` against
+        // the same scratch and cache directories.
+        guard !isLoadingModel else { return }
         isLoadingModel = true
         loadProgress.text = "Preparing…"
         errorMessage = nil
@@ -279,24 +289,24 @@ struct BentiLabView: View {
                     }
                 )
                 await MainActor.run {
+                    isLoadingModel = false
                     guard token == generation else { return }
                     translator = loaded
-                    isLoadingModel = false
                     memory = MemoryProbe.snapshot()
                     cacheBytes = ModelOptimizer.cacheBytes(in: directory)
                 }
             } catch {
                 await MainActor.run {
+                    isLoadingModel = false
                     guard token == generation else { return }
                     errorMessage = "Model load failed: \(error)"
-                    isLoadingModel = false
                 }
             }
         }
     }
 
     private func translate() {
-        guard let translator else { return }
+        guard let translator, !isTranslating else { return }
         isTranslating = true
         errorMessage = nil
         let sentence = input
@@ -305,16 +315,16 @@ struct BentiLabView: View {
             do {
                 let translation = try translator.translate(sentence)
                 await MainActor.run {
+                    isTranslating = false
                     guard token == generation else { return }
                     result = translation
-                    isTranslating = false
                     memory = MemoryProbe.snapshot()
                 }
             } catch {
                 await MainActor.run {
+                    isTranslating = false
                     guard token == generation else { return }
                     errorMessage = "Translation failed: \(error)"
-                    isTranslating = false
                 }
             }
         }
