@@ -184,15 +184,19 @@ final class BentiTranslator: @unchecked Sendable {
     func translate(_ english: String) throws -> BentiTranslation {
         let start = Date()
         let sampler = MemoryProbe.Sampler()
+        let entryFootprint = MemoryProbe.footprintBytes()
         var stages: [MemoryStage] = [
-            MemoryStage(label: "Before translate", footprintBytes: MemoryProbe.footprintBytes())
+            MemoryStage(
+                label: "Before translate", peakBytes: entryFootprint,
+                footprintBytes: entryFootprint)
         ]
         let clock = LoadClock()
         defer { sampler.stop() }
 
         let pre = BentiPreprocessor.preprocess(english)
         let inputIds = tokenizer.encode(tagged: pre.tagged)
-        let generated = try greedyDecode(inputIds: inputIds, stages: &stages, clock: clock)
+        let generated = try greedyDecode(
+            inputIds: inputIds, stages: &stages, clock: clock, sampler: sampler)
 
         var text = Self.decodeToText(ids: generated, idToPiece: idToPiece)
         text = Self.restorePlaceholders(text, placeholders: pre.placeholders)
@@ -202,7 +206,9 @@ final class BentiTranslator: @unchecked Sendable {
 
         let latency = Date().timeIntervalSince(start)
         stages.append(
-            MemoryStage(label: "After release", footprintBytes: MemoryProbe.footprintBytes()))
+            MemoryStage(
+                label: "Postprocess", peakBytes: sampler.takeWindowPeak(),
+                footprintBytes: MemoryProbe.footprintBytes()))
 
         return BentiTranslation(
             gurmukhi: text,
@@ -219,7 +225,8 @@ final class BentiTranslator: @unchecked Sendable {
     // MARK: - Greedy decode loop (spec section 4)
 
     private func greedyDecode(
-        inputIds: [Int64], stages: inout [MemoryStage], clock: LoadClock
+        inputIds: [Int64], stages: inout [MemoryStage], clock: LoadClock,
+        sampler: MemoryProbe.Sampler
     ) throws -> [Int64] {
         let sourceLength = inputIds.count
         let mask = [Int64](repeating: 1, count: sourceLength)
@@ -229,19 +236,25 @@ final class BentiTranslator: @unchecked Sendable {
         let encoderHidden = try runEncoder(
             inputIds: inputIds, maskValue: maskValue, clock: clock)
         stages.append(
-            MemoryStage(label: "After encoder", footprintBytes: MemoryProbe.footprintBytes()))
+            MemoryStage(
+                label: "Encoder", peakBytes: sampler.takeWindowPeak(),
+                footprintBytes: MemoryProbe.footprintBytes()))
 
         // Stage 2: decoder without past, one step. decoder_start_token_id == </s>.
         let (firstId, past) = try runFirstDecodeStep(
             encoderHidden: encoderHidden, maskValue: maskValue, clock: clock)
         stages.append(
-            MemoryStage(label: "After decode step 1", footprintBytes: MemoryProbe.footprintBytes()))
+            MemoryStage(
+                label: "Decode step 1", peakBytes: sampler.takeWindowPeak(),
+                footprintBytes: MemoryProbe.footprintBytes()))
 
         // Stage 3: decoder with past for the remaining steps.
         let generated = try runDecodeLoop(
             firstId: firstId, past: past, maskValue: maskValue, clock: clock)
         stages.append(
-            MemoryStage(label: "After decode loop", footprintBytes: MemoryProbe.footprintBytes()))
+            MemoryStage(
+                label: "Decode loop", peakBytes: sampler.takeWindowPeak(),
+                footprintBytes: MemoryProbe.footprintBytes()))
 
         return generated
     }

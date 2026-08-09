@@ -155,7 +155,10 @@ struct BentiLabView: View {
                         Text(loadProgress.text).foregroundStyle(Theme.mist)
                     }
                 } else {
+                    // A translation orphaned by a mode switch still owns its
+                    // sessions; loading over it would measure both at once.
                     Button("Load model") { loadModel() }
+                        .disabled(isTranslating)
                 }
                 if cacheBytes > 0 {
                     row("Optimized cache", Self.mb(cacheBytes))
@@ -233,8 +236,14 @@ struct BentiLabView: View {
             if let available = MemoryProbe.availableBytes() {
                 row("Headroom before jetsam", Self.mb(available))
             }
+            Text("Per stage: peak while it ran / footprint after it released.")
+                .font(.caption)
+                .foregroundStyle(Theme.mist)
             ForEach(result.stages) { stage in
-                row(stage.label, Self.mb(stage.footprintBytes), secondary: true)
+                row(
+                    stage.label,
+                    "\(Self.mb(stage.peakBytes)) / \(Self.mb(stage.footprintBytes))",
+                    secondary: true)
             }
         }
         .listRowBackground(Theme.raisedFill)
@@ -270,8 +279,11 @@ struct BentiLabView: View {
 
     private func loadModel() {
         // Two concurrent inits would both run `ModelOptimizer.prepare` against
-        // the same scratch and cache directories.
-        guard !isLoadingModel else { return }
+        // the same scratch and cache directories. And loading while a previous
+        // translation is still running (possible after a mode switch, which
+        // clears `translator` but cannot cancel the ORT run) would measure the
+        // two pipelines on top of each other.
+        guard !isLoadingModel, !isTranslating else { return }
         isLoadingModel = true
         loadProgress.text = "Preparing…"
         errorMessage = nil
@@ -306,7 +318,7 @@ struct BentiLabView: View {
     }
 
     private func translate() {
-        guard let translator, !isTranslating else { return }
+        guard let translator, !isTranslating, !isLoadingModel else { return }
         isTranslating = true
         errorMessage = nil
         let sentence = input

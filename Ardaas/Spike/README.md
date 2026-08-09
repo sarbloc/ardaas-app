@@ -40,9 +40,10 @@ first and ignore it.
 - **Peak this translate** — the headline. Sampled off-thread during the
   translation, because the dominant allocation lives and dies inside a single
   ORT run. Shown against the 1374 MB baseline. Expect ~555 MB in Optimized mode.
-- **Per-stage footprints** — after encoder / after decode step 1 / after decode
-  loop / after release. Shows where the peak happens and that idle footprint
-  returns to baseline between translations.
+- **Per-stage footprints** — encoder / decode step 1 / decode loop /
+  postprocess, each as *peak while the stage ran* / *footprint after it
+  released*. Shows where the peak happens and that memory is handed back
+  between stages rather than accumulating.
 - **Headroom before jetsam** — `os_proc_available_memory()`.
 - **Sentence latency ms / tokens/s**, and how much of it was session load
   (~204 ms on the host for all three graphs in Optimized mode; ~976 ms from the

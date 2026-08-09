@@ -19,9 +19,15 @@ struct MemorySnapshot: Sendable, Equatable {
     let peakBytes: Int64
 }
 
-/// A footprint reading taken at a named point in the pipeline.
+/// What one stage of the pipeline cost.
 struct MemoryStage: Sendable, Equatable, Identifiable {
     let label: String
+    /// Highest footprint sampled *while the stage was running*. This is the
+    /// meaningful number: in optimized mode each stage releases its session
+    /// before returning, so a reading taken afterwards says nothing about what
+    /// the stage actually needed.
+    let peakBytes: Int64
+    /// Footprint once the stage finished and released what it owned.
     let footprintBytes: Int64
     var id: String { label }
 }
@@ -62,10 +68,14 @@ enum MemoryProbe {
     final class Sampler: @unchecked Sendable {
         private let lock = NSLock()
         private var maxFootprint: Int64 = 0
+        /// Max since the last `takeWindowPeak()`, for per-stage attribution.
+        private var windowMax: Int64 = 0
         private var isRunning = true
 
         init(intervalSeconds: TimeInterval = 0.01) {
-            self.maxFootprint = MemoryProbe.footprintBytes()
+            let initial = MemoryProbe.footprintBytes()
+            self.maxFootprint = initial
+            self.windowMax = initial
             Thread.detachNewThread { [weak self] in
                 while true {
                     guard let self, self.record() else { return }
@@ -81,7 +91,21 @@ enum MemoryProbe {
             defer { lock.unlock() }
             guard isRunning else { return false }
             maxFootprint = max(maxFootprint, current)
+            windowMax = max(windowMax, current)
             return true
+        }
+
+        /// Highest footprint observed since the previous call (or since the
+        /// sampler started), then opens a new window. Lets each pipeline stage
+        /// report its own peak off a single sampling thread.
+        func takeWindowPeak() -> Int64 {
+            let current = MemoryProbe.footprintBytes()
+            lock.lock()
+            defer { lock.unlock() }
+            let peak = max(windowMax, current)
+            maxFootprint = max(maxFootprint, peak)
+            windowMax = current
+            return peak
         }
 
         /// Stops sampling and returns the highest footprint observed. Idempotent:
