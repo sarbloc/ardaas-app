@@ -214,6 +214,12 @@ enum ModelOptimizer {
 
         let scratch = scratchDirectory(in: modelDirectory)
         try? FileManager.default.removeItem(at: scratch)
+        // Drop the previous cache before rebuilding rather than after. Getting
+        // here means it already failed validation, so it is dead weight — and
+        // keeping it would make a routine rebuild (ORT bump, re-download)
+        // demand a second cache's worth of free space, turning an upgrade into
+        // an out-of-space failure on a nearly full device.
+        try? FileManager.default.removeItem(at: destination)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
 
         var moved = false
@@ -236,6 +242,8 @@ enum ModelOptimizer {
         // Written last: until the manifest lands the cache reads as invalid.
         try writeManifest(in: scratch, for: modelDirectory)
 
+        // The old cache was already removed above; this only clears a directory
+        // recreated by a concurrent process between then and now.
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.moveItem(at: scratch, to: destination)
         moved = true

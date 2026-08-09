@@ -170,6 +170,10 @@ struct BentiLabView: View {
                         ModelOptimizer.removeCache(in: ModelDownloader.modelDirectory)
                         cacheBytes = 0
                         translator = nil
+                        // The displayed numbers came from graphs that no longer
+                        // exist; the rebuild will produce different artifacts.
+                        result = nil
+                        errorMessage = nil
                     }
                     .font(.footnote)
                     .disabled(isLoadingModel || isTranslating)
