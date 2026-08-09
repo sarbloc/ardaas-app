@@ -302,14 +302,18 @@ struct BentiLabView: View {
                 )
                 await MainActor.run {
                     isLoadingModel = false
+                    // Refreshed even when the result is orphaned: the load may
+                    // still have written the ~667 MB cache, and hiding it would
+                    // leave the user no way to reclaim it.
+                    cacheBytes = ModelOptimizer.cacheBytes(in: directory)
                     guard token == generation else { return }
                     translator = loaded
                     memory = MemoryProbe.snapshot()
-                    cacheBytes = ModelOptimizer.cacheBytes(in: directory)
                 }
             } catch {
                 await MainActor.run {
                     isLoadingModel = false
+                    cacheBytes = ModelOptimizer.cacheBytes(in: directory)
                     guard token == generation else { return }
                     errorMessage = "Model load failed: \(error)"
                 }

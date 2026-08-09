@@ -82,6 +82,11 @@ enum ModelOptimizer {
 
     private static let manifestName = "manifest.json"
 
+    /// The external initializer blob ORT writes beside an optimized graph. The
+    /// whole point of the pass: without it the weights are back inside the
+    /// .onnx and back on the heap.
+    static func externalDataName(for graph: String) -> String { graph + ".data" }
+
     /// Matches the `exactVersion` pinned for the onnxruntime package in
     /// project.yml. Part of the cache key so bumping ORT rebuilds the cache.
     static let ortPackageVersion = "1.24.2"
@@ -143,9 +148,12 @@ enum ModelOptimizer {
               stored.sources == sources
         else { return false }
 
-        // Every graph must be accounted for, and every recorded file — graphs
-        // and their initializer side-cars alike — must still be intact.
-        guard graphNames.allSatisfy({ stored.outputs[$0] != nil }) else { return false }
+        // Every graph AND its initializer side-car must be accounted for: a
+        // cache of graphs with their weights still inline would load fine and
+        // silently give up the entire memory saving. Then every recorded file
+        // must still be intact.
+        let required = graphNames.flatMap { [$0, externalDataName(for: $0)] }
+        guard required.allSatisfy({ stored.outputs[$0] != nil }) else { return false }
         return stored.outputs.allSatisfy { name, size in
             fileSize(directory.appendingPathComponent(name)) == size
         }
@@ -242,7 +250,7 @@ enum ModelOptimizer {
         guard FileManager.default.fileExists(atPath: source.path) else {
             throw ModelOptimizerError.missingSource(source.lastPathComponent)
         }
-        let externalDataName = destination.lastPathComponent + ".data"
+        let externalDataName = Self.externalDataName(for: destination.lastPathComponent)
         do {
             let options = try ORTSessionOptions()
             try options.setLogSeverityLevel(.warning)
@@ -265,6 +273,17 @@ enum ModelOptimizer {
         } catch {
             throw ModelOptimizerError.optimizationFailed(
                 graph: source.lastPathComponent, underlying: "\(error)")
+        }
+
+        // Fail loudly rather than cache a graph whose weights are still inline:
+        // it would load perfectly and quietly forfeit the whole memory saving.
+        let externalData = destination.deletingLastPathComponent()
+            .appendingPathComponent(externalDataName)
+        guard let bytes = fileSize(externalData), bytes > 0 else {
+            throw ModelOptimizerError.optimizationFailed(
+                graph: source.lastPathComponent,
+                underlying: "no external initializer file was written (\(externalDataName)); "
+                    + "this ONNX Runtime build may not support external initializers")
         }
     }
 

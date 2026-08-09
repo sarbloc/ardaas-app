@@ -134,6 +134,19 @@ final class ModelOptimizerTests: XCTestCase {
         XCTAssertThrowsError(try ModelOptimizer.sourceFingerprints(for: root))
     }
 
+    /// A cache of graphs with their weights still inline would load fine and
+    /// silently forfeit the entire memory saving, so it must be rejected.
+    func testCacheIsInvalidWhenNoSidecarWasEverRecorded() throws {
+        try makeSources()
+        let directory = ModelOptimizer.optimizedDirectory(in: root)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for name in ModelOptimizer.graphNames {
+            try Data(repeating: 0x42, count: 8).write(to: directory.appendingPathComponent(name))
+        }
+        try ModelOptimizer.writeManifest(in: directory, for: root)
+        XCTAssertFalse(ModelOptimizer.isCacheValid(in: root))
+    }
+
     /// A repaired or re-downloaded graph can be byte-different at the same
     /// length; size alone would keep the stale cache alive.
     func testCacheIsInvalidatedWhenASourceIsRewrittenAtTheSameSize() throws {
