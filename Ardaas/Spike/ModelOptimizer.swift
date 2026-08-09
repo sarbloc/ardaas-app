@@ -90,6 +90,18 @@ enum ModelOptimizer {
         modelDirectory.appendingPathComponent("Optimized", isDirectory: true)
     }
 
+    /// Where `prepare` assembles a new cache before moving it into place.
+    static func scratchDirectory(in modelDirectory: URL) -> URL {
+        modelDirectory.appendingPathComponent("Optimized.building", isDirectory: true)
+    }
+
+    /// Every directory this type may hold bytes in. Both are reported and
+    /// deleted together: a build killed part-way leaves several hundred MB in
+    /// the scratch directory, which the user must be able to see and reclaim.
+    private static func cacheDirectories(in modelDirectory: URL) -> [URL] {
+        [optimizedDirectory(in: modelDirectory), scratchDirectory(in: modelDirectory)]
+    }
+
     private static func manifestURL(in directory: URL) -> URL {
         directory.appendingPathComponent(manifestName)
     }
@@ -101,20 +113,22 @@ enum ModelOptimizer {
         return size
     }
 
-    /// Total bytes held by the optimized cache, for the lab screen's disk row.
+    /// Total bytes held on disk by the optimized cache and any abandoned
+    /// scratch build, for the lab screen's disk row.
     static func cacheBytes(in modelDirectory: URL) -> Int64 {
-        let directory = optimizedDirectory(in: modelDirectory)
-        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path)
-        else { return 0 }
-        return names.reduce(0) { total, name in
-            let attributes = try? FileManager.default.attributesOfItem(
-                atPath: directory.appendingPathComponent(name).path)
-            return total + ((attributes?[.size] as? NSNumber)?.int64Value ?? 0)
+        cacheDirectories(in: modelDirectory).reduce(0) { total, directory in
+            guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path)
+            else { return total }
+            return names.reduce(total) { subtotal, name in
+                subtotal + (fileSize(directory.appendingPathComponent(name)) ?? 0)
+            }
         }
     }
 
     static func removeCache(in modelDirectory: URL) {
-        try? FileManager.default.removeItem(at: optimizedDirectory(in: modelDirectory))
+        for directory in cacheDirectories(in: modelDirectory) {
+            try? FileManager.default.removeItem(at: directory)
+        }
     }
 
     /// True when a cache matching the current recipe and source files exists,
@@ -178,7 +192,9 @@ enum ModelOptimizer {
     /// directory the translator should load its graphs from.
     ///
     /// Writes into a scratch directory and moves it into place, so a crash or
-    /// kill mid-pass can never leave a half-written cache behind.
+    /// kill mid-pass can never leave a half-written cache behind. On a thrown
+    /// error the scratch is cleaned up here; if the process dies first, the
+    /// next `prepare` clears it and `removeCache` can reclaim it meanwhile.
     @discardableResult
     static func prepare(
         modelDirectory: URL,
@@ -188,10 +204,15 @@ enum ModelOptimizer {
         let destination = optimizedDirectory(in: modelDirectory)
         if isCacheValid(in: modelDirectory) { return destination }
 
-        let scratch = modelDirectory.appendingPathComponent(
-            "Optimized.building", isDirectory: true)
+        let scratch = scratchDirectory(in: modelDirectory)
         try? FileManager.default.removeItem(at: scratch)
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+
+        var moved = false
+        defer {
+            // Half-written graphs are several hundred MB; never leave them.
+            if !moved { try? FileManager.default.removeItem(at: scratch) }
+        }
 
         for name in graphNames {
             onProgress(name)
@@ -209,6 +230,7 @@ enum ModelOptimizer {
 
         try? FileManager.default.removeItem(at: destination)
         try FileManager.default.moveItem(at: scratch, to: destination)
+        moved = true
         excludeFromBackup(destination)
         return destination
     }

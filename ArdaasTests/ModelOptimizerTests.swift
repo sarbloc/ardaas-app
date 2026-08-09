@@ -161,6 +161,25 @@ final class ModelOptimizerTests: XCTestCase {
         XCTAssertEqual(ModelOptimizer.cacheBytes(in: root), 0)
         XCTAssertFalse(ModelOptimizer.isCacheValid(in: root))
     }
+
+    /// A build killed part-way strands several hundred MB in the scratch
+    /// directory; the user must be able to see and reclaim it.
+    func testAbandonedScratchIsCountedAndReclaimable() throws {
+        try makeSources()
+        let scratch = ModelOptimizer.scratchDirectory(in: root)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        try Data(repeating: 0x44, count: 4096)
+            .write(to: scratch.appendingPathComponent(ModelOptimizer.graphNames[0]))
+
+        XCTAssertEqual(
+            ModelOptimizer.cacheBytes(in: root), 4096,
+            "an abandoned scratch build must be visible on the disk row")
+        XCTAssertFalse(ModelOptimizer.isCacheValid(in: root))
+
+        ModelOptimizer.removeCache(in: root)
+        XCTAssertEqual(ModelOptimizer.cacheBytes(in: root), 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.path))
+    }
 }
 
 /// The memory numbers in the lab screen are only meaningful if the mach
