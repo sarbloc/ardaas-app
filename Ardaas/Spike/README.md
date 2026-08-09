@@ -12,7 +12,10 @@ lives in the spike workspace: `indictrans-spike/PIPELINE_SPEC.md`).
 | `BentiTokenizer.swift` | source tokenizer from `tokenizer_src.json`: NFKC, Metaspace, BPE, added lang tokens, `</s>` append, ≥32322→unk remap |
 | `BentiTranslator.swift` | 3-session ONNX greedy decode (encoder / decoder / decoder_with_past with KV-cache feedback) + decode/postprocess (dict.TGT join, Devanagari→Gurmukhi, indic detokenize, purity gate) |
 | `ModelDownloader.swift` | first-use download of the 6 files from HF with streaming SHA-256 verification |
-| `BentiLabView.swift` | debug screen: download state, translate box, metrics |
+| `ModelOptimizer.swift` | one-time rewrite of the 3 graphs so their weights are memory-mapped rather than heap-resident (see `MEMORY.md`) |
+| `MemoryProbe.swift` | `phys_footprint` snapshots, off-thread peak sampling, jetsam headroom |
+| `BentiLabView.swift` | debug screen: download state, pipeline mode picker, translate box, memory + latency metrics |
+| `MEMORY.md` | the memory pass: what the 1374 MB was, what landed, what didn't, minimum-device policy |
 
 Entry point: DEBUG-only flask button in the HomeView toolbar.
 
@@ -29,16 +32,27 @@ Entry point: DEBUG-only flask button in the HomeView toolbar.
 
 ## Metrics to read (and report on #35)
 
-- **Model load ms** — ONNX session creation for all 3 graphs (host
-  reference: ~1.1 s on a 16-core Xeon).
-- **Sentence latency ms / tokens/s** — host reference: 1.2–1.7 s per
-  sentence at 27–36 generated tokens. First translate is warm-up; ignore it.
-- **Footprint / peak footprint** — `task_info(TASK_VM_INFO)`
-  `phys_footprint` (what Xcode's gauge shows) and the ledger peak. Expect
-  ~360 MB+ once all three sessions are live; watch for jetsam on older
-  devices.
+The Pipeline picker switches between **Baseline** (the original configuration
+that measured 1374 MB) and **Optimized**, so both can be measured in one cable
+run. Switching modes rebuilds the translator; measure a warm-up translation
+first and ignore it.
+
+- **Peak this translate** — the headline. Sampled off-thread during the
+  translation, because the dominant allocation lives and dies inside a single
+  ORT run. Shown against the 1374 MB baseline. Expect ~555 MB in Optimized mode.
+- **Per-stage footprints** — after encoder / after decode step 1 / after decode
+  loop / after release. Shows where the peak happens and that idle footprint
+  returns to baseline between translations.
+- **Headroom before jetsam** — `os_proc_available_memory()`.
+- **Sentence latency ms / tokens/s**, and how much of it was session load
+  (~204 ms on the host for all three graphs in Optimized mode; ~976 ms from the
+  un-optimized files).
+- **Model prepare ms** — first Optimized load also runs the one-time graph
+  optimization (~1.7 s on the host); later loads reuse the cache.
 - The purity warning in the output section — should never appear for plain
   English bentis.
+
+See `MEMORY.md` for the full analysis and the recommended minimum-device policy.
 
 ## Correctness without the model
 
@@ -51,6 +65,13 @@ CI cannot run the 352 MB of ONNX graphs. Logic parity is gated by:
 - `ArdaasTests/TransliterationTests.swift` — transliteration (incl. danda
   preservation), indic detokenization, HF cleanup, placeholder round trip,
   purity gate; expected values generated with indic_nlp_library.
+- `ArdaasTests/ModelOptimizerTests.swift` — the optimized-graph cache must fail
+  closed (stale sources, missing manifest, missing graph, ORT/recipe version
+  bump), plus the memory probe's mach plumbing. Filesystem only, no ONNX.
+
+Graph-rewrite parity (original vs memory-mapped vs prepacked-external graphs)
+was verified off-device against all 21 fixtures — identical token ids in all
+63 decode runs. See `MEMORY.md`.
 
 Fixture regeneration: `indictrans-spike/gen_fixtures.py` in the spike
 workspace (needs its venv).
@@ -64,7 +85,11 @@ workspace (needs its venv).
 - Model files are verified by hash at download time only (size check on
   later launches).
 - No sentence splitting: one benti = one model call (hard cap 256
-  positions ≈ 150 English words). No memory-pressure session eviction.
+  positions ≈ 150 English words). No memory-pressure session eviction and no
+  `os_proc_available_memory()` pre-flight check before translating — both are
+  recommended in `MEMORY.md` before this ships to users.
+- The optimized graph cache costs ~667 MB of disk on top of the 352 MB of
+  originals; a shipped version should drop the originals once it is built.
 - Restored placeholders (dates/numbers) legitimately trip the Gurmukhi
   purity gate — cosmetic for a spike.
 - Perl `IsAlnum`/`IsAlpha` classes approximated with ICU `\p{L}\p{M}\p{N}`

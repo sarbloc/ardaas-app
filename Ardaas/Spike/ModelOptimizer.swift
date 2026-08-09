@@ -1,0 +1,209 @@
+import Foundation
+import OnnxRuntimeBindings
+
+// Spike (#35), memory pass: rewrite the three downloaded ONNX graphs into
+// ORT-optimized graphs whose initializers (and pre-packed initializers) live in
+// a side-car `.data` file.
+//
+// Why this is the single biggest memory lever available through the ONNX
+// Runtime Objective-C API:
+//
+// * When a model's initializers are stored *inside* the .onnx protobuf, ORT
+//   reads them onto the heap. ~193 MB of anonymous, dirty pages per decoder
+//   graph, all of it charged to `phys_footprint` and therefore to jetsam.
+// * When they live in an external data file, ORT memory-maps that file
+//   (`GetExtDataFromTensorProto` -> `Env::MapFileIntoMemory`, the default on
+//   every POSIX platform including iOS). Mapped read-only file pages are
+//   "external" in the XNU ledger and are *not* charged to `phys_footprint`,
+//   even while fully resident.
+// * `session.save_external_prepacked_constant_initializers` extends that to the
+//   pre-packed (kernel-rearranged) weight buffers, which would otherwise be
+//   re-materialised on the heap at session creation and undo most of the win.
+//
+// The rewrite is a pure ORT graph optimization: measured bit-identical greedy
+// token ids on all 21 tokenizer parity fixtures.
+//
+// The pass must run CPU-only. Registering CoreML (or any EP that produces
+// compiled nodes) makes ORT refuse to serialize the optimized model with
+// "Unable to serialize model as it contains compiled nodes". This spike never
+// appends an execution provider, so CPU-only is simply the default.
+
+enum ModelOptimizerError: Error, CustomStringConvertible {
+    case missingSource(String)
+    case optimizationFailed(graph: String, underlying: String)
+
+    var description: String {
+        switch self {
+        case .missingSource(let name):
+            return "Missing source graph: \(name)"
+        case .optimizationFailed(let graph, let underlying):
+            return "Failed to optimize \(graph): \(underlying)"
+        }
+    }
+}
+
+enum ModelOptimizer {
+    /// The three inference graphs, in load order.
+    static let graphNames = [
+        "encoder_model.onnx",
+        "decoder_model.onnx",
+        "decoder_with_past_model.onnx",
+    ]
+
+    /// Bump when the optimization recipe changes, or when the pinned ONNX
+    /// Runtime version changes — an optimized graph is only guaranteed to be
+    /// loadable by the ORT build that wrote it.
+    static let formatVersion = 1
+
+    struct Manifest: Codable, Equatable {
+        let formatVersion: Int
+        let ortPackageVersion: String
+        /// Source graph name -> byte size, so an interrupted or superseded
+        /// download invalidates the cache.
+        let sources: [String: Int64]
+    }
+
+    /// Matches the `exactVersion` pinned for the onnxruntime package in
+    /// project.yml. Part of the cache key so bumping ORT rebuilds the cache.
+    static let ortPackageVersion = "1.24.2"
+
+    static func optimizedDirectory(in modelDirectory: URL) -> URL {
+        modelDirectory.appendingPathComponent("Optimized", isDirectory: true)
+    }
+
+    private static func manifestURL(in directory: URL) -> URL {
+        directory.appendingPathComponent("manifest.json")
+    }
+
+    /// Total bytes held by the optimized cache, for the lab screen's disk row.
+    static func cacheBytes(in modelDirectory: URL) -> Int64 {
+        let directory = optimizedDirectory(in: modelDirectory)
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path)
+        else { return 0 }
+        return names.reduce(0) { total, name in
+            let attributes = try? FileManager.default.attributesOfItem(
+                atPath: directory.appendingPathComponent(name).path)
+            return total + ((attributes?[.size] as? NSNumber)?.int64Value ?? 0)
+        }
+    }
+
+    static func removeCache(in modelDirectory: URL) {
+        try? FileManager.default.removeItem(at: optimizedDirectory(in: modelDirectory))
+    }
+
+    /// True when a cache matching the current recipe and source files exists.
+    static func isCacheValid(in modelDirectory: URL) -> Bool {
+        let directory = optimizedDirectory(in: modelDirectory)
+        guard let expected = try? expectedManifest(for: modelDirectory),
+              let data = try? Data(contentsOf: manifestURL(in: directory)),
+              let stored = try? JSONDecoder().decode(Manifest.self, from: data),
+              stored == expected
+        else { return false }
+        return graphNames.allSatisfy {
+            FileManager.default.fileExists(atPath: directory.appendingPathComponent($0).path)
+        }
+    }
+
+    /// Records the recipe + source fingerprint that a freshly built cache
+    /// corresponds to. Exposed for tests; `prepare` is the only caller in the app.
+    static func writeManifest(in directory: URL, for modelDirectory: URL) throws {
+        let manifest = try expectedManifest(for: modelDirectory)
+        try JSONEncoder().encode(manifest).write(to: manifestURL(in: directory), options: .atomic)
+    }
+
+    static func expectedManifest(for modelDirectory: URL) throws -> Manifest {
+        var sources: [String: Int64] = [:]
+        for name in graphNames {
+            let url = modelDirectory.appendingPathComponent(name)
+            guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size],
+                  let bytes = (size as? NSNumber)?.int64Value
+            else { throw ModelOptimizerError.missingSource(name) }
+            sources[name] = bytes
+        }
+        return Manifest(
+            formatVersion: formatVersion, ortPackageVersion: ortPackageVersion, sources: sources)
+    }
+
+    /// Builds the optimized cache if it is missing or stale, and returns the
+    /// directory the translator should load its graphs from.
+    ///
+    /// Writes into a scratch directory and moves it into place, so a crash or
+    /// kill mid-pass can never leave a half-written cache behind.
+    @discardableResult
+    static func prepare(
+        modelDirectory: URL,
+        env: ORTEnv,
+        onProgress: (String) -> Void = { _ in }
+    ) throws -> URL {
+        let destination = optimizedDirectory(in: modelDirectory)
+        if isCacheValid(in: modelDirectory) { return destination }
+
+        let scratch = modelDirectory.appendingPathComponent(
+            "Optimized.building", isDirectory: true)
+        try? FileManager.default.removeItem(at: scratch)
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+
+        for name in graphNames {
+            onProgress(name)
+            try autoreleasepool {
+                try optimize(
+                    source: modelDirectory.appendingPathComponent(name),
+                    destination: scratch.appendingPathComponent(name),
+                    env: env
+                )
+            }
+        }
+
+        // Written last: until the manifest lands the cache reads as invalid.
+        try writeManifest(in: scratch, for: modelDirectory)
+
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: scratch, to: destination)
+        excludeFromBackup(destination)
+        return destination
+    }
+
+    /// Creates a throwaway session purely for its side effect: ORT writes the
+    /// optimized graph plus its external initializer blob to disk. The session
+    /// is never run and is released immediately.
+    private static func optimize(source: URL, destination: URL, env: ORTEnv) throws {
+        guard FileManager.default.fileExists(atPath: source.path) else {
+            throw ModelOptimizerError.missingSource(source.lastPathComponent)
+        }
+        let externalDataName = destination.lastPathComponent + ".data"
+        do {
+            let options = try ORTSessionOptions()
+            try options.setLogSeverityLevel(.warning)
+            try options.setGraphOptimizationLevel(.all)
+            try options.setOptimizedModelFilePath(destination.path)
+            // Written relative to the optimized model's own directory.
+            try options.addConfigEntry(
+                withKey: "session.optimized_model_external_initializers_file_name",
+                value: externalDataName)
+            // Anything smaller than a page is not worth a mapping.
+            try options.addConfigEntry(
+                withKey: "session.optimized_model_external_initializers_min_size_in_bytes",
+                value: "4096")
+            // Pre-packed weights go to the same file, so they are mapped rather
+            // than heap-allocated on every later session creation.
+            try options.addConfigEntry(
+                withKey: "session.save_external_prepacked_constant_initializers",
+                value: "1")
+            _ = try ORTSession(env: env, modelPath: source.path, sessionOptions: options)
+        } catch {
+            throw ModelOptimizerError.optimizationFailed(
+                graph: source.lastPathComponent, underlying: "\(error)")
+        }
+    }
+
+    private static func excludeFromBackup(_ url: URL) {
+        var url = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        do {
+            try url.setResourceValues(values)
+        } catch {
+            print("BentiSpike: failed to exclude optimized cache from backup: \(error)")
+        }
+    }
+}
