@@ -79,6 +79,26 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.path))
     }
 
+    /// A stock build (no BENTI_ONNX) cannot complete the optimization step, so
+    /// it must not spend the user's bandwidth discovering that.
+    func testABuildWithoutTheEngineRefusesBeforeDownloading() async {
+        let installer = ModelInstaller(
+            catalog: model.catalog,
+            directory: root,
+            fetcher: fetcher,
+            optimizer: UnavailableGraphOptimizer(),
+            availableDiskBytes: { 10_000_000 })
+
+        do {
+            try await installer.install(allowingCellular: false) { _ in }
+            XCTFail("expected .engineUnavailable")
+        } catch {
+            XCTAssertEqual(error as? TranslationError, .engineUnavailable)
+        }
+        XCTAssertTrue(fetcher.requests.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.path))
+    }
+
     // MARK: - Happy path
 
     func testFreshInstallDownloadsOptimizesAndBecomesReady() async throws {

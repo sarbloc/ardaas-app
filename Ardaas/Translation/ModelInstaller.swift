@@ -86,6 +86,10 @@ final class ModelInstaller: @unchecked Sendable {
         allowingCellular: Bool,
         onPhase: @escaping @Sendable (Phase) -> Void
     ) async throws {
+        // A build without ONNX Runtime can never finish the optimization step,
+        // so refuse now rather than after 359 MB has been fetched.
+        guard optimizer.isAvailable else { throw TranslationError.engineUnavailable }
+
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         ModelOptimizer.excludeFromBackup(directory)
 

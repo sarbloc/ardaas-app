@@ -8,6 +8,10 @@ import Foundation
 /// on, and the cache/disk-hygiene logic has to be testable without 352 MB of
 /// real graphs.
 protocol GraphOptimizing: Sendable {
+    /// False when this build cannot optimize graphs at all. Lets an install be
+    /// refused up front instead of after 359 MB has been fetched.
+    var isAvailable: Bool { get }
+
     /// Writes an ORT-optimized copy of `source` at `destination`, with its
     /// initializers in a side-car named `externalDataName` beside it.
     func optimize(source: URL, destination: URL, externalDataName: String) throws
@@ -18,8 +22,14 @@ protocol GraphOptimizing: Sendable {
     func verifyLoadable(graph: URL) throws
 }
 
+extension GraphOptimizing {
+    var isAvailable: Bool { true }
+}
+
 /// Used when the app was built without the ONNX Runtime dependency.
 struct UnavailableGraphOptimizer: GraphOptimizing {
+    var isAvailable: Bool { false }
+
     func optimize(source: URL, destination: URL, externalDataName: String) throws {
         throw TranslationError.engineUnavailable
     }
