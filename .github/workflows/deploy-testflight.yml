@@ -19,7 +19,7 @@ jobs:
     if: vars.TESTFLIGHT_ENABLED == 'true'
     # macOS minutes bill at 10x — this job costs ~150 billed minutes per
     # main merge. Pause with the kill switch when minutes matter.
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
