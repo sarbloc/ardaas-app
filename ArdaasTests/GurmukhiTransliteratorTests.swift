@@ -358,4 +358,25 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             }
         }
     }
+
+    /// The Buddha Dal Roman layer is **generated** by this engine, unlike the
+    /// SGPC one which is human-authored. Pinning it here is what stops the
+    /// bundled JSON silently going stale: any rule change that would alter the
+    /// canonical text fails CI and forces the layer to be regenerated (and
+    /// re-proof-read) rather than leaving the app shipping one romanization in
+    /// the canonical text and a different one for the user's benti.
+    func testBundledBuddhaDalLayerMatchesTheEngine() throws {
+        let content = try XCTUnwrap(
+            ArdaasLibrary.loadBundled().variant(id: "buddha-dal")
+        ).content
+        XCTAssertFalse(content.segments.isEmpty)
+        for segment in content.segments {
+            XCTAssertEqual(
+                segment.transliteration,
+                GurmukhiTransliterator.transliterate(segment.gurmukhi),
+                "bundled transliteration has drifted from the engine "
+                    + "for segment \(segment.id) — regenerate the layer"
+            )
+        }
+    }
 }

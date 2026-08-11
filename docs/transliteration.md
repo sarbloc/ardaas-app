@@ -8,6 +8,21 @@ layer for variants that ship without one (the Buddha Dal text).
 The doc comment on the type is the canonical spec; this file is the short
 version for review. **The scheme is a style choice — worth a proof-read.**
 
+## The generated Buddha Dal layer
+
+`Ardaas/Resources/ardaas-buddha-dal.json` ships a `transliteration` for every
+segment that is **engine output, not hand-authored** — that is what makes the
+canonical text and a romanized benti look like one voice. It is checked in
+rather than computed at launch so it can be proof-read and diffed like any
+other scripture change.
+
+`testBundledBuddhaDalLayerMatchesTheEngine` re-derives every segment and
+asserts equality, so the two can never drift: change a rule and CI fails until
+the layer is regenerated (and re-proof-read). Regenerating is mechanical —
+map `GurmukhiTransliterator.transliterate` over each segment's `gurmukhi`.
+
+The SGPC layer is human-authored and deliberately **not** pinned this way.
+
 ## House style
 
 The target is the plain-ASCII "Gurbani style" already used by the bundled SGPC
