@@ -49,7 +49,7 @@ import Foundation
 /// ### Nasalization, gemination, conjuncts
 ///
 /// Tippi (ੰ) and bindi (ਂ) both render as `n`, or `m` before a labial
-/// (`ਪ ਫ ਬ ਭ ਮ`): `ਪੰਥ` → `Panth`, `ਅੰਮ੍ਰਿਤਸਰ` → `Amritsar`. When the nasal
+/// (`ਪ ਫ ਬ ਭ ਮ ਫ਼`): `ਪੰਥ` → `Panth`, `ਅੰਮ੍ਰਿਤਸਰ` → `Amritsar`. When the nasal
 /// letter equals the following consonant it is written once rather than
 /// doubled (`ਮੰਨ` → `Man`, not `Mann`).
 ///
@@ -77,19 +77,29 @@ import Foundation
 ///    non-initial, non-final syllable is dropped when both neighbours still
 ///    have a pronounced vowel (the classic `VCəCV → VCCV` rule):
 ///    `ਪਾਤਸ਼ਾਹੀ` → `Paatshaahi`, `ਹਰਗੋਬਿੰਦ` → `Hargobind`, `ਅਰਦਾਸ` → `Ardaas`.
-///    The first syllable of a word is never emptied, and a syllable carrying a
-///    nasal keeps its vowel.
+///    The first syllable of a word is never emptied, a syllable carrying a
+///    nasal keeps its vowel, and nothing is deleted before a vowel-initial
+///    syllable, where it would merge two syllables (`ਭਗਉਤੀ` → `Bhagauti`, not
+///    `Bhaguti`).
 ///
 /// Known limitations of the rule: it is orthographic, so it cannot know about
 /// morpheme boundaries (compounds may keep or lose a schwa a reader would
 /// place differently), it does not restore the schwa that Punjabi keeps before
 /// certain sonorant clusters, and rule 1 will wrongly silence a final short
-/// vowel in the rare modern word that genuinely ends in one.
+/// vowel in the rare modern word that genuinely ends in one. Where two
+/// deletable schwas are adjacent only the rightmost goes, so `ਗੁਰਦਵਾਰਿਆਂ`
+/// comes out `Guradvaariyaan`.
+///
+/// A vowel-vowel juncture with no glide is written as-is, so `ਲਈਂ` → `Lain`
+/// can be misread as the `ai` of ਐ. Writing it `La-in` would be no clearer,
+/// and the house style itself writes such junctures plain ("Nau", "Bhagauti").
 ///
 /// ### Everything else
 ///
-/// `ੴ` → `Ik-Onkar`; `॥` → `||` and `।` → `|`, each separated from the
-/// preceding word by one space; Gurmukhi digits ੦–੯ → ASCII `0`–`9`.
+/// `ੴ` → `Ik-Onkar`; `॥` → `||` and `।` → `|`. These are standalone tokens:
+/// each is separated from its neighbours by one space, even when the source
+/// runs them into the surrounding words (`ਜੀ॥ਸਤਿ` → `Ji || Sat`), and an
+/// existing space is never doubled. Gurmukhi digits ੦–੯ → ASCII `0`–`9`.
 /// Line breaks, spacing and any Latin/ASCII already in the input pass through
 /// untouched and un-recased, so a mixed-script benti survives intact.
 /// Udaat (ੑ) and yakash (ੵ) are dropped; visarga (ਃ) renders as `h`.
@@ -109,49 +119,56 @@ enum GurmukhiTransliterator {
     static func transliterate(_ gurmukhi: String) -> String {
         var output = ""
         var word: [Unicode.Scalar] = []
+        // ੴ and the dandas are standalone tokens: they are set off by a space
+        // even when the source runs them into the next word ("ਜੀ॥ਸਤਿ").
+        var afterStandaloneToken = false
+
+        func separate() {
+            if afterStandaloneToken, let last = output.last, !last.isWhitespace {
+                output.append(" ")
+            }
+        }
+
+        func flushWord() {
+            guard !word.isEmpty else { return }
+            separate()
+            output += transliterate(word: word)
+            word.removeAll(keepingCapacity: true)
+            afterStandaloneToken = false
+        }
+
         for scalar in gurmukhi.unicodeScalars {
             if isWordScalar(scalar) {
                 word.append(scalar)
                 continue
             }
-            flush(&word, into: &output)
-            append(passthrough: scalar, to: &output)
+            flushWord()
+
+            switch scalar.value {
+            case 0x0A74: // ੴ
+                separate()
+                output += "Ik-Onkar"
+                afterStandaloneToken = true
+            case 0x0964, 0x0965: // । ॥
+                if let last = output.last, !last.isWhitespace {
+                    output.append(" ")
+                }
+                output += scalar.value == 0x0965 ? "||" : "|"
+                afterStandaloneToken = true
+            case 0x0A66...0x0A6F: // Gurmukhi digits
+                separate()
+                output.append(asciiDigits[Int(scalar.value - 0x0A66)])
+                afterStandaloneToken = false
+            default:
+                output.unicodeScalars.append(scalar)
+                afterStandaloneToken = false
+            }
         }
-        flush(&word, into: &output)
+        flushWord()
         return output
     }
 
     // MARK: - Word assembly
-
-    private static func flush(_ word: inout [Unicode.Scalar], into output: inout String) {
-        guard !word.isEmpty else { return }
-        output += transliterate(word: word)
-        word.removeAll(keepingCapacity: true)
-    }
-
-    private static func append(passthrough scalar: Unicode.Scalar, to output: inout String) {
-        switch scalar.value {
-        case 0x0A74: // ੴ
-            output += "Ik-Onkar"
-        case 0x0965: // ॥
-            appendDanda("||", to: &output)
-        case 0x0964: // ।
-            appendDanda("|", to: &output)
-        case 0x0A66...0x0A6F: // Gurmukhi digits
-            output.append(asciiDigits[Int(scalar.value - 0x0A66)])
-        default:
-            output.unicodeScalars.append(scalar)
-        }
-    }
-
-    /// Dandas are set off from the preceding word by exactly one space, which
-    /// is what the house style does ("Waheguru Ji Ki Fateh ||").
-    private static func appendDanda(_ danda: String, to output: inout String) {
-        if let last = output.last, !last.isWhitespace {
-            output.append(" ")
-        }
-        output += danda
-    }
 
     private static func transliterate(word: [Unicode.Scalar]) -> String {
         if let known = lexicon[canonicalKey(word)] {
@@ -281,7 +298,10 @@ enum GurmukhiTransliterator {
                   !units[index].hasNasal,
                   !units[index].onset.isEmpty,
                   units[index - 1].vowel != nil,
-                  units[index + 1].vowel != nil
+                  units[index + 1].vowel != nil,
+                  // Never delete before a vowel-initial syllable: that would
+                  // merge two syllables (ਭਗਉਤੀ → "Bhaguti", not "Bhagauti").
+                  !units[index + 1].onset.isEmpty
             else { continue }
             units[index].vowel = nil
         }
@@ -329,7 +349,8 @@ enum GurmukhiTransliterator {
     // MARK: - Tables
 
     private static let asciiDigits: [Character] = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
-    private static let labials: Set<Character> = ["p", "b", "m"]
+    /// First Roman letters of the labial consonants ਪ ਫ ਬ ਭ ਮ and ਫ਼.
+    private static let labials: Set<Character> = ["p", "b", "m", "f"]
     private static let shortMatras: Set<UInt32> = [0x0A3F, 0x0A41]
 
     /// Aspirates (plus ਸ਼/ਙ/ਞ) are never doubled by addak: `Sikhi`, not `Sikkhi`.

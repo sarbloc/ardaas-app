@@ -27,10 +27,10 @@ same look while being internally consistent.
 | Stops etc. | ਕ k · ਖ kh · ਗ g · ਘ gh · ਙ ng · ਚ ch · ਛ chh · ਜ j · ਝ jh · ਞ nj · ਟ t · ਠ th · ਡ d · ਢ dh · ਣ n · ਤ t · ਥ th · ਦ d · ਧ dh · ਨ n · ਪ p · ਫ ph · ਬ b · ਭ bh · ਮ m · ਯ y · ਰ r · ਲ l · ਵ v · ੜ rh · ਸ s · ਹ h |
 | Pairin bindi | ਸ਼ sh · ਖ਼ kh · ਗ਼ gh · ਜ਼ z · ਫ਼ f · ਲ਼ l (precomposed **and** base + U+0A3C nukta) |
 | Vowels | ਅ a · ਆ/ਾ aa · ਇ/ਿ i · ਈ/ੀ i · ਉ/ੁ u · ਊ/ੂ u · ਏ/ੇ e · ਐ/ੈ ai · ਓ/ੋ o · ਔ/ੌ au |
-| Nasals | ੰ tippi and ਂ bindi → `n`, or `m` before ਪ ਫ ਬ ਭ ਮ |
+| Nasals | ੰ tippi and ਂ bindi → `n`, or `m` before a labial (ਪ ਫ ਬ ਭ ਮ ਫ਼) |
 | Addak | doubles the next consonant's first letter (ਦਿੱਤੇ → Ditte, ਸੱਚੇ → Sacche) |
 | Conjuncts | ੍ + ਹ/ਰ/ਵ join the onset (ਪ੍ਰ → pr, ਕ੍ਰਿ → kri, ਤਿਨ੍ਹਾਂ → Tinhaan) |
-| Symbols | ੴ → `Ik-Onkar` · ॥ → `||` · । → `|` · ੦–੯ → `0`–`9` |
+| Symbols | ੴ → `Ik-Onkar` · ॥ → `||` · । → `|` (standalone tokens: always space-separated, never double-spaced) · ੦–੯ → `0`–`9` |
 
 Deliberate choices worth flagging:
 
@@ -62,8 +62,10 @@ word. Three rules, per word:
 3. **Medial schwa deletion** — scanning right to left, a non-initial,
    non-final inherent `a` drops when both neighbours still have a pronounced
    vowel (`VCəCV → VCCV`): ਅਰਦਾਸ → `Ardaas`, ਪਾਤਸ਼ਾਹੀ → `Paatshaahi`,
-   ਹਰਗੋਬਿੰਦ → `Hargobind`. The first syllable of a word is never emptied and a
-   syllable carrying a nasal keeps its vowel.
+   ਹਰਗੋਬਿੰਦ → `Hargobind`. The first syllable of a word is never emptied, a
+   syllable carrying a nasal keeps its vowel, and nothing is deleted before a
+   vowel-initial syllable, where it would merge two syllables (ਭਗਉਤੀ →
+   `Bhagauti`, not `Bhaguti`).
 
 ### Known limitations
 
@@ -75,6 +77,9 @@ word. Three rules, per word:
 - Rule 1 wrongly silences a final short vowel in the rare modern Punjabi word
   that genuinely ends in one.
 - Nothing restores the schwa Punjabi keeps before certain sonorant clusters.
+- A vowel-vowel juncture with no glide is written plain, so ਲਈਂ → `Lain` can be
+  misread as the `ai` of ਐ. `La-in` would be no clearer, and the house style
+  writes such junctures plain too ("Nau", "Bhagauti").
 
 ## Exception lexicon
 

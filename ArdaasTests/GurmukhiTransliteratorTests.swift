@@ -130,6 +130,10 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਮਾਂ", "Maan"),        // bindi → n
             ("ਨਹੀਂ", "Nahin"),
             ("ਦਸਾਂ", "Dasaan"),
+            ("ਪੰਪ", "Pamp"),        // → m before a labial
+            ("ਸੰਬ", "Samb"),
+            ("\u{0A38}\u{0A70}\u{0A5E}", "Samf"),          // ਫ਼ counts as labial
+            ("\u{0A38}\u{0A70}\u{0A2B}\u{0A3C}", "Samf"),  // …either spelling
             ("ਅੰਮ੍ਰਿਤ", "Amrit"),   // homorganic m + ਮ written once
             ("ਮੰਨ", "Man"),         // homorganic n + ਨ written once
         ])
@@ -178,6 +182,9 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਹਰਗੋਬਿੰਦ", "Hargobind"),
             ("ਜ਼ੋਰਾਵਰ", "Zoraavar"),
             ("ਪੰਜਾਬੀ", "Panjaabi"),
+            // Never deleted before a vowel-initial syllable: dropping this
+            // schwa would merge two syllables into one ("Bhaguti").
+            ("ਭਗਉਤੀ", "Bhagauti"),
         ])
     }
 
@@ -235,6 +242,13 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਖਾਲਸਾ ਜੀ ।", "Khalsa Ji |"),
             ("ਜੀ॥", "Ji ||"),   // a danda is always set off by one space
             ("ਜੀ ॥", "Ji ||"),  // …and never doubles an existing one
+            // ੴ and the dandas are standalone tokens, so they are separated
+            // from the next token even when the source runs them together.
+            ("ਜੀ॥ਸਤਿ", "Ji || Sat"),
+            ("ਜੀ।ਸਤਿ", "Ji | Sat"),
+            ("ਜੀ॥ ਸਤਿ", "Ji || Sat"),
+            ("ਜੀ॥੧੦", "Ji || 10"),
+            ("ੴਵਾਹਿਗੁਰੂ", "Ik-Onkar Waheguru"),
         ])
     }
 
