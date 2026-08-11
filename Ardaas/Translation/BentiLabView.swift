@@ -66,9 +66,9 @@ struct BentiLabView: View {
                 TranslationBuild.isEngineAvailable ? "linked (BENTI_ONNX)" : "not linked")
             if !TranslationBuild.isEngineAvailable {
                 Text(
-                    "Stock build. Download and disk management work; translation throws "
-                    + "engineUnavailable. Regenerate with `xcodegen --spec project-onnx.yml` "
-                    + "to link the engine."
+                    "Stock build: the engine is not linked, so installing and translating "
+                    + "both throw engineUnavailable and the download controls are hidden. "
+                    + "Regenerate with `xcodegen --spec project-onnx.yml` to link it."
                 )
                 .font(.caption)
                 .foregroundStyle(Theme.mist)
@@ -80,6 +80,12 @@ struct BentiLabView: View {
     private var modelSection: some View {
         Section("Model") {
             switch service.state {
+            case .notDownloaded where !TranslationBuild.isEngineAvailable:
+                // The installer refuses up front without the engine, so don't
+                // advertise an action that can only fail here.
+                Text("Link the engine to enable the install.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.mist)
             case .notDownloaded:
                 disclosure
                 Toggle("Allow cellular", isOn: $allowCellular)

@@ -233,6 +233,17 @@ final class ModelInstaller: @unchecked Sendable {
         let required = downloadBytes
             + (buildingCache ? catalog.estimatedOptimizedCacheBytes : 0)
         guard available >= required else {
+            // A stale cache we are about to rebuild is space we already own:
+            // count it as reclaimable rather than failing an upgrade or repair
+            // on a nearly full device.
+            if buildingCache {
+                let reclaimable = ModelOptimizer.cacheBytes(in: directory)
+                if reclaimable > 0, available + reclaimable >= required {
+                    try? fileManager.removeItem(
+                        at: ModelOptimizer.optimizedDirectory(in: directory))
+                    return
+                }
+            }
             throw TranslationError.insufficientDisk(
                 availableBytes: available, requiredBytes: required)
         }

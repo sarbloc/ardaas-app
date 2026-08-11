@@ -42,6 +42,11 @@ final class BentiTranslationService: ObservableObject {
     let installer: ModelInstaller
     private let engine: TranslationEngine
     private var installTask: Task<Void, Never>?
+    /// A cancelled install keeps running until its current step returns —
+    /// optimization in particular cannot be interrupted mid-flight. Held here
+    /// so the next install waits it out instead of racing it over the same
+    /// files. Cleared once awaited.
+    private var cancelledInstallTask: Task<Void, Never>?
     /// Bumped whenever an install is superseded (cancel, delete, restart), so a
     /// late progress hop from the old one cannot overwrite the new state.
     private var generation = 0
@@ -89,7 +94,12 @@ final class BentiTranslationService: ObservableObject {
             Task { @MainActor in self?.apply(phase, token: token) }
         }
 
+        let previous = cancelledInstallTask
         installTask = Task { [weak self] in
+            // Let any cancelled predecessor finish unwinding before we touch
+            // the model directory, or two installs mutate the same files.
+            await previous?.value
+            if Task.isCancelled { return }
             let outcome: ModelState
             do {
                 try await installer.install(
@@ -106,6 +116,7 @@ final class BentiTranslationService: ObservableObject {
             }
             guard let self, token == self.generation else { return }
             self.installTask = nil
+            self.cancelledInstallTask = nil
             self.state = outcome
             self.installedBytes = installer.installedBytes()
         }
@@ -118,6 +129,9 @@ final class BentiTranslationService: ObservableObject {
         generation += 1
         installTask = nil
         task.cancel()
+        // Keep the handle: the task is still unwinding, and the next install
+        // must await it before touching the same files.
+        cancelledInstallTask = task
         state = installer.currentState()
         installedBytes = installer.installedBytes()
     }
@@ -129,8 +143,12 @@ final class BentiTranslationService: ObservableObject {
         let task = installTask
         installTask = nil
         task?.cancel()
-        // Wait the cancelled install out rather than deleting underneath it.
+        // Wait the cancelled install out rather than deleting underneath it —
+        // including one cancelled earlier that may still be unwinding.
+        let stillUnwinding = cancelledInstallTask
+        cancelledInstallTask = nil
         await task?.value
+        await stillUnwinding?.value
         await engine.release()
 
         let installer = self.installer
