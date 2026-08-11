@@ -86,15 +86,15 @@ struct ReaderView: View {
     }
 
     private func reader(for content: ArdaasContent) -> some View {
-        let items = ArdaasComposer.compose(content: content, benti: savedArdaas.bentiText)
+        let items = ArdaasComposer.compose(content: content, benti: savedArdaas.bentiLayers)
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     switch item {
                     case .canonical(let segment):
                         segmentView(segment)
-                    case .benti(let text):
-                        bentiView(text)
+                    case .benti(let layers):
+                        bentiView(interimBentiText(layers))
                     }
                 }
             }
@@ -137,6 +137,24 @@ struct ReaderView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Interim single-layer rendering of the benti. #45 gives it the same
+    /// per-layer stack as a canonical segment; until then show one layer —
+    /// the first populated layer whose toggle is on, so the benti never
+    /// shows a script the reader has hidden. If every populated layer is
+    /// toggled off, fall back to the first populated one rather than
+    /// rendering an empty box (the same never-blank principle as
+    /// `segmentView`). Today only English is ever populated, so this
+    /// reproduces the pre-#43 behaviour exactly. The composer never emits
+    /// an all-blank benti, so `""` is unreachable.
+    private func interimBentiText(_ layers: BentiLayers) -> String {
+        let populated = [
+            (layers.gurmukhi, showGurmukhi),
+            (layers.transliteration, showTransliteration),
+            (layers.english, showEnglish),
+        ].filter { !$0.0.isEmpty }
+        return (populated.first { $0.1 } ?? populated.first)?.0 ?? ""
     }
 
     private func bentiView(_ text: String) -> some View {
