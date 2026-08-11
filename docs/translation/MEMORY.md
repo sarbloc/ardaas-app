@@ -222,9 +222,9 @@ Jetsam foreground limits are not published by Apple; these are the
 community-measured figures (`os_proc_available_memory()` is the only reliable
 runtime source, and the lab screen now shows it).
 
-| Device RAM | Examples | Approx foreground limit | ~555 MB peak |
+| Device RAM | Examples | Approx foreground limit | 582 MB peak |
 |---|---|---|---|
-| 3 GB | iPhone SE 2/3, XR, 11 Pro | ~1.4 GB | Fits, ~2.5× headroom |
+| 3 GB | iPhone SE 2/3, XR, 11 Pro | ~1.4 GB | Fits, ~2.4x headroom |
 | 4 GB | iPhone 11, 12, 13, 14 | ~2.0 GB | Comfortable |
 | 6 GB | 13/14 Pro, 15, 15 Plus | ~3.0 GB | Comfortable |
 | 8 GB | 15 Pro, 16 Pro | ~4.0 GB | Comfortable |
