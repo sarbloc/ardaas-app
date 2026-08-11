@@ -109,7 +109,11 @@ final class ModelInstaller: @unchecked Sendable {
         }
         onPhase(.downloading(progress: Double(completedBytes) / Double(totalBytes)))
 
-        if !outstanding.isEmpty {
+        // Also check when nothing is left to download but the cache still has
+        // to be built — e.g. killed after the downloads, before optimization.
+        // That path still needs the full scratch budget, and failing here is
+        // far better than dying mid-optimize with a filesystem error.
+        if !outstanding.isEmpty || !cacheIsValid {
             try checkDiskSpace(
                 downloadBytes: outstanding.reduce(Int64(0)) { $0 + $1.bytes },
                 buildingCache: !cacheIsValid)
