@@ -86,6 +86,18 @@ struct BentiLabView: View {
                 Text("Link the engine to enable the install.")
                     .font(.footnote)
                     .foregroundStyle(Theme.mist)
+                // A previous engine-linked build can have left the model on
+                // disk. State is honestly .notDownloaded (translation cannot
+                // run here), but the bytes are real — offer a way out rather
+                // than stranding them until a reinstall.
+                if service.installedBytes > 0 {
+                    Text("\(Self.bytes(service.installedBytes)) left by an engine-linked build.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.mist)
+                    Button("Delete model", role: .destructive) {
+                        Task { @MainActor in await service.deleteModel() }
+                    }
+                }
             case .notDownloaded:
                 disclosure
                 Toggle("Allow cellular", isOn: $allowCellular)
