@@ -1,0 +1,39 @@
+# XcodeGen overlay that turns the on-device translation engine ON (#42).
+#
+#   xcodegen                              # stock: no ONNX Runtime anywhere
+#   xcodegen --spec project-onnx.yml      # engine linked, BENTI_ONNX defined
+#
+# Both write Ardaas.xcodeproj, so this is a one-command switch rather than a
+# code change. `project.yml` stays the default, which is what CI builds and
+# what the TestFlight workflow archives — so no release build carries the
+# ~300 MB onnxruntime xcframework until #44 is ready to ship the feature.
+#
+# Why an overlay spec and not a build configuration: neither Xcode nor
+# XcodeGen can make a Swift Package product dependency conditional on the
+# build configuration. XcodeGen's Dependency object exposes `link`, `embed`,
+# `weak`, `platforms` and `destinationFilters` — no configuration filter — so
+# "Release without ONNX, Debug with" is not expressible on one target. Two
+# specs is the smallest thing that actually keeps the framework out of a
+# release binary. See docs/translation/README.md for the alternatives
+# considered.
+include:
+  - project.yml
+
+packages:
+  # Official ONNX Runtime SPM package — each tag wraps a prebuilt binary
+  # xcframework, so pin an exact release. Must stay in step with
+  # `ModelOptimizer.ortPackageVersion`: an ORT-optimized graph is only
+  # guaranteed loadable by the build that wrote it, and that constant is part
+  # of the cache key that forces a rebuild when this moves.
+  onnxruntime:
+    url: https://github.com/microsoft/onnxruntime-swift-package-manager
+    exactVersion: 1.24.2
+
+targets:
+  Ardaas:
+    dependencies:
+      - package: onnxruntime
+        product: onnxruntime
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) BENTI_ONNX

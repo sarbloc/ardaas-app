@@ -21,6 +21,17 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      # project-onnx.yml is the one-command switch that links ONNX Runtime and
+      # defines BENTI_ONNX (#42). The shipping configuration is the stock spec,
+      # so that is what gets built and tested below — this step only proves the
+      # overlay still parses and merges, so it cannot rot unnoticed. Generation
+      # resolves no packages and produces no build products; the project it
+      # writes is discarded.
+      - name: Validate the ONNX overlay spec
+        run: |
+          xcodegen generate --spec project-onnx.yml
+          rm -rf Ardaas.xcodeproj
+
       - name: Generate Xcode project
         run: xcodegen generate
 
