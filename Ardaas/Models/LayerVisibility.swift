@@ -157,4 +157,23 @@ struct LayerAvailability: Equatable {
             count + (toggles[kind] && carries(kind) ? 1 : 0)
         }
     }
+
+    /// Which layers a canonical segment actually renders under these
+    /// toggles — the toggled-on layers this scope carries, and Gurmukhi
+    /// alone if that leaves nothing (the segments' never-blank guard, which
+    /// lives here so `segmentView` and the toggle-pinning rules can't drift
+    /// apart).
+    func renderedLayers(under toggles: LayerToggles) -> Set<LayerKind> {
+        let rendered = LayerKind.allCases.filter { toggles[$0] && carries($0) }
+        return rendered.isEmpty ? [.gurmukhi] : Set(rendered)
+    }
+
+    /// Whether switching `kind` off would actually remove it from the
+    /// canonical segments. It would not when the never-blank guard puts
+    /// Gurmukhi straight back — on a Gurmukhi-only variant that makes the
+    /// Gurmukhi toggle a no-op, so the Reader disables it.
+    func hidesLayer(_ kind: LayerKind, under toggles: LayerToggles) -> Bool {
+        renderedLayers(under: toggles).contains(kind)
+            && !renderedLayers(under: toggles.setting(kind, to: false)).contains(kind)
+    }
 }

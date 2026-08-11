@@ -87,14 +87,6 @@ struct ReaderView: View {
         screenAvailability.visibleLayerCount(under: toggles)
     }
 
-    /// Layers visible in the canonical segments = toggled on AND carried by
-    /// this variant. Drives `segmentView`'s never-blank guard, which must
-    /// ignore the benti: a benti-only English layer keeps the screen
-    /// non-empty but does nothing for a segment that has no English.
-    private var visibleCanonicalLayerCount: Int {
-        canonicalAvailability.visibleLayerCount(under: toggles)
-    }
-
     @ViewBuilder
     private var content: some View {
         switch loadResult {
@@ -139,25 +131,28 @@ struct ReaderView: View {
 
     @ViewBuilder
     private func segmentView(_ segment: ArdaasSegment) -> some View {
+        // `renderedLayers` carries the never-blank guard: if the persisted
+        // toggles leave this variant with nothing to show (e.g. Gurmukhi off
+        // + only layers it lacks on), Gurmukhi renders anyway. It reasons
+        // about the variant alone, never the benti — a benti-only English
+        // layer keeps the screen non-empty but does nothing for a segment
+        // that has no English.
+        let rendered = canonicalAvailability.renderedLayers(under: toggles)
         VStack(alignment: .leading, spacing: 6) {
-            // `|| visibleCanonicalLayerCount == 0` is the never-blank guard:
-            // if the persisted toggles leave this variant with nothing to
-            // show (e.g. Gurmukhi off + only unavailable layers on),
-            // Gurmukhi renders anyway.
-            if showGurmukhi || visibleCanonicalLayerCount == 0 {
+            if rendered.contains(.gurmukhi) {
                 Text(segment.gurmukhi)
                     .font(.system(size: 22 * fontScale))
                     .lineSpacing(8 * fontScale)
                     .foregroundStyle(Theme.parchment)
             }
-            if showTransliteration, let transliteration = segment.transliteration {
+            if rendered.contains(.transliteration), let transliteration = segment.transliteration {
                 Text(transliteration)
                     .font(.system(size: 15 * fontScale))
                     .italic()
                     .lineSpacing(5 * fontScale)
                     .foregroundStyle(Theme.sand)
             }
-            if showEnglish, let english = segment.english {
+            if rendered.contains(.english), let english = segment.english {
                 Text(english)
                     .font(.system(size: 15 * fontScale, design: .serif))
                     .lineSpacing(5 * fontScale)
@@ -318,15 +313,17 @@ struct ReaderView: View {
     ///   carried by the variant or the benti). Unchecking it would leave
     ///   nothing the reader asked for; the segments' never-blank guard is a
     ///   backstop, not a destination.
-    /// - Nothing canonical carries it and the benti's never-blank fallback
-    ///   would put it straight back — an untranslated benti, whose single
-    ///   written layer is all there is to show. Without this the Translation
-    ///   pill this PR newly offers on a variant with no attested English
-    ///   would be a no-op for exactly the pending-translation case.
+    /// - Neither the segments nor the benti would drop it, because a
+    ///   never-blank rule puts it straight back: the segments' guard
+    ///   restores Gurmukhi on a variant that carries nothing else, and the
+    ///   benti's fallback restores the single written layer of a benti still
+    ///   awaiting translation. Without this the Translation pill this PR
+    ///   newly offers on a variant with no attested English would be a no-op
+    ///   for exactly the pending-translation case.
     private func isPinnedLayer(_ kind: LayerKind) -> Bool {
         guard toggles[kind] else { return false }
         if visibleLayerCount == 1 { return true }
-        return !canonicalAvailability.carries(kind)
+        return !canonicalAvailability.hidesLayer(kind, under: toggles)
             && !savedArdaas.bentiLayers.hidesLayer(kind, under: toggles)
     }
 

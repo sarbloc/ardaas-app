@@ -246,6 +246,66 @@ final class LayerAvailabilityTests: XCTestCase {
         )
     }
 
+    // MARK: - What a segment renders
+
+    func testSegmentRendersTheToggledLayersTheVariantCarries() {
+        XCTAssertEqual(
+            LayerAvailability.canonical(fullVariant).renderedLayers(under: toggles()),
+            [.gurmukhi, .transliteration, .english]
+        )
+        XCTAssertEqual(
+            LayerAvailability.canonical(noEnglishVariant).renderedLayers(under: toggles()),
+            [.gurmukhi, .transliteration]
+        )
+        XCTAssertEqual(
+            LayerAvailability.canonical(fullVariant)
+                .renderedLayers(under: toggles(transliteration: false)),
+            [.gurmukhi, .english]
+        )
+    }
+
+    /// The segments' never-blank guard: Gurmukhi renders anyway rather than
+    /// leaving an empty segment.
+    func testSegmentFallsBackToGurmukhiWhenNothingElseWouldRender() {
+        XCTAssertEqual(
+            LayerAvailability.canonical(gurmukhiOnlyVariant)
+                .renderedLayers(under: toggles(gurmukhi: false)),
+            [.gurmukhi]
+        )
+        XCTAssertEqual(
+            LayerAvailability.canonical(fullVariant).renderedLayers(
+                under: toggles(gurmukhi: false, transliteration: false, english: false)
+            ),
+            [.gurmukhi]
+        )
+    }
+
+    // MARK: - Whether a toggle can take effect
+
+    func testCanonicalLayerHidesWhenTheVariantCarriesSomethingElse() {
+        let availability = LayerAvailability.canonical(fullVariant)
+        XCTAssertTrue(availability.hidesLayer(.gurmukhi, under: toggles()))
+        XCTAssertTrue(availability.hidesLayer(.english, under: toggles()))
+    }
+
+    /// On a Gurmukhi-only variant the guard restores Gurmukhi immediately,
+    /// so its toggle cannot take effect and the Reader pins it — even when a
+    /// benti-only layer is keeping the screen-wide count above one.
+    func testGurmukhiCannotHideOnAGurmukhiOnlyVariant() {
+        XCTAssertFalse(
+            LayerAvailability.canonical(gurmukhiOnlyVariant)
+                .hidesLayer(.gurmukhi, under: toggles())
+        )
+    }
+
+    /// A layer the variant does not carry was never rendered canonically, so
+    /// switching it off changes nothing there (the benti decides separately).
+    func testUncarriedLayerHidesNothingCanonically() {
+        XCTAssertFalse(
+            LayerAvailability.canonical(noEnglishVariant).hidesLayer(.english, under: toggles())
+        )
+    }
+
     // MARK: - Screen scope (the #45 rule)
 
     /// The operator decision: the benti's English is the user's own words,
