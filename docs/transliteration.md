@@ -91,6 +91,12 @@ schwa. Both apply before schwa deletion:
 lexicalized reduction rather than a live rule, so it stays in the exception
 lexicon: applying it generally would also give *Saaheb* and *Boheth*.
 
+Coalescence is orthographic, so it also fires on the tatsama borrowings that
+keep /əhi/: ਸਹਿਤ comes out `Seht` where a reader may say *Sahit*. Nothing in
+the spelling separates it from ਰਹਿਤ → `Reht`, so that is a lexicon job rather
+than a rule one — add it if it ever shows up in the canonical text or turns up
+in bentis.
+
 ## Schwa deletion
 
 The biggest quality lever, and the part most likely to be wrong on an unusual

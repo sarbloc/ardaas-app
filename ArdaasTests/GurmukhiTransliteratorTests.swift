@@ -263,6 +263,10 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਸਾਹਿਬ", "Saahib"),
             ("ਬੋਹਿਥ", "Bohith"),
             ("ਹਿੰਮਤ", "Himat"),    // word-initial ਹਿ has no schwa to absorb
+            // Known over-application, pinned so it can't change silently: a
+            // tatsama borrowing that keeps /əhi/ is spelled exactly like ਰਹਿਤ,
+            // so the rule can't tell them apart. A reader may say "Sahit".
+            ("ਸਹਿਤ", "Seht"),
         ])
     }
 

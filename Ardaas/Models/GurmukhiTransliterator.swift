@@ -94,6 +94,11 @@ import Foundation
 /// - **A short vowel on ਹ is never elided** by rule 1 below: `ਕਹੁ` → `Kahu`,
 ///   not `Kah`.
 ///
+/// Coalescence is orthographic, so it also fires on the tatsama borrowings
+/// that keep /əhi/: `ਸਹਿਤ` comes out `Seht` where a reader may say *Sahit*.
+/// Nothing in the spelling separates it from `ਰਹਿਤ` → `Reht`, so this is a
+/// lexicon job, not a rule one.
+///
 /// ### Schwa deletion
 ///
 /// The single biggest quality lever. Three rules, applied per word:
