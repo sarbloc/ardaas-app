@@ -336,6 +336,12 @@ enum ModelOptimizer {
             }
         } catch {
             restore()
+            // The cache we just proved unloadable still looks structurally
+            // valid (manifest + sizes), so leaving it would make
+            // currentState() report .ready and route translate() straight
+            // into it after a relaunch. Drop it; the originals are back, so
+            // the next install rebuilds rather than re-downloading.
+            removeCache(in: modelDirectory)
             throw TranslationError.optimizationFailed(
                 graph: "cache",
                 detail: "optimized graphs did not load without the originals: \(error)")

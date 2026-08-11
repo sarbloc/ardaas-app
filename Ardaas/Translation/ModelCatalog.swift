@@ -70,9 +70,13 @@ struct ModelCatalog: Sendable, Equatable {
                  sha256: "f7817850c9e4b99c59fad57d0611c7720f1921f215e6f247cf25d52eff7f1146",
                  kind: .vocabulary),
         ],
+        // Pinned to an immutable revision rather than `main`: the SHA-256s
+        // above are fixed, so an upstream push to the branch would break every
+        // fresh install with .hashMismatch until a new app build shipped.
         repoBase: URL(
             string: "https://huggingface.co/naklitechie/"
-                + "indictrans2-en-indic-dist-200M-ONNX-int8/resolve/main/")!,
+                + "indictrans2-en-indic-dist-200M-ONNX-int8/resolve/"
+                + "e88c4f837dfbf2abecf239b5c89169dfa31580bb/")!,
         directoryName: "BentiModel",
         // ~639 MiB, measured on the reference host.
         estimatedOptimizedCacheBytes: 670_000_000
