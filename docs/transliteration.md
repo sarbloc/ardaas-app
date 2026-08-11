@@ -80,22 +80,26 @@ Deliberate choices worth flagging:
 ਹ is weak: it never hosts a deleted vowel, and it colours a preceding inherent
 schwa. Both apply before schwa deletion:
 
-- **A schwa before ਹ + sihari coalesces into `eh`.** ਪ·ਹਿ is read /pɛh/, not
-  /pəhi/, so the schwa becomes `e` and the ਹ closes the syllable: ਪਹਿ → `Peh`,
-  ਮਹਿ → `Meh`, ਰਹਿਤ → `Reht`, ਪਹਿਲਾ → `Pehlaa`. The trigger is specifically
-  the *inherent* schwa; a written vowel before ਹ keeps its own syllable, so
-  ਸਾਹਿਬ stays `Saahib` and ਬੋਹਿਥ stays `Bohith`.
+- **A schwa before a word-final ਹ + sihari coalesces into `eh`.** A word ending
+  in ਹਿ is read /-ɛh/, not /-əhi/, so the schwa becomes `e` and the ਹ closes the
+  syllable: ਪਹਿ → `Peh`, ਮਹਿ → `Meh`, ਕਹਿ → `Keh`, ਕਰਹਿ → `Kareh`. Two things
+  narrow it:
+  - **Word-final only.** Mid-word ਹਿ takes the ordinary rules, so ਸਹਿਤ →
+    `Sahit`, ਮਹਿਮਾ → `Mahimaa`, ਪਹਿਲਾ → `Pahilaa`.
+  - **The inherent schwa only.** A written vowel before ਹ keeps its own
+    syllable, so ਸਾਹਿਬ stays `Saahib`, ਬੋਹਿਥ stays `Bohith` and ਨਾਹਿ stays
+    `Naahi`.
 - **A short vowel on ਹ is never elided.** ਕਹੁ → `Kahu`, not `Kah`.
 
 ਵਾਹਿਗੁਰੂ → `Waheguru` shows the same `e` after a long vowel, but that is a
 lexicalized reduction rather than a live rule, so it stays in the exception
 lexicon: applying it generally would also give *Saaheb* and *Boheth*.
 
-Coalescence is orthographic, so it also fires on the tatsama borrowings that
-keep /əhi/: ਸਹਿਤ comes out `Seht` where a reader may say *Sahit*. Nothing in
-the spelling separates it from ਰਹਿਤ → `Reht`, so that is a lexicon job rather
-than a rule one — add it if it ever shows up in the canonical text or turns up
-in bentis.
+Restricting the rule to word-final position is what keeps the tatsama
+borrowings that hold their /əhi/ intact — ਸਹਿਤ reads `Sahit`. The words that
+*are* reduced mid-word aren't predictable from the spelling (ਰਹਿਤ is spelled
+exactly like ਸਹਿਤ but read /rɛhət/), so they are lexicon entries rather than
+rule output: ਰਹਿਤ → `Rehat`.
 
 ## Schwa deletion
 
@@ -129,6 +133,10 @@ word. Three rules, per word:
   that genuinely ends in one — ਹ aside, which is now exempt.
 - Nothing restores the schwa Punjabi keeps before certain sonorant clusters;
   only the conjunct-cluster case is handled.
+- A word whose *mid-word* ਹਿ is reduced by readers comes out unreduced until it
+  is lexicalized: ਪਹਿਲਾ → `Pahilaa`, ਰਹਿਰਾਸ → `Rahiraas`. Neither is in the
+  canonical text, so this only reaches a user-authored benti; ਰਹਿਤ → `Rehat` is
+  the one such word lexicalized so far.
 - A vowel-vowel juncture with no glide is written plain, so ਲਈਂ → `Lai(n)` can
   be misread as the `ai` of ਐ. `La-i(n)` would be no clearer, and the house
   style writes such junctures plain too ("Nau", "Bhagauti").
@@ -138,7 +146,8 @@ word. Three rules, per word:
 A deliberately small table — a dozen or so words, several of them just alternate
 spellings of the same one — covering high-frequency words whose rule output reads
 wrong: ਵਾਹਿਗੁਰੂ → `Waheguru` (rules: *Vaahiguru*), ਖਾਲਸਾ → `Khalsa`
-(*Khaalsaa*), ਸਤਿਗੁਰੂ → `Satguru`, ਫ਼ਤਹਿ/ਫਤਿਹ/ਫਤੇ → `Fateh`, ਨੂੰ → `Noon`.
+(*Khaalsaa*), ਸਤਿਗੁਰੂ → `Satguru`, ਫ਼ਤਹਿ/ਫਤਿਹ/ਫਤੇ → `Fateh`, ਨੂੰ → `Noon`,
+ਰਹਿਤ → `Rehat` (*Rahit*).
 A few words the rules already get right (ਗੁਰੂ, ਜੀ, ਸ੍ਰੀ, ਸਿੰਘ, ਅਰਦਾਸ) are pinned
 there too, so a later rule change can't silently alter them.
 

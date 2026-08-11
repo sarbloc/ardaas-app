@@ -83,21 +83,23 @@ import Foundation
 /// ਹ is weak: it never hosts a deleted vowel, and it colours a preceding
 /// inherent schwa. Two consequences, both applied before schwa deletion:
 ///
-/// - **A schwa before ਹ + sihari coalesces into `eh`.** `ਪ·ਹਿ` is read
-///   /pɛh/, not /pəhi/, so the schwa becomes `e` and the ਹ closes the
-///   syllable: `ਪਹਿ` → `Peh`, `ਮਹਿ` → `Meh`, `ਰਹਿਤ` → `Reht`. The trigger is
-///   specifically the inherent schwa; a written vowel before ਹ is unaffected,
-///   which is why `ਸਾਹਿਬ` stays `Saahib` and `ਬੋਹਿਥ` stays `Bohith`.
+/// - **A schwa before a word-final ਹ + sihari coalesces into `eh`.** A word
+///   ending in ਹਿ is read /-ɛh/, not /-əhi/, so the schwa becomes `e` and the
+///   ਹ closes the syllable: `ਪਹਿ` → `Peh`, `ਮਹਿ` → `Meh`, `ਕਹਿ` → `Keh`.
+///   Two things narrow it. It is **word-final only** — mid-word ਹਿ takes the
+///   ordinary rules, so `ਸਹਿਤ` → `Sahit` and `ਪਹਿਲਾ` → `Pahilaa` — and the
+///   trigger is specifically the inherent schwa, so a written vowel before ਹ
+///   is unaffected and `ਸਾਹਿਬ` stays `Saahib`, `ਬੋਹਿਥ` stays `Bohith`.
 ///   (`ਵਾਹਿਗੁਰੂ` → `Waheguru` shows the same `e` after a long vowel, but that
 ///   is a lexicalized reduction, so it lives in the lexicon below rather than
 ///   in this rule.)
 /// - **A short vowel on ਹ is never elided** by rule 1 below: `ਕਹੁ` → `Kahu`,
 ///   not `Kah`.
 ///
-/// Coalescence is orthographic, so it also fires on the tatsama borrowings
-/// that keep /əhi/: `ਸਹਿਤ` comes out `Seht` where a reader may say *Sahit*.
-/// Nothing in the spelling separates it from `ਰਹਿਤ` → `Reht`, so this is a
-/// lexicon job, not a rule one.
+/// Restricting the first rule to word-final position is what keeps the tatsama
+/// borrowings that hold their /əhi/ intact: `ਸਹਿਤ` reads `Sahit`. The words
+/// that *are* reduced mid-word are lexical, not predictable from the spelling,
+/// so they go in the lexicon: `ਰਹਿਤ` → `Rehat`.
 ///
 /// ### Schwa deletion
 ///
@@ -339,33 +341,31 @@ enum GurmukhiTransliterator {
 
     // MARK: - ਹ coalescence
 
-    /// An inherent schwa immediately before ਹ + sihari is read as one syllable
-    /// `eh`, with the ਹ in the coda: `ਪ·ਹਿ` → `peh`, `ਰ·ਹਿ·ਤ` → `reht`.
+    /// A **word-final** ਹ + sihari coalesces with the inherent schwa before it
+    /// into one syllable `eh`, with the ਹ in the coda: `ਪ·ਹਿ` → `peh`.
     ///
-    /// Only the *inherent* schwa coalesces. A written vowel before ਹ keeps its
-    /// own syllable, so `ਸਾਹਿਬ` stays `Saahib` and `ਬੋਹਿਥ` stays `Bohith`.
+    /// Two conditions, both necessary:
+    ///
+    /// - **Word-final.** Only a word that *ends* in ਹਿ coalesces: `ਪਹਿ` → `Peh`,
+    ///   `ਮਹਿ` → `Meh`. Mid-word ਹਿ is left to the ordinary rules, so `ਸਹਿਤ` →
+    ///   `Sahit` and `ਪਹਿਲਾ` → `Pahilaa`.
+    /// - **An inherent schwa.** A written vowel before ਹ keeps its own syllable,
+    ///   so `ਸਾਹਿਬ` stays `Saahib` and `ਬੋਹਿਥ` stays `Bohith`.
     private static func coalesceSchwaBeforeHaha(_ units: inout [Unit]) {
-        var result: [Unit] = []
-        result.reserveCapacity(units.count)
-        for unit in units {
-            guard unit.onset == "h",
-                  unit.vowel == "i", unit.isShortMatra,
-                  unit.nasal == nil, unit.coda.isEmpty,
-                  !unit.geminate, !unit.isCluster,
-                  var previous = result.last,
-                  previous.isInherent, previous.vowel == "a",
-                  !previous.onset.isEmpty,
-                  previous.nasal == nil, previous.coda.isEmpty
-            else {
-                result.append(unit)
-                continue
-            }
-            previous.vowel = "e"
-            previous.isInherent = false
-            previous.coda = "h"
-            result[result.count - 1] = previous
-        }
-        units = result
+        guard units.count > 1 else { return }
+        let last = units.count - 1
+        guard units[last].onset == "h",
+              units[last].vowel == "i", units[last].isShortMatra,
+              units[last].nasal == nil, units[last].coda.isEmpty,
+              !units[last].geminate, !units[last].isCluster,
+              units[last - 1].isInherent, units[last - 1].vowel == "a",
+              !units[last - 1].onset.isEmpty,
+              units[last - 1].nasal == nil, units[last - 1].coda.isEmpty
+        else { return }
+        units[last - 1].vowel = "e"
+        units[last - 1].isInherent = false
+        units[last - 1].coda = "h"
+        units.removeLast()
     }
 
     // MARK: - Schwa deletion
@@ -533,6 +533,10 @@ enum GurmukhiTransliterator {
         "ਫ਼ਤਿਹ": "Fateh",         // rules: Fatih
         "ਫਤੇ": "Fateh",          // rules: Phate (the Buddha Dal spelling)
         "ਫ਼ਤੇ": "Fateh",          // rules: Fate
+        // Lexicalized spelling specified by Sarbloc. The ਹ rule is word-final
+        // only, so the rules give "Rahit" — right for the tatsama ਸਹਿਤ →
+        // "Sahit", wrong for this word, which is read /rɛhət/.
+        "ਰਹਿਤ": "Rehat",         // rules: Rahit
     ].reduce(into: [String: String]()) { table, entry in
         table[canonicalKey(Array(entry.key.unicodeScalars))] = entry.value
     }

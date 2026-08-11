@@ -247,26 +247,46 @@ final class GurmukhiTransliteratorTests: XCTestCase {
         ])
     }
 
-    /// ਹ never hosts a deleted vowel, and an inherent schwa before ਹ + sihari
-    /// coalesces with it into `eh`.
+    /// ਹ never hosts a deleted vowel, and a schwa before a **word-final**
+    /// ਹ + sihari coalesces with it into `eh`.
     func testHahaKeepsItsVowel() {
         expect([
+            // Word-final ਹਿ: the schwa before it becomes `e` and the ਹ closes
+            // the syllable.
             ("ਪਹਿ", "Peh"),
             ("ਮਹਿ", "Meh"),
             ("ਕਹਿ", "Keh"),
-            ("ਰਹਿਤ", "Reht"),      // coalescence works mid-word too
-            ("ਪਹਿਲਾ", "Pehlaa"),
+            ("ਰਹਿ", "Reh"),
+            ("ਸਹਿ", "Seh"),
+            ("ਕਰਹਿ", "Kareh"),     // …also when the word is longer
+            ("ਤਿਸਹਿ", "Tiseh"),
             ("ਕਹੁ", "Kahu"),       // a final aunkar on ਹ is not elided either
             ("ਬਹੁ", "Bahu"),
             // Only the *inherent* schwa coalesces: a written vowel before ਹ
-            // keeps its own syllable.
+            // keeps its own syllable, word-final or not.
             ("ਸਾਹਿਬ", "Saahib"),
             ("ਬੋਹਿਥ", "Bohith"),
+            ("ਨਾਹਿ", "Naahi"),
             ("ਹਿੰਮਤ", "Himat"),    // word-initial ਹਿ has no schwa to absorb
-            // Known over-application, pinned so it can't change silently: a
-            // tatsama borrowing that keeps /əhi/ is spelled exactly like ਰਹਿਤ,
-            // so the rule can't tell them apart. A reader may say "Sahit".
-            ("ਸਹਿਤ", "Seht"),
+        ])
+    }
+
+    /// The rule is word-final only, so mid-word ਹਿ takes the ordinary rules.
+    /// That is what keeps the tatsama borrowings that hold their /əhi/ intact;
+    /// the words genuinely reduced mid-word are lexical, not predictable from
+    /// the spelling, so they are lexicon entries instead.
+    func testMidWordHahaIsNotCoalesced() {
+        expect([
+            ("ਸਹਿਤ", "Sahit"),
+            ("ਮਹਿਮਾ", "Mahimaa"),
+            // Spelled exactly like ਸਹਿਤ but read /rɛhət/, which is why it takes
+            // a lexicon entry — the rules alone would give "Rahit".
+            ("ਰਹਿਤ", "Rehat"),
+            // The cost of the narrowing, pinned so it can't change silently: a
+            // word whose mid-word ਹਿ *is* reduced by readers comes out
+            // unreduced until it is lexicalized. Not in the canonical text, so
+            // this only reaches a user-authored benti.
+            ("ਪਹਿਲਾ", "Pahilaa"),
         ])
     }
 
@@ -288,6 +308,7 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਫਤਿਹ", "Fateh"),
             ("ਫਤਹਿ", "Fateh"),
             ("ਫਤੇ", "Fateh"),  // the Buddha Dal spelling
+            ("ਰਹਿਤ", "Rehat"),  // rules alone: "Rahit"
         ])
         // The nukta spelling of ਫ਼ਤਹਿ resolves to the same entry.
         expect([("\u{0A2B}\u{0A3C}\u{0A24}\u{0A39}\u{0A3F}", "Fateh")])
