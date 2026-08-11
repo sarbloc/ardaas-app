@@ -30,7 +30,7 @@ same look while being internally consistent.
 | Nasals | ੰ tippi and ਂ bindi → `n`, or `m` before a labial (ਪ ਫ ਬ ਭ ਮ ਫ਼) |
 | Addak | doubles the next consonant's first letter (ਦਿੱਤੇ → Ditte, ਸੱਚੇ → Sacche) |
 | Conjuncts | ੍ + ਹ/ਰ/ਵ join the onset (ਪ੍ਰ → pr, ਕ੍ਰਿ → kri, ਤਿਨ੍ਹਾਂ → Tinhaan) |
-| Symbols | ੴ → `Ik-Onkar` · ॥ → `||` · । → `|` (standalone tokens: always space-separated, never double-spaced) · ੦–੯ → `0`–`9` |
+| Symbols | ੴ → `Ik-Onkar` · ॥ → `||` · । → `|` (standalone tokens: separated from an adjacent word or Latin text by one space, never double-spaced, following punctuation left alone) · ੦–੯ → `0`–`9` |
 
 Deliberate choices worth flagging:
 

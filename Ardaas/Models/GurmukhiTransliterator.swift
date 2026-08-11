@@ -98,8 +98,10 @@ import Foundation
 ///
 /// `ੴ` → `Ik-Onkar`; `॥` → `||` and `।` → `|`. These are standalone tokens:
 /// each is separated from its neighbours by one space, even when the source
-/// runs them into the surrounding words (`ਜੀ॥ਸਤਿ` → `Ji || Sat`), and an
-/// existing space is never doubled. Gurmukhi digits ੦–੯ → ASCII `0`–`9`.
+/// runs them into an adjacent word or Latin text (`ਜੀ॥ਸਤਿ` → `Ji || Sat`,
+/// `ਜੀ॥hello` → `Ji || hello`), while an existing space is never doubled and
+/// following punctuation is left alone (`ਜੀ॥.` → `Ji ||.`).
+/// Gurmukhi digits ੦–੯ → ASCII `0`–`9`.
 /// Line breaks, spacing and any Latin/ASCII already in the input pass through
 /// untouched and un-recased, so a mixed-script benti survives intact.
 /// Udaat (ੑ) and yakash (ੵ) are dropped; visarga (ਃ) renders as `h`.
@@ -160,6 +162,12 @@ enum GurmukhiTransliterator {
                 output.append(asciiDigits[Int(scalar.value - 0x0A66)])
                 afterStandaloneToken = false
             default:
+                // Latin/ASCII running straight into a standalone token
+                // ("ਜੀ॥hello") is separated too, but punctuation is left
+                // alone so "ਜੀ॥." doesn't become "Ji ||.".
+                if afterStandaloneToken, Character(scalar).isLetter || Character(scalar).isNumber {
+                    separate()
+                }
                 output.unicodeScalars.append(scalar)
                 afterStandaloneToken = false
             }

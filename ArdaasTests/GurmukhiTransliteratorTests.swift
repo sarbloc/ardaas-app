@@ -249,6 +249,9 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਜੀ॥ ਸਤਿ", "Ji || Sat"),
             ("ਜੀ॥੧੦", "Ji || 10"),
             ("ੴਵਾਹਿਗੁਰੂ", "Ik-Onkar Waheguru"),
+            ("ਜੀ॥hello", "Ji || hello"),   // …including Latin
+            ("ੴ2026", "Ik-Onkar 2026"),
+            ("ਜੀ॥.", "Ji ||."),            // but not punctuation
         ])
     }
 
