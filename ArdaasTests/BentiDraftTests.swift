@@ -114,6 +114,18 @@ final class BentiDraftTests: XCTestCase {
         XCTAssertFalse(draft.isStale)
     }
 
+    /// Deleting the English is not staleness: there is nothing left for the
+    /// Gurmukhi to disagree with, and a Gurmukhi-only benti saves fine.
+    func testDeletingTheEnglishIsNotStale() {
+        var draft = BentiDraft(typed: "Bless the sangat.")
+        draft.applyTranslation("ਅਰਦਾਸ", of: draft.translationSource)
+        draft.typed = "  "
+        XCTAssertFalse(draft.isStale)
+        XCTAssertEqual(
+            draft.layers,
+            BentiLayers(gurmukhi: "ਅਰਦਾਸ", transliteration: "Ardaas", english: ""))
+    }
+
     func testUntranslatedDraftIsNeverStale() {
         var draft = BentiDraft(typed: "Bless the sangat.")
         XCTAssertFalse(draft.isStale)

@@ -79,9 +79,14 @@ struct BentiDraft: Equatable {
     /// the Gurmukhi on screen no longer corresponds to the text above it. The
     /// draft is kept (it may hold the user's own edits) and flagged, never
     /// silently discarded or silently saved as if it still matched.
+    ///
+    /// Deleting the English entirely is not staleness: there is then nothing
+    /// for the Gurmukhi to disagree with, and a Gurmukhi-only benti is a
+    /// perfectly good thing to save.
     var isStale: Bool {
         guard let translatedFrom, hasTranslationDraft else { return false }
-        return translatedFrom != typed.trimmed
+        let current = typed.trimmed
+        return !current.isEmpty && current != translatedFrom
     }
 
     /// A translation draft is on screen: only meaningful while the typed text

@@ -46,6 +46,7 @@ struct ComposeView: View {
     @State private var library: ArdaasLibrary?
 
     @State private var isShowingConsent = false
+    @State private var isConfirmingStaleSave = false
     @State private var isTranslating = false
     /// The user asked to translate but the model had to be installed first;
     /// translate for them once it is ready rather than making them tap again.
@@ -56,12 +57,20 @@ struct ComposeView: View {
         label.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Saving mid-translate would persist the layers as they were *before* the
-    /// result lands — an English-only record on a first translate, or the
-    /// previous Gurmukhi against edited English on a re-translate — so Save
-    /// waits the translation out.
+    /// A translation the user has explicitly asked for is still coming: either
+    /// running, or waiting on the install they just consented to.
+    ///
+    /// Saving now would persist the layers as they were *before* the result
+    /// lands — an English-only record on a first translate, or the previous
+    /// Gurmukhi against edited English on a re-translate — and dismissing
+    /// Compose cancels the install as well. So Save waits it out, and the
+    /// progress row says so and points at Cancel download as the way out.
+    private var isAwaitingTranslation: Bool {
+        isTranslating || (translateWhenReady && translation.state.isWorking)
+    }
+
     private var canSave: Bool {
-        !trimmedLabel.isEmpty && !draft.isEmpty && !isTranslating
+        !trimmedLabel.isEmpty && !draft.isEmpty && !isAwaitingTranslation
     }
 
     /// Whether the translation section is on screen at all. Hidden without an
@@ -147,6 +156,24 @@ struct ComposeView: View {
                     translation.download(allowingCellular: allowCellular)
                 }
             }
+            .confirmationDialog(
+                "The Gurmukhi no longer matches your English",
+                isPresented: $isConfirmingStaleSave,
+                titleVisibility: .visible
+            ) {
+                Button("Save both anyway") { save(draft.layers) }
+                Button("Save the English only", role: .destructive) {
+                    // Computed before the state write so the record is built
+                    // from a value we hold, not from a just-mutated @State.
+                    var cleared = draft
+                    cleared.clearTranslation()
+                    draft = cleared
+                    save(cleared.layers)
+                }
+                Button("Keep editing", role: .cancel) {}
+            } message: {
+                Text("You edited the English after translating it, so the two layers say different things. Translate again to update the Gurmukhi — or save them as they are.")
+            }
             .navigationTitle("New Ardaas")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -157,7 +184,15 @@ struct ComposeView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        save()
+                        // A stale draft would persist Gurmukhi that says
+                        // something different from the English next to it, and
+                        // nothing outside this screen can tell that later — so
+                        // it is never saved without an explicit answer.
+                        if draft.isStale {
+                            isConfirmingStaleSave = true
+                        } else {
+                            save(draft.layers)
+                        }
                     }
                     .disabled(!canSave)
                 }
@@ -205,7 +240,9 @@ struct ComposeView: View {
                     ProgressView(value: progress)
                 }
                 .accessibilityElement(children: .combine)
-                Text("Keep this screen open. If you leave, whatever finished is kept and it picks up from there next time.")
+                Text(translateWhenReady
+                     ? "Keep this screen open — leaving cancels the download, and Save waits until your translation is done. Cancel below to save your English benti on its own."
+                     : "Keep this screen open. If you leave, whatever finished is kept and it picks up from there next time.")
                     .font(.footnote)
                     .foregroundStyle(Theme.mist)
                 Button("Cancel download", role: .cancel) {
@@ -354,9 +391,8 @@ struct ComposeView: View {
         }
     }
 
-    private func save() {
-        guard canSave else { return }
-        let layers = draft.layers
+    private func save(_ layers: BentiLayers) {
+        guard canSave, !layers.isEmpty else { return }
         modelContext.insert(
             SavedArdaas(
                 label: trimmedLabel,
