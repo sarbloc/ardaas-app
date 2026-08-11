@@ -298,13 +298,14 @@ enum ModelOptimizer {
         let present = catalog.graphNames.filter {
             fileManager.fileExists(atPath: modelDirectory.appendingPathComponent($0).path)
         }
-        guard !present.isEmpty else {
-            // Killed after the graphs moved into retirement but before the
-            // delete: the root is clean and the cache is valid, so nothing
-            // else ever revisits that ~352 MB. Sweep it here.
-            try? fileManager.removeItem(at: retiredDirectory(in: modelDirectory))
-            return
-        }
+        // Deliberately do NOT delete a pre-existing retirement directory here.
+        // If a previous run was killed mid-retirement, those parked originals
+        // are the only recovery copy, and this path has not re-run
+        // verifyLoadable — dropping them could strand an unverified cache with
+        // nothing to fall back to. They are reclaimed safely elsewhere:
+        // removeCache (disk-pressure rebuild) and deleteEverything (user
+        // delete) both include Originals.retiring.
+        guard !present.isEmpty else { return }
 
         let retired = retiredDirectory(in: modelDirectory)
         try? fileManager.removeItem(at: retired)
