@@ -295,20 +295,32 @@ enum ModelOptimizer {
         }
 
         let fileManager = FileManager.default
+        let retired = retiredDirectory(in: modelDirectory)
+
+        // Make this idempotent under a mid-retirement kill. A leftover
+        // retirement directory means a previous attempt parked graphs and
+        // never finished, so verification never completed for them. Unpark
+        // everything first and start the whole retire+verify pass clean —
+        // otherwise the leftovers are either lost (deleted without a
+        // fallback) or silently skipped (cache treated as verified when it
+        // never was).
+        if fileManager.fileExists(atPath: retired.path) {
+            let parkedNames = (try? fileManager.contentsOfDirectory(atPath: retired.path)) ?? []
+            for name in parkedNames {
+                let destination = modelDirectory.appendingPathComponent(name)
+                guard !fileManager.fileExists(atPath: destination.path) else { continue }
+                try? fileManager.moveItem(at: retired.appendingPathComponent(name), to: destination)
+            }
+            try? fileManager.removeItem(at: retired)
+        }
+
         let present = catalog.graphNames.filter {
             fileManager.fileExists(atPath: modelDirectory.appendingPathComponent($0).path)
         }
-        // Deliberately do NOT delete a pre-existing retirement directory here.
-        // If a previous run was killed mid-retirement, those parked originals
-        // are the only recovery copy, and this path has not re-run
-        // verifyLoadable — dropping them could strand an unverified cache with
-        // nothing to fall back to. They are reclaimed safely elsewhere:
-        // removeCache (disk-pressure rebuild) and deleteEverything (user
-        // delete) both include Originals.retiring.
+        // Nothing to retire and nothing was parked: a previous pass completed
+        // in full, verification included.
         guard !present.isEmpty else { return }
 
-        let retired = retiredDirectory(in: modelDirectory)
-        try? fileManager.removeItem(at: retired)
         try fileManager.createDirectory(at: retired, withIntermediateDirectories: true)
 
         var parked: [String] = []
