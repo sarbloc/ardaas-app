@@ -59,12 +59,32 @@ struct ReaderView: View {
         return library.resolvedVariant(id: savedArdaas.variantId).content
     }
 
-    /// Layers visible right now = toggled on AND present in this variant.
+    /// The persisted toggles as one value, so the visibility rules can be
+    /// pure functions of it.
+    private var toggles: LayerToggles {
+        LayerToggles(
+            gurmukhi: showGurmukhi,
+            transliteration: showTransliteration,
+            english: showEnglish
+        )
+    }
+
+    /// What the canonical segments can show — the variant's own coverage.
+    private var canonicalAvailability: LayerAvailability {
+        .canonical(loadedContent)
+    }
+
+    /// What the screen as a whole can show — the variant's coverage plus the
+    /// benti's own populated layers (see `LayerAvailability.screen`).
+    private var screenAvailability: LayerAvailability {
+        .screen(content: loadedContent, benti: savedArdaas.bentiLayers)
+    }
+
+    /// Layers visible anywhere on screen = toggled on AND carried by the
+    /// variant or the benti. Drives which toggles are disabled, so the last
+    /// thing on screen can never be switched off.
     private var visibleLayerCount: Int {
-        var count = showGurmukhi ? 1 : 0
-        if showTransliteration, loadedContent?.hasTransliteration ?? true { count += 1 }
-        if showEnglish, loadedContent?.hasEnglish ?? true { count += 1 }
-        return count
+        screenAvailability.visibleLayerCount(under: toggles)
     }
 
     @ViewBuilder
@@ -94,7 +114,7 @@ struct ReaderView: View {
                     case .canonical(let segment):
                         segmentView(segment)
                     case .benti(let layers):
-                        bentiView(interimBentiText(layers))
+                        bentiView(layers)
                     }
                 }
             }
@@ -111,25 +131,28 @@ struct ReaderView: View {
 
     @ViewBuilder
     private func segmentView(_ segment: ArdaasSegment) -> some View {
+        // `renderedLayers` carries the never-blank guard: if the persisted
+        // toggles leave this variant with nothing to show (e.g. Gurmukhi off
+        // + only layers it lacks on), Gurmukhi renders anyway. It reasons
+        // about the variant alone, never the benti — a benti-only English
+        // layer keeps the screen non-empty but does nothing for a segment
+        // that has no English.
+        let rendered = canonicalAvailability.renderedLayers(under: toggles)
         VStack(alignment: .leading, spacing: 6) {
-            // `|| visibleLayerCount == 0` is the never-blank guard: if the
-            // persisted toggles leave this variant with nothing to show
-            // (e.g. Gurmukhi off + only unavailable layers on), Gurmukhi
-            // renders anyway.
-            if showGurmukhi || visibleLayerCount == 0 {
+            if rendered.contains(.gurmukhi) {
                 Text(segment.gurmukhi)
                     .font(.system(size: 22 * fontScale))
                     .lineSpacing(8 * fontScale)
                     .foregroundStyle(Theme.parchment)
             }
-            if showTransliteration, let transliteration = segment.transliteration {
+            if rendered.contains(.transliteration), let transliteration = segment.transliteration {
                 Text(transliteration)
                     .font(.system(size: 15 * fontScale))
                     .italic()
                     .lineSpacing(5 * fontScale)
                     .foregroundStyle(Theme.sand)
             }
-            if showEnglish, let english = segment.english {
+            if rendered.contains(.english), let english = segment.english {
                 Text(english)
                     .font(.system(size: 15 * fontScale, design: .serif))
                     .lineSpacing(5 * fontScale)
@@ -139,41 +162,53 @@ struct ReaderView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Interim single-layer rendering of the benti. #45 gives it the same
-    /// per-layer stack as a canonical segment; until then show one layer —
-    /// the first populated layer whose toggle is on, so the benti never
-    /// shows a script the reader has hidden. If every populated layer is
-    /// toggled off, fall back to the first populated one rather than
-    /// rendering an empty box (the same never-blank principle as
-    /// `segmentView`). Today only English is ever populated, so this
-    /// reproduces the pre-#43 behaviour exactly. The composer never emits
-    /// an all-blank benti, so `""` is unreachable.
-    private func interimBentiText(_ layers: BentiLayers) -> String {
-        let populated = [
-            (layers.gurmukhi, showGurmukhi),
-            (layers.transliteration, showTransliteration),
-            (layers.english, showEnglish),
-        ].filter { !$0.0.isEmpty }
-        return (populated.first { $0.1 } ?? populated.first)?.0 ?? ""
+    /// The benti, rendered layer by layer exactly as a canonical segment is
+    /// — same type sizes, colours and spacing — inside the kesri-tinted card
+    /// that marks it out as the user's own words. Which layers appear is the
+    /// pure decision in `BentiLayers.visibleLines`, including its never-blank
+    /// fallback, so the card is never drawn empty.
+    private func bentiView(_ layers: BentiLayers) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(layers.visibleLines(under: toggles)) { line in
+                bentiLine(line)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            Color.accentColor.opacity(0.12),
+            in: RoundedRectangle(cornerRadius: 10)
+        )
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.accentColor.opacity(0.6))
+                .frame(width: 3)
+                .padding(.vertical, 6)
+        }
     }
 
-    private func bentiView(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 17 * fontScale))
-            .lineSpacing(6 * fontScale)
-            .foregroundStyle(Theme.parchment)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(12)
-            .background(
-                Color.accentColor.opacity(0.12),
-                in: RoundedRectangle(cornerRadius: 10)
-            )
-            .overlay(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(Color.accentColor.opacity(0.6))
-                    .frame(width: 3)
-                    .padding(.vertical, 6)
-            }
+    /// One benti layer, styled to match its canonical counterpart in
+    /// `segmentView` so the two read as one continuous text.
+    @ViewBuilder
+    private func bentiLine(_ line: BentiLine) -> some View {
+        switch line.kind {
+        case .gurmukhi:
+            Text(line.text)
+                .font(.system(size: 22 * fontScale))
+                .lineSpacing(8 * fontScale)
+                .foregroundStyle(Theme.parchment)
+        case .transliteration:
+            Text(line.text)
+                .font(.system(size: 15 * fontScale))
+                .italic()
+                .lineSpacing(5 * fontScale)
+                .foregroundStyle(Theme.sand)
+        case .english:
+            Text(line.text)
+                .font(.system(size: 15 * fontScale, design: .serif))
+                .lineSpacing(5 * fontScale)
+                .foregroundStyle(Theme.mist)
+        }
     }
 
     // MARK: - Footer
@@ -183,17 +218,22 @@ struct ReaderView: View {
     /// rarely.
     @ViewBuilder
     private var footerBar: some View {
-        let hasTransliteration = loadedContent?.hasTransliteration ?? false
-        let hasEnglish = loadedContent?.hasEnglish ?? false
-        // Pills only for layers this variant actually carries; no footer
-        // at all for a gurmukhi-only variant.
+        // Pills only for layers something on screen actually carries — the
+        // variant or the benti. Using the screen-wide availability (not the
+        // variant's) is what keeps the user's own words controllable on a
+        // variant with no attested English: the benti's English renders
+        // there, so its pill has to be there to switch it off. No footer at
+        // all when neither the variant nor the benti has either layer.
+        let availability = screenAvailability
+        let hasTransliteration = availability.transliteration
+        let hasEnglish = availability.english
         if hasTransliteration || hasEnglish {
             HStack(spacing: 12) {
                 if hasTransliteration {
-                    layerPill("Transliteration", isOn: $showTransliteration)
+                    layerPill("Transliteration", kind: .transliteration, isOn: $showTransliteration)
                 }
                 if hasEnglish {
-                    layerPill("Translation", isOn: $showEnglish)
+                    layerPill("Translation", kind: .english, isOn: $showEnglish)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -203,7 +243,7 @@ struct ReaderView: View {
         }
     }
 
-    private func layerPill(_ title: String, isOn: Binding<Bool>) -> some View {
+    private func layerPill(_ title: String, kind: LayerKind, isOn: Binding<Bool>) -> some View {
         Button {
             isOn.wrappedValue.toggle()
         } label: {
@@ -224,7 +264,7 @@ struct ReaderView: View {
                 .foregroundStyle(isOn.wrappedValue ? Color.accentColor : Color.secondary)
         }
         .buttonStyle(.plain)
-        .disabled(isLastVisibleLayer(isOn.wrappedValue))
+        .disabled(isPinnedLayer(kind))
         .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
     }
 
@@ -243,7 +283,7 @@ struct ReaderView: View {
             }
             Section("Layers") {
                 Toggle("Gurmukhi", isOn: $showGurmukhi)
-                    .disabled(isLastVisibleLayer(showGurmukhi))
+                    .disabled(isPinnedLayer(.gurmukhi))
             }
             Section("Text Size") {
                 Button {
@@ -265,11 +305,26 @@ struct ReaderView: View {
         }
     }
 
-    /// True when `layer` is on and it is the only layer currently
-    /// visible (toggled on AND available in this variant) — unchecking it
-    /// would leave nothing visible, so its toggle is disabled.
-    private func isLastVisibleLayer(_ layer: Bool) -> Bool {
-        layer && visibleLayerCount == 1
+    /// True when `kind`'s toggle is on but switching it off would achieve
+    /// nothing, so the control is disabled rather than left as a dead one.
+    /// Two ways that happens:
+    ///
+    /// - It is the only layer visible anywhere on screen (toggled on AND
+    ///   carried by the variant or the benti). Unchecking it would leave
+    ///   nothing the reader asked for; the segments' never-blank guard is a
+    ///   backstop, not a destination.
+    /// - Neither the segments nor the benti would drop it, because a
+    ///   never-blank rule puts it straight back: the segments' guard
+    ///   restores Gurmukhi on a variant that carries nothing else, and the
+    ///   benti's fallback restores the single written layer of a benti still
+    ///   awaiting translation. Without this the Translation pill this PR
+    ///   newly offers on a variant with no attested English would be a no-op
+    ///   for exactly the pending-translation case.
+    private func isPinnedLayer(_ kind: LayerKind) -> Bool {
+        guard toggles[kind] else { return false }
+        if visibleLayerCount == 1 { return true }
+        return !canonicalAvailability.hidesLayer(kind, under: toggles)
+            && !savedArdaas.bentiLayers.hidesLayer(kind, under: toggles)
     }
 
     private func adjustFontScale(by delta: Double) {
@@ -285,7 +340,9 @@ struct ReaderView: View {
     )
     let sample = SavedArdaas(
         label: "Morning Ardaas",
-        bentiText: "Please bless the family with health and chardi kala."
+        bentiText: "Please bless the family with health and chardi kala.",
+        bentiGurmukhi: "ਪਰਿਵਾਰ ਨੂੰ ਤੰਦਰੁਸਤੀ ਅਤੇ ਚੜ੍ਹਦੀ ਕਲਾ ਬਖ਼ਸ਼ੋ ਜੀ।",
+        bentiTransliteration: "parivār nūṃ tandarustī ate charhdī kalā bakhsho jī."
     )
     container.mainContext.insert(sample)
     return NavigationStack {
