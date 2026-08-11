@@ -52,6 +52,11 @@ struct ComposeView: View {
     /// translate for them once it is ready rather than making them tap again.
     @State private var translateWhenReady = false
     @State private var translationError: String?
+    /// Held so dismissing the screen abandons the result rather than resuming
+    /// into a view that is gone. It does not stop the inference itself — the
+    /// decode loop checks no cancellation (see #52) — but the service is
+    /// released as soon as it returns.
+    @State private var translationTask: Task<Void, Never>?
 
     private var trimmedLabel: String {
         label.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -139,6 +144,10 @@ struct ComposeView: View {
                     library = try? ArdaasLibrary.loadBundled()
                 }
                 translation.refresh()
+            }
+            .onDisappear {
+                translationTask?.cancel()
+                translationTask = nil
             }
             .onChange(of: translation.state) { _, newState in
                 guard newState.isReady, translateWhenReady else { return }
@@ -376,15 +385,20 @@ struct ComposeView: View {
         guard !source.isEmpty else { return }
         isTranslating = true
         translationError = nil
-        Task { @MainActor in
+        translationTask?.cancel()
+        translationTask = Task { @MainActor in
             do {
                 let gurmukhi = try await translation.translate(source)
+                // The screen may have gone (dismissed) while this ran; don't
+                // write a result nobody is looking at.
+                if Task.isCancelled { return }
                 if gurmukhi.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     translationError = "The translation came back empty. Try rewording your benti."
                 } else {
                     draft.applyTranslation(gurmukhi, of: source)
                 }
             } catch {
+                if Task.isCancelled { return }
                 translationError = Self.message(for: TranslationError.wrap(error))
             }
             isTranslating = false
