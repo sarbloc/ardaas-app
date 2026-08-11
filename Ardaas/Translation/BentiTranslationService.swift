@@ -66,6 +66,15 @@ final class BentiTranslationService: ObservableObject {
         observeMemoryWarnings()
     }
 
+    deinit {
+        // Without this an install outlives its owner: the sheet closes, the
+        // task keeps downloading with nothing observing it, and reopening
+        // creates a second service that races the first over the same files.
+        // Whole files already fetched are kept, so a later install resumes.
+        installTask?.cancel()
+        cancelledInstallTask?.cancel()
+    }
+
     /// Re-reads disk. Cheap (size checks plus one small JSON manifest), so it
     /// is safe to call on every appearance — but it never overrides an install
     /// that is currently running.
