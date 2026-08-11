@@ -59,6 +59,16 @@ struct ReaderView: View {
         return library.resolvedVariant(id: savedArdaas.variantId).content
     }
 
+    /// The persisted toggles as one value, so the visibility rules can be
+    /// pure functions of it.
+    private var toggles: LayerToggles {
+        LayerToggles(
+            gurmukhi: showGurmukhi,
+            transliteration: showTransliteration,
+            english: showEnglish
+        )
+    }
+
     /// What the canonical segments can show — the variant's own coverage.
     private var canonicalAvailability: LayerAvailability {
         .canonical(loadedContent)
@@ -74,11 +84,7 @@ struct ReaderView: View {
     /// variant or the benti. Drives which toggles are disabled, so the last
     /// thing on screen can never be switched off.
     private var visibleLayerCount: Int {
-        screenAvailability.visibleLayerCount(
-            showGurmukhi: showGurmukhi,
-            showTransliteration: showTransliteration,
-            showEnglish: showEnglish
-        )
+        screenAvailability.visibleLayerCount(under: toggles)
     }
 
     /// Layers visible in the canonical segments = toggled on AND carried by
@@ -86,11 +92,7 @@ struct ReaderView: View {
     /// ignore the benti: a benti-only English layer keeps the screen
     /// non-empty but does nothing for a segment that has no English.
     private var visibleCanonicalLayerCount: Int {
-        canonicalAvailability.visibleLayerCount(
-            showGurmukhi: showGurmukhi,
-            showTransliteration: showTransliteration,
-            showEnglish: showEnglish
-        )
+        canonicalAvailability.visibleLayerCount(under: toggles)
     }
 
     @ViewBuilder
@@ -172,13 +174,7 @@ struct ReaderView: View {
     /// fallback, so the card is never drawn empty.
     private func bentiView(_ layers: BentiLayers) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(
-                layers.visibleLines(
-                    showGurmukhi: showGurmukhi,
-                    showTransliteration: showTransliteration,
-                    showEnglish: showEnglish
-                )
-            ) { line in
+            ForEach(layers.visibleLines(under: toggles)) { line in
                 bentiLine(line)
             }
         }
@@ -239,10 +235,10 @@ struct ReaderView: View {
         if hasTransliteration || hasEnglish {
             HStack(spacing: 12) {
                 if hasTransliteration {
-                    layerPill("Transliteration", isOn: $showTransliteration)
+                    layerPill("Transliteration", kind: .transliteration, isOn: $showTransliteration)
                 }
                 if hasEnglish {
-                    layerPill("Translation", isOn: $showEnglish)
+                    layerPill("Translation", kind: .english, isOn: $showEnglish)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -252,7 +248,7 @@ struct ReaderView: View {
         }
     }
 
-    private func layerPill(_ title: String, isOn: Binding<Bool>) -> some View {
+    private func layerPill(_ title: String, kind: LayerKind, isOn: Binding<Bool>) -> some View {
         Button {
             isOn.wrappedValue.toggle()
         } label: {
@@ -273,7 +269,7 @@ struct ReaderView: View {
                 .foregroundStyle(isOn.wrappedValue ? Color.accentColor : Color.secondary)
         }
         .buttonStyle(.plain)
-        .disabled(isLastVisibleLayer(isOn.wrappedValue))
+        .disabled(isPinnedLayer(kind))
         .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
     }
 
@@ -292,7 +288,7 @@ struct ReaderView: View {
             }
             Section("Layers") {
                 Toggle("Gurmukhi", isOn: $showGurmukhi)
-                    .disabled(isLastVisibleLayer(showGurmukhi))
+                    .disabled(isPinnedLayer(.gurmukhi))
             }
             Section("Text Size") {
                 Button {
@@ -314,12 +310,24 @@ struct ReaderView: View {
         }
     }
 
-    /// True when `layer` is on and it is the only layer currently visible
-    /// anywhere on screen (toggled on AND carried by the variant or the
-    /// benti) — unchecking it would leave nothing visible, so its toggle is
-    /// disabled.
-    private func isLastVisibleLayer(_ layer: Bool) -> Bool {
-        layer && visibleLayerCount == 1
+    /// True when `kind`'s toggle is on but switching it off would achieve
+    /// nothing, so the control is disabled rather than left as a dead one.
+    /// Two ways that happens:
+    ///
+    /// - It is the only layer visible anywhere on screen (toggled on AND
+    ///   carried by the variant or the benti). Unchecking it would leave
+    ///   nothing the reader asked for; the segments' never-blank guard is a
+    ///   backstop, not a destination.
+    /// - Nothing canonical carries it and the benti's never-blank fallback
+    ///   would put it straight back — an untranslated benti, whose single
+    ///   written layer is all there is to show. Without this the Translation
+    ///   pill this PR newly offers on a variant with no attested English
+    ///   would be a no-op for exactly the pending-translation case.
+    private func isPinnedLayer(_ kind: LayerKind) -> Bool {
+        guard toggles[kind] else { return false }
+        if visibleLayerCount == 1 { return true }
+        return !canonicalAvailability.carries(kind)
+            && !savedArdaas.bentiLayers.hidesLayer(kind, under: toggles)
     }
 
     private func adjustFontScale(by delta: Double) {
