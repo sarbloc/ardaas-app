@@ -140,15 +140,21 @@ struct ReaderView: View {
     }
 
     /// Interim single-layer rendering of the benti. #45 gives it the same
-    /// per-layer toggles as a canonical segment; until then show the first
-    /// populated layer, preferring the recited Gurmukhi, so nothing renders
-    /// blank once #44 starts writing the other layers. Today only English
-    /// is ever populated, so this reproduces the pre-#43 behaviour exactly.
-    /// The composer never emits an all-blank benti, so the fallback is
-    /// unreachable.
+    /// per-layer stack as a canonical segment; until then show one layer —
+    /// the first populated layer whose toggle is on, so the benti never
+    /// shows a script the reader has hidden. If every populated layer is
+    /// toggled off, fall back to the first populated one rather than
+    /// rendering an empty box (the same never-blank principle as
+    /// `segmentView`). Today only English is ever populated, so this
+    /// reproduces the pre-#43 behaviour exactly. The composer never emits
+    /// an all-blank benti, so `""` is unreachable.
     private func interimBentiText(_ layers: BentiLayers) -> String {
-        [layers.gurmukhi, layers.english, layers.transliteration]
-            .first { !$0.isEmpty } ?? ""
+        let populated = [
+            (layers.gurmukhi, showGurmukhi),
+            (layers.transliteration, showTransliteration),
+            (layers.english, showEnglish),
+        ].filter { !$0.0.isEmpty }
+        return (populated.first { $0.1 } ?? populated.first)?.0 ?? ""
     }
 
     private func bentiView(_ text: String) -> some View {
