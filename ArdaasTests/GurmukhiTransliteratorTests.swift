@@ -98,12 +98,13 @@ final class GurmukhiTransliteratorTests: XCTestCase {
         ])
     }
 
-    /// The bearers ੳ ਅ ੲ take whichever matra follows them.
+    /// The bearers ੳ ਅ ੲ take whichever matra follows them; a bare ੳ is `o`.
     func testVowelBearersTakeTheirMatra() {
         expect([
             ("\u{0A73}\u{0A42}", "U"),   // ੳ + dulainkar
             ("\u{0A72}\u{0A40}", "I"),   // ੲ + bihari
             ("\u{0A05}\u{0A3E}", "Aa"),  // ਅ + kanna
+            ("\u{0A73}", "O"),           // bare ੳ, carrying no matra
         ])
     }
 
@@ -119,23 +120,60 @@ final class GurmukhiTransliteratorTests: XCTestCase {
         ])
     }
 
+    /// An independent ਉ that opens its own syllable — i.e. one that takes a
+    /// glide — reads `o`, written `ou` to stay distinct from ਓ. Everywhere
+    /// else ਉ is a plain `u`.
+    func testIndependentOoraOpeningItsOwnSyllable() {
+        expect([
+            ("ਜੀਉ", "Jiyou"),
+            ("ਜੀਓ", "Jiyo"),      // ਓ stays a bare "o": the two don't collide
+            ("ਪੀਉ", "Piyou"),
+            // No glide, so no own syllable: these are plain vowel junctures.
+            ("ਨਉ", "Nau"),
+            ("ਨਾਉ", "Naau"),
+            ("ਭਗਉਤੀ", "Bhagauti"),
+            ("ਉਪਦੇਸ਼", "Updesh"),  // word-initial ਉ
+            ("ਊਚੇ", "Uche"),       // ਊ is unaffected
+        ])
+    }
+
     // MARK: - Nasalization, gemination, conjuncts
 
-    func testNasalization() {
+    /// Tippi is a nasal *consonant*, so it is written plainly and assimilates.
+    func testTippiNasalization() {
         expect([
-            ("ਪੰਥ", "Panth"),       // tippi → n
+            ("ਪੰਥ", "Panth"),
             ("ਅੰਗ", "Ang"),
             ("ਸਿੰਘ", "Singh"),
+            ("ਪਿੰਡੁ", "Pind"),
             ("ਗੋਬਿੰਦ", "Gobind"),
-            ("ਮਾਂ", "Maan"),        // bindi → n
-            ("ਨਹੀਂ", "Nahin"),
-            ("ਦਸਾਂ", "Dasaan"),
             ("ਪੰਪ", "Pamp"),        // → m before a labial
             ("ਸੰਬ", "Samb"),
             ("\u{0A38}\u{0A70}\u{0A5E}", "Samf"),          // ਫ਼ counts as labial
             ("\u{0A38}\u{0A70}\u{0A2B}\u{0A3C}", "Samf"),  // …either spelling
             ("ਅੰਮ੍ਰਿਤ", "Amrit"),   // homorganic m + ਮ written once
+            ("ਅੰਮ੍ਰਿਤਸਰ", "Amritsar"),
             ("ਮੰਨ", "Man"),         // homorganic n + ਨ written once
+        ])
+    }
+
+    /// Bindi marks a nasalized *vowel*, so it is parenthesised and never
+    /// assimilates. Only bindi is bracketed — tippi above stays plain.
+    func testBindiIsParenthesised() {
+        expect([
+            ("ਮਾਂ", "Maa(n)"),
+            ("ਨਹੀਂ", "Nahi(n)"),
+            ("ਦਸਾਂ", "Dasaa(n)"),
+            ("ਲਈਂ", "Lai(n)"),
+            ("ਥਾਂਈ", "Thaa(n)i"),        // bindi mid-word, on the kanna
+            ("ਧੌਂਸਿਆਂ", "Dhau(n)siyaa(n)"),
+            // A word carrying both: the tippi is the ng of "Singh", the bindi
+            // the nasalized plural ending.
+            ("ਸਿੰਘਾਂ", "Singhaa(n)"),
+            // No m-assimilation for bindi, unlike tippi ("Pamp" above).
+            ("ਮਾਂਪ", "Maa(n)p"),
+            // The rare adak bindi (U+0A01) is a bindi too.
+            ("\u{0A2E}\u{0A3E}\u{0A01}", "Maa(n)"),
         ])
     }
 
@@ -156,7 +194,7 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਪ੍ਰਿਥਮ", "Pritham"),      // pairin rara
             ("ਕ੍ਰਿਪਾ", "Kripaa"),
             ("ਪ੍ਰਭੂ", "Prabhu"),
-            ("ਤਿਨ੍ਹਾਂ", "Tinhaan"),     // pairin haha
+            ("ਤਿਨ੍ਹਾਂ", "Tinhaa(n)"),   // pairin haha
             ("ਖੁਲ੍ਹੇ", "Khulhe"),
             ("ਸ੍ਵਾਸ", "Svaas"),         // pairin wawa
             ("ਚੜ੍ਹਦੀ", "Charhdi"),      // ੜ is "rh"; the pairin haha is absorbed
@@ -185,6 +223,12 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             // Never deleted before a vowel-initial syllable: dropping this
             // schwa would merge two syllables into one ("Bhaguti").
             ("ਭਗਉਤੀ", "Bhagauti"),
+            // Nor before a conjunct cluster, which would pile up three
+            // consonants ("Samgri").
+            ("ਸਮਗ੍ਰੀ", "Samagri"),
+            // The block is on the *following* syllable only, so a conjunct
+            // earlier in the word still lets a later schwa go.
+            ("ਅੰਮ੍ਰਿਤਸਰ", "Amritsar"),
         ])
     }
 
@@ -199,6 +243,26 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਨਾਮੁ", "Naam"),
             ("ਅਮਰਦਾਸੁ", "Amardaas"),
             ("ਕਿ", "Ki"),  // single syllable: the vowel is all it has
+            ("ਸੂਤ੍ਰਿ", "Sutr"),  // …a conjunct onset elides its sihari too
+        ])
+    }
+
+    /// ਹ never hosts a deleted vowel, and an inherent schwa before ਹ + sihari
+    /// coalesces with it into `eh`.
+    func testHahaKeepsItsVowel() {
+        expect([
+            ("ਪਹਿ", "Peh"),
+            ("ਮਹਿ", "Meh"),
+            ("ਕਹਿ", "Keh"),
+            ("ਰਹਿਤ", "Reht"),      // coalescence works mid-word too
+            ("ਪਹਿਲਾ", "Pehlaa"),
+            ("ਕਹੁ", "Kahu"),       // a final aunkar on ਹ is not elided either
+            ("ਬਹੁ", "Bahu"),
+            // Only the *inherent* schwa coalesces: a written vowel before ਹ
+            // keeps its own syllable.
+            ("ਸਾਹਿਬ", "Saahib"),
+            ("ਬੋਹਿਥ", "Bohith"),
+            ("ਹਿੰਮਤ", "Himat"),    // word-initial ਹਿ has no schwa to absorb
         ])
     }
 
@@ -307,7 +371,13 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ),
             // SGPC layer: "Sabh Thaai" in one segment and "Sabh Thai" in
             // another. Neither is derivable: the bindi on ਥਾਂ is written.
-            ("ਸਭ ਥਾਂਈ", "Sabh Thaani"),
+            ("ਸਭ ਥਾਂਈ", "Sabh Thaa(n)i"),
+            // Proof-read as correct against the Buddha Dal text.
+            ("\u{0A26}\u{0A47}\u{0A17}\u{0A3C} \u{0A24}\u{0A47}\u{0A17}\u{0A3C}", "Degh Tegh"),
+            ("ਤੁਮ ਪਹਿ ਅਰਦਾਸਿ", "Tum Peh Ardaas"),
+            ("ਕਹੁ ਨਾਨਕ", "Kahu Naanak"),
+            ("ਸਗਲ ਸਮਗ੍ਰੀ ਤੁਮਰੈ ਸੂਤ੍ਰਿ ਧਾਰੀ", "Sagal Samagri Tumrai Sutr Dhaari"),
+            ("ਜੀਉ ਪਿੰਡੁ ਸਭੁ ਤੇਰੀ ਰਾਸਿ", "Jiyou Pind Sabh Teri Raas"),
         ])
     }
 

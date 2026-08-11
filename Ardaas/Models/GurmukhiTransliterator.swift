@@ -37,7 +37,8 @@ import Foundation
 /// ### Vowels
 ///
 /// `ਅ a · ਆ/ਾ aa · ਇ/ਿ i · ਈ/ੀ i · ਉ/ੁ u · ਊ/ੂ u · ਏ/ੇ e · ਐ/ੈ ai ·`
-/// `ਓ/ੋ o · ਔ/ੌ au`. The bearers ੳ ਅ ੲ carry whichever matra follows them.
+/// `ਓ/ੋ o · ਔ/ੌ au`. The bearers ੳ ਅ ੲ carry whichever matra follows them; a
+/// bare ੳ with no matra is `o`.
 ///
 /// Only the `a`/`aa` length contrast is written. `i`/`u` length is not, which
 /// is what the house style does in its most common forms: `Ji`, `Ki`, `Sri`,
@@ -46,12 +47,25 @@ import Foundation
 /// A glide is inserted before a vowel-initial syllable that follows an `i` or
 /// `u`: `ਧਿਆਨ` → `Dhiyaan`, `ਸੁਆਸ` → `Suwaas`.
 ///
+/// An independent ਉ that opens its own syllable this way — i.e. one that takes
+/// a glide — is read `o` rather than `u`, and is written `ou` so that it stays
+/// distinct from ਓ: `ਜੀਉ` → `Jiyou`, where `ਜੀਓ` → `Jiyo`. Elsewhere ਉ is the
+/// second half of a plain vowel juncture (`ਨਉ` → `Nau`, `ਨਾਉ` → `Naau`,
+/// `ਭਗਉਤੀ` → `Bhagauti`) or a word-initial `u` (`ਉਪਦੇਸ਼` → `Updesh`), and those
+/// keep `u`.
+///
 /// ### Nasalization, gemination, conjuncts
 ///
-/// Tippi (ੰ) and bindi (ਂ) both render as `n`, or `m` before a labial
-/// (`ਪ ਫ ਬ ਭ ਮ ਫ਼`): `ਪੰਥ` → `Panth`, `ਅੰਮ੍ਰਿਤਸਰ` → `Amritsar`. When the nasal
-/// letter equals the following consonant it is written once rather than
-/// doubled (`ਮੰਨ` → `Man`, not `Mann`).
+/// Tippi (ੰ) is a full nasal consonant: `n`, or `m` before a labial
+/// (`ਪ ਫ ਬ ਭ ਮ ਫ਼`) — `ਪੰਥ` → `Panth`, `ਸਿੰਘ` → `Singh`, `ਅੰਮ੍ਰਿਤਸਰ` →
+/// `Amritsar`. When the nasal letter equals the following consonant it is
+/// written once rather than doubled (`ਮੰਨ` → `Man`, not `Mann`).
+///
+/// Bindi (ਂ, and the rare adak bindi ਁ) marks a *nasalized vowel* rather than a
+/// nasal consonant, so it is written parenthesised and never assimilates:
+/// `ਸਿੰਘਾਂ` → `Singhaa(n)`, `ਲਈਂ` → `Lai(n)`, `ਥਾਂਈ` → `Thaa(n)i`. The
+/// parentheses are what keep the two signs apart in Roman — `Singh` is the
+/// name, `Singhaa(n)` its oblique plural.
 ///
 /// Addak (ੱ) geminates the following consonant by doubling its first Roman
 /// letter (`ਦਿੱਤੇ` → `Ditte`, `ਸੱਚੇ` → `Sacche`), with two readability
@@ -64,13 +78,30 @@ import Foundation
 /// consonant whose Roman already ends in `h` is absorbed (`ਚੜ੍ਹਦੀ` →
 /// `Charhdi`, not `Charhhdi`).
 ///
+/// ### ਹ and the vowel it carries
+///
+/// ਹ is weak: it never hosts a deleted vowel, and it colours a preceding
+/// inherent schwa. Two consequences, both applied before schwa deletion:
+///
+/// - **A schwa before ਹ + sihari coalesces into `eh`.** `ਪ·ਹਿ` is read
+///   /pɛh/, not /pəhi/, so the schwa becomes `e` and the ਹ closes the
+///   syllable: `ਪਹਿ` → `Peh`, `ਮਹਿ` → `Meh`, `ਰਹਿਤ` → `Reht`. The trigger is
+///   specifically the inherent schwa; a written vowel before ਹ is unaffected,
+///   which is why `ਸਾਹਿਬ` stays `Saahib` and `ਬੋਹਿਥ` stays `Bohith`.
+///   (`ਵਾਹਿਗੁਰੂ` → `Waheguru` shows the same `e` after a long vowel, but that
+///   is a lexicalized reduction, so it lives in the lexicon below rather than
+///   in this rule.)
+/// - **A short vowel on ਹ is never elided** by rule 1 below: `ਕਹੁ` → `Kahu`,
+///   not `Kah`.
+///
 /// ### Schwa deletion
 ///
 /// The single biggest quality lever. Three rules, applied per word:
 ///
 /// 1. **Final short-vowel elision.** A word-final sihari (ਿ) or aunkar (ੁ) is
 ///    silent, the standard Gurbani reading convention:
-///    `ਸਿਮਰਿ` → `Simar`, `ਸਤਿ` → `Sat`, `ਅਮਰਦਾਸੁ` → `Amardaas`.
+///    `ਸਿਮਰਿ` → `Simar`, `ਸਤਿ` → `Sat`, `ਅਮਰਦਾਸੁ` → `Amardaas`. Not on ਹ,
+///    per the section above.
 /// 2. **Final schwa deletion.** The inherent `a` of a word-final consonant is
 ///    dropped: `ਨਾਨਕ` → `Naanak`, not `Naanaka`.
 /// 3. **Medial schwa deletion.** Scanning right to left, the inherent `a` of a
@@ -78,9 +109,10 @@ import Foundation
 ///    have a pronounced vowel (the classic `VCəCV → VCCV` rule):
 ///    `ਪਾਤਸ਼ਾਹੀ` → `Paatshaahi`, `ਹਰਗੋਬਿੰਦ` → `Hargobind`, `ਅਰਦਾਸ` → `Ardaas`.
 ///    The first syllable of a word is never emptied, a syllable carrying a
-///    nasal keeps its vowel, and nothing is deleted before a vowel-initial
+///    nasal keeps its vowel, nothing is deleted before a vowel-initial
 ///    syllable, where it would merge two syllables (`ਭਗਉਤੀ` → `Bhagauti`, not
-///    `Bhaguti`).
+///    `Bhaguti`), and nothing is deleted before a conjunct cluster, where it
+///    would pile up three consonants (`ਸਮਗ੍ਰੀ` → `Samagri`, not `Samgri`).
 ///
 /// Known limitations of the rule: it is orthographic, so it cannot know about
 /// morpheme boundaries (compounds may keep or lose a schwa a reader would
@@ -88,10 +120,10 @@ import Foundation
 /// certain sonorant clusters, and rule 1 will wrongly silence a final short
 /// vowel in the rare modern word that genuinely ends in one. Where two
 /// deletable schwas are adjacent only the rightmost goes, so `ਗੁਰਦਵਾਰਿਆਂ`
-/// comes out `Guradvaariyaan`.
+/// comes out `Guradvaariyaa(n)`.
 ///
-/// A vowel-vowel juncture with no glide is written as-is, so `ਲਈਂ` → `Lain`
-/// can be misread as the `ai` of ਐ. Writing it `La-in` would be no clearer,
+/// A vowel-vowel juncture with no glide is written as-is, so `ਲਈਂ` → `Lai(n)`
+/// can be misread as the `ai` of ਐ. Writing it `La-i(n)` would be no clearer,
 /// and the house style itself writes such junctures plain ("Nau", "Bhagauti").
 ///
 /// ### Everything else
@@ -183,6 +215,7 @@ enum GurmukhiTransliterator {
             return known
         }
         var syllables = units(from: word)
+        coalesceSchwaBeforeHaha(&syllables)
         applySchwaDeletion(&syllables)
         return titleCased(render(syllables))
     }
@@ -194,6 +227,13 @@ enum GurmukhiTransliterator {
 
     // MARK: - Syllable model
 
+    /// Tippi and bindi both nasalize, but they are written differently: tippi
+    /// is a full nasal consonant, bindi a parenthesised mark on the vowel.
+    private enum Nasal {
+        case tippi
+        case bindi
+    }
+
     /// One orthographic syllable: an onset (possibly with subscript conjuncts),
     /// a vowel (`nil` once deleted, or for a bare consonant), and its codas.
     private struct Unit {
@@ -203,7 +243,13 @@ enum GurmukhiTransliterator {
         var isInherent = false
         /// The vowel came from a sihari/aunkar, i.e. a final-elision candidate.
         var isShortMatra = false
-        var hasNasal = false
+        /// The vowel came from an independent ਉ, which reads `o` (written `ou`)
+        /// when it opens its own syllable.
+        var isIndependentU = false
+        var nasal: Nasal? = nil
+        /// The onset was joined by a subscript conjunct (ਗ੍ਰ), so it is a
+        /// consonant cluster rather than a single consonant.
+        var isCluster = false
         var geminate = false
         var coda = ""
     }
@@ -227,7 +273,7 @@ enum GurmukhiTransliterator {
                 continue
             case 0x0A01, 0x0A02, 0x0A70: // adak bindi, bindi, tippi
                 if units.isEmpty { units.append(Unit()) }
-                units[units.count - 1].hasNasal = true
+                units[units.count - 1].nasal = value == 0x0A70 ? .tippi : .bindi
                 continue
             case 0x0A03: // ਃ visarga
                 if units.isEmpty { units.append(Unit()) }
@@ -250,6 +296,7 @@ enum GurmukhiTransliterator {
             if let vowel = independentVowels[value] {
                 var unit = Unit()
                 unit.vowel = vowel
+                unit.isIndependentU = value == 0x0A09 // ਉ
                 units.append(unit)
                 continue
             }
@@ -268,6 +315,7 @@ enum GurmukhiTransliterator {
                 if !(consonant == "h" && units[units.count - 1].onset.hasSuffix("h")) {
                     units[units.count - 1].onset += consonant
                 }
+                units[units.count - 1].isCluster = true
                 continue
             }
 
@@ -284,18 +332,51 @@ enum GurmukhiTransliterator {
         return units
     }
 
+    // MARK: - ਹ coalescence
+
+    /// An inherent schwa immediately before ਹ + sihari is read as one syllable
+    /// `eh`, with the ਹ in the coda: `ਪ·ਹਿ` → `peh`, `ਰ·ਹਿ·ਤ` → `reht`.
+    ///
+    /// Only the *inherent* schwa coalesces. A written vowel before ਹ keeps its
+    /// own syllable, so `ਸਾਹਿਬ` stays `Saahib` and `ਬੋਹਿਥ` stays `Bohith`.
+    private static func coalesceSchwaBeforeHaha(_ units: inout [Unit]) {
+        var result: [Unit] = []
+        result.reserveCapacity(units.count)
+        for unit in units {
+            guard unit.onset == "h",
+                  unit.vowel == "i", unit.isShortMatra,
+                  unit.nasal == nil, unit.coda.isEmpty,
+                  !unit.geminate, !unit.isCluster,
+                  var previous = result.last,
+                  previous.isInherent, previous.vowel == "a",
+                  !previous.onset.isEmpty,
+                  previous.nasal == nil, previous.coda.isEmpty
+            else {
+                result.append(unit)
+                continue
+            }
+            previous.vowel = "e"
+            previous.isInherent = false
+            previous.coda = "h"
+            result[result.count - 1] = previous
+        }
+        units = result
+    }
+
     // MARK: - Schwa deletion
 
     private static func applySchwaDeletion(_ units: inout [Unit]) {
         guard units.count > 1 else { return }
         let last = units.count - 1
 
-        // 1. A word-final sihari/aunkar is silent.
-        if units[last].isShortMatra, !units[last].hasNasal, !units[last].onset.isEmpty {
+        // 1. A word-final sihari/aunkar is silent — but not on ਹ, which never
+        //    hosts a deleted vowel (ਕਹੁ → "Kahu", not "Kah").
+        if units[last].isShortMatra, units[last].nasal == nil,
+           !units[last].onset.isEmpty, units[last].onset != "h" {
             units[last].vowel = nil
         }
         // 2. A word-final inherent schwa is deleted.
-        if units[last].isInherent, !units[last].hasNasal, !units[last].onset.isEmpty {
+        if units[last].isInherent, units[last].nasal == nil, !units[last].onset.isEmpty {
             units[last].vowel = nil
         }
         // 3. Medial schwa deletion, right to left: V C ə C V → V C C V.
@@ -303,13 +384,16 @@ enum GurmukhiTransliterator {
         for index in stride(from: units.count - 2, through: 1, by: -1) {
             guard units[index].isInherent,
                   units[index].vowel != nil,
-                  !units[index].hasNasal,
+                  units[index].nasal == nil,
                   !units[index].onset.isEmpty,
                   units[index - 1].vowel != nil,
                   units[index + 1].vowel != nil,
                   // Never delete before a vowel-initial syllable: that would
                   // merge two syllables (ਭਗਉਤੀ → "Bhaguti", not "Bhagauti").
-                  !units[index + 1].onset.isEmpty
+                  !units[index + 1].onset.isEmpty,
+                  // Nor before a conjunct cluster, which would pile up three
+                  // consonants (ਸਮਗ੍ਰੀ → "Samgri", not "Samagri").
+                  !units[index + 1].isCluster
             else { continue }
             units[index].vowel = nil
         }
@@ -325,12 +409,24 @@ enum GurmukhiTransliterator {
                 let isWordFinal = index == units.count - 1 && unit.vowel == nil
                 if !isWordFinal { onset = String(first) + onset }
             }
+            var vowel = unit.vowel ?? ""
             if onset.isEmpty, index > 0 {
-                result += glide(before: index, in: units)
+                let glideLetter = glide(before: index, in: units)
+                result += glideLetter
+                // A glide means this ਉ opens its own syllable, where it reads
+                // `o`: ਜੀਉ → "Jiyou", kept distinct from ਜੀਓ → "Jiyo".
+                if !glideLetter.isEmpty, unit.isIndependentU, vowel == "u" {
+                    vowel = "ou"
+                }
             }
             result += onset
-            result += unit.vowel ?? ""
-            if unit.hasNasal { result += nasal(at: index, in: units) }
+            result += vowel
+            if let nasal = unit.nasal {
+                switch nasal {
+                case .tippi: result += tippi(at: index, in: units)
+                case .bindi: result += "(n)"
+                }
+            }
             result += unit.coda
         }
         return result
@@ -340,13 +436,14 @@ enum GurmukhiTransliterator {
     /// `i`/`u` takes the matching glide.
     private static func glide(before index: Int, in units: [Unit]) -> String {
         let previous = units[index - 1]
-        guard !previous.hasNasal, let vowel = previous.vowel else { return "" }
+        guard previous.nasal == nil, let vowel = previous.vowel else { return "" }
         if vowel.hasSuffix("i") { return "y" }
         if vowel.hasSuffix("u") { return "w" }
         return ""
     }
 
-    private static func nasal(at index: Int, in units: [Unit]) -> String {
+    /// Tippi is a nasal consonant, so it assimilates to what follows.
+    private static func tippi(at index: Int, in units: [Unit]) -> String {
         let nextOnset = index + 1 < units.count ? units[index + 1].onset : ""
         guard let next = nextOnset.first else { return "n" }
         let letter: Character = labials.contains(next) ? "m" : "n"
@@ -400,7 +497,7 @@ enum GurmukhiTransliterator {
         0x0A05: "a", 0x0A06: "aa", 0x0A07: "i", 0x0A08: "i", 0x0A09: "u",
         0x0A0A: "u", 0x0A0F: "e", 0x0A10: "ai", 0x0A13: "o", 0x0A14: "au",
         0x0A72: "i", // ੲ bearer, normally overwritten by its matra
-        0x0A73: "u", // ੳ bearer, normally overwritten by its matra
+        0x0A73: "o", // ੳ bearer, normally overwritten by its matra
     ]
 
     private static let matras: [UInt32: String] = [
@@ -425,8 +522,8 @@ enum GurmukhiTransliterator {
         "ਨੂੰ": "Noon",            // rules: Nun
         "ਫਤਹ": "Fateh",          // rules: Phatah
         "ਫ਼ਤਹ": "Fateh",          // rules: Fatah
-        "ਫਤਹਿ": "Fateh",         // rules: Phatah
-        "ਫ਼ਤਹਿ": "Fateh",         // rules: Fatah
+        "ਫਤਹਿ": "Fateh",         // rules: Phateh
+        "ਫ਼ਤਹਿ": "Fateh",         // pinned; the ਹ rules now derive it
         "ਫਤਿਹ": "Fateh",         // rules: Phatih
         "ਫ਼ਤਿਹ": "Fateh",         // rules: Fatih
         "ਫਤੇ": "Fateh",          // rules: Phate (the Buddha Dal spelling)
