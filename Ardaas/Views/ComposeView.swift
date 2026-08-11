@@ -56,16 +56,27 @@ struct ComposeView: View {
         label.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Saving mid-translate would persist the layers as they were *before* the
+    /// result lands — an English-only record on a first translate, or the
+    /// previous Gurmukhi against edited English on a re-translate — so Save
+    /// waits the translation out.
     private var canSave: Bool {
-        !trimmedLabel.isEmpty && !draft.isEmpty
+        !trimmedLabel.isEmpty && !draft.isEmpty && !isTranslating
     }
 
-    /// Whether the Translate action is on screen at all. Hidden without an
+    /// Whether the translation section is on screen at all. Hidden without an
     /// engine (it could only fail) and for Gurmukhi input (nothing to
-    /// translate) — but shown, disabled, for an empty editor, so the feature
-    /// is discoverable before anything is typed.
-    private var showsTranslateAction: Bool {
-        TranslationBuild.isEngineAvailable && !draft.isTypedInGurmukhi
+    /// translate) — but shown, disabled, for an empty editor, so the feature is
+    /// discoverable before anything is typed.
+    ///
+    /// The `isWorking` term keeps an install visible when the user switches to
+    /// Gurmukhi mid-download: the transfer carries on regardless, and hiding it
+    /// would hide the progress *and* the only Cancel button. A failure is not
+    /// held open the same way — `state` is sticky, so it surfaces again as soon
+    /// as the text goes back to being translatable.
+    private var showsTranslationSection: Bool {
+        TranslationBuild.isEngineAvailable
+            && (!draft.isTypedInGurmukhi || translation.state.isWorking)
     }
 
     var body: some View {
@@ -98,8 +109,11 @@ struct ComposeView: View {
 
                 if draft.isTypedInGurmukhi {
                     transliterationSection
-                } else if showsTranslateAction {
+                }
+                if showsTranslationSection {
                     translateSection
+                    // False whenever the typed text is Gurmukhi, so a draft
+                    // from earlier English stays hidden while it is ignored.
                     if draft.hasTranslationDraft {
                         gurmukhiDraftSection
                     }
