@@ -5,28 +5,67 @@ import SwiftUI
 /// `SavedArdaas`. Presentation-agnostic — the presenter (e.g. the Home
 /// screen) shows it as a sheet; it dismisses itself after saving or on
 /// cancel.
+///
+/// ## Translation (#44)
+///
+/// The benti can be written in English and translated to Gurmukhi entirely on
+/// device, or typed straight in Gurmukhi. Which one is happening is decided by
+/// `BentiScriptDetector` from what is in the editor:
+///
+/// * **Gurmukhi typed** → no translation at all. The transliteration is
+///   generated live by `GurmukhiTransliterator`, which is deterministic and
+///   needs no model, so this path works in every build.
+/// * **Anything else** → a Translate action, which the first time presents
+///   `TranslationConsentView` and downloads nothing until the user confirms
+///   there. The result is a *draft*: shown with a machine-translation
+///   disclaimer, editable, and with its transliteration regenerated from
+///   whatever the user leaves in the Gurmukhi editor.
+///
+/// In a build without the ONNX Runtime linked (`TranslationBuild
+/// .isEngineAvailable == false`, which is every release build today) the
+/// Translate action is not shown at all rather than offered and then failing —
+/// but the Gurmukhi-typed path above is untouched.
+///
+/// Saving writes all three layers. Saving without translating writes English
+/// only, exactly as before this screen could translate.
 struct ComposeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
+    /// Owned by this screen: the download it may start is cancelled when the
+    /// screen goes away (partial files are kept and resume), which is why the
+    /// consent copy asks the user to keep the screen open.
+    @StateObject private var translation = BentiTranslationService()
+
     @State private var label = ""
-    @State private var bentiText = ""
+    @State private var draft = BentiDraft()
     @State private var variantId = ArdaasLibrary.defaultVariantId
 
     /// Loaded once; failure hides the picker and saves fall back to the
     /// default variant (a broken bundle already surfaces in the Reader).
     @State private var library: ArdaasLibrary?
 
+    @State private var isShowingConsent = false
+    @State private var isTranslating = false
+    /// The user asked to translate but the model had to be installed first;
+    /// translate for them once it is ready rather than making them tap again.
+    @State private var translateWhenReady = false
+    @State private var translationError: String?
+
     private var trimmedLabel: String {
         label.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var trimmedBenti: String {
-        bentiText.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var canSave: Bool {
+        !trimmedLabel.isEmpty && !draft.isEmpty
     }
 
-    private var canSave: Bool {
-        !trimmedLabel.isEmpty && !trimmedBenti.isEmpty
+    /// Whether the Translate action is on screen at all. Hidden without an
+    /// engine (it could only fail) and for Gurmukhi input (nothing to
+    /// translate) — but shown, disabled, for an empty editor, so the feature
+    /// is discoverable before anything is typed.
+    private var showsTranslateAction: Bool {
+        TranslationBuild.isEngineAvailable && !draft.isTypedInGurmukhi
     }
 
     var body: some View {
@@ -51,11 +90,20 @@ struct ComposeView: View {
                 }
 
                 Section("Benti") {
-                    TextEditor(text: $bentiText)
+                    TextEditor(text: $draft.typed)
                         .frame(minHeight: 160)
                         .accessibilityLabel("Benti")
                 }
                 .listRowBackground(Theme.raisedFill)
+
+                if draft.isTypedInGurmukhi {
+                    transliterationSection
+                } else if showsTranslateAction {
+                    translateSection
+                    if draft.hasTranslationDraft {
+                        gurmukhiDraftSection
+                    }
+                }
 
                 Section {
                     gurmukhiKeyboardTip
@@ -66,6 +114,23 @@ struct ComposeView: View {
             .onAppear {
                 if library == nil {
                     library = try? ArdaasLibrary.loadBundled()
+                }
+                translation.refresh()
+            }
+            .onChange(of: translation.state) { _, newState in
+                guard newState.isReady, translateWhenReady else { return }
+                translateWhenReady = false
+                translate()
+            }
+            .sheet(isPresented: $isShowingConsent) {
+                TranslationConsentView(
+                    downloadBytes: translation.downloadBytes,
+                    peakDiskBytes: translation.peakDiskBytes,
+                    installedDiskBytes: translation.installedDiskBytes
+                ) { allowCellular in
+                    translationError = nil
+                    translateWhenReady = true
+                    translation.download(allowingCellular: allowCellular)
                 }
             }
             .navigationTitle("New Ardaas")
@@ -84,6 +149,152 @@ struct ComposeView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Gurmukhi typed directly
+
+    /// No model involved: the transliteration is generated from the typed
+    /// Gurmukhi by pure rules, so this renders in every build, offline, with
+    /// nothing installed.
+    private var transliterationSection: some View {
+        Section("Transliteration") {
+            Text(draft.transliteration)
+                .font(.callout)
+                .italic()
+                .foregroundStyle(Theme.sand)
+                .textSelection(.enabled)
+                .accessibilityLabel("Transliteration")
+            Text("Generated from your Gurmukhi. Saved alongside it so you can read the Ardaas in either script.")
+                .font(.footnote)
+                .foregroundStyle(Theme.mist)
+        }
+        .listRowBackground(Theme.raisedFill)
+    }
+
+    // MARK: - Translate
+
+    @ViewBuilder
+    private var translateSection: some View {
+        Section("Gurmukhi") {
+            switch translation.state {
+            case .notDownloaded:
+                translateButton
+                Text("Translation runs on this phone. The first time, it downloads a \(Self.bytes(translation.downloadBytes)) model — you'll see exactly what before anything starts.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.mist)
+
+            case .downloading(let progress):
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Downloading the translation model — \(Int(progress * 100))%")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.mist)
+                    ProgressView(value: progress)
+                }
+                .accessibilityElement(children: .combine)
+                Text("Keep this screen open. If you leave, whatever finished is kept and it picks up from there next time.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.mist)
+                Button("Cancel download", role: .cancel) {
+                    translateWhenReady = false
+                    translation.cancelDownload()
+                }
+
+            case .optimizing:
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Preparing the model — one time only.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.mist)
+                }
+                .accessibilityElement(children: .combine)
+
+            case .ready:
+                translateButton
+                Text("Runs on this phone. Your benti is not uploaded anywhere.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.mist)
+
+            case .failed(let error):
+                Label(Self.message(for: error), systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+                Button("Try again") { isShowingConsent = true }
+            }
+
+            if let translationError {
+                Label(translationError, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
+            }
+        }
+        .listRowBackground(Theme.raisedFill)
+    }
+
+    private var translateButton: some View {
+        Button {
+            if translation.state.isReady {
+                translate()
+            } else {
+                // Nothing is downloaded until the user confirms in there.
+                isShowingConsent = true
+            }
+        } label: {
+            if isTranslating {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Translating…")
+                }
+            } else {
+                Label(
+                    draft.hasTranslationDraft ? "Translate again" : "Translate to Gurmukhi",
+                    systemImage: "character.book.closed")
+            }
+        }
+        .disabled(!draft.isTranslatable || isTranslating)
+    }
+
+    /// The reviewable draft: editable Gurmukhi, its regenerated
+    /// transliteration, and an honest disclaimer about where it came from.
+    private var gurmukhiDraftSection: some View {
+        Section("Gurmukhi draft") {
+            TextEditor(text: $draft.gurmukhi)
+                .frame(minHeight: 110)
+                .font(.title3)
+                .foregroundStyle(Theme.parchment)
+                .accessibilityLabel("Gurmukhi benti")
+
+            if !draft.transliteration.isEmpty {
+                Text(draft.transliteration)
+                    .font(.footnote)
+                    .italic()
+                    .foregroundStyle(Theme.sand)
+                    .textSelection(.enabled)
+                    .accessibilityLabel("Transliteration")
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Machine translation — check before saving", systemImage: "exclamationmark.triangle")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.kesri)
+                Text("This was translated on your phone by a small model, not by a person. Read it, edit the Gurmukhi if anything is off — the transliteration updates as you do — then save.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.mist)
+            }
+            .padding(.vertical, 2)
+
+            if draft.isStale {
+                Label("You've changed the English since this was translated. Translate again to update the Gurmukhi.", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.kesri)
+            }
+
+            Button("Remove Gurmukhi", role: .destructive) {
+                draft.clearTranslation()
+                translationError = nil
+            }
+            .font(.footnote)
+        }
+        .listRowBackground(Theme.raisedFill)
     }
 
     private var gurmukhiKeyboardTip: some View {
@@ -105,12 +316,72 @@ struct ComposeView: View {
         .padding(.vertical, 4)
     }
 
+    // MARK: - Actions
+
+    @MainActor
+    private func translate() {
+        guard !isTranslating, draft.isTranslatable, translation.state.isReady else { return }
+        let source = draft.translationSource
+        guard !source.isEmpty else { return }
+        isTranslating = true
+        translationError = nil
+        Task { @MainActor in
+            do {
+                let gurmukhi = try await translation.translate(source)
+                if gurmukhi.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    translationError = "The translation came back empty. Try rewording your benti."
+                } else {
+                    draft.applyTranslation(gurmukhi, of: source)
+                }
+            } catch {
+                translationError = Self.message(for: TranslationError.wrap(error))
+            }
+            isTranslating = false
+        }
+    }
+
     private func save() {
         guard canSave else { return }
+        let layers = draft.layers
         modelContext.insert(
-            SavedArdaas(label: trimmedLabel, bentiText: trimmedBenti, variantId: variantId)
+            SavedArdaas(
+                label: trimmedLabel,
+                bentiText: layers.english,
+                variantId: variantId,
+                bentiGurmukhi: layers.gurmukhi,
+                bentiTransliteration: layers.transliteration
+            )
         )
         dismiss()
+    }
+
+    // MARK: - Copy
+
+    /// User-facing wording for the failures reachable from this screen. Falls
+    /// back to the error's own text rather than hiding it — a silent failure
+    /// would be worse than a technical one.
+    private static func message(for error: TranslationError) -> String {
+        switch error {
+        case .cellularNotAllowed:
+            return "The download needs Wi-Fi, or your permission to use mobile data."
+        case .insufficientDisk:
+            return "Not enough free space on this phone to install the translation model."
+        case .insufficientMemory:
+            return "Not enough free memory to translate right now. Close a few apps and try again."
+        case .inputTooLong:
+            return "This benti is too long to translate in one go. Try a shorter one."
+        case .cancelled:
+            return "Cancelled."
+        case .engineUnavailable, .notReady:
+            return "Translation isn't ready yet."
+        default:
+            return error.description
+        }
+    }
+
+    /// Decimal units, matching how iOS reports storage to the user.
+    private static func bytes(_ value: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: value, countStyle: .file)
     }
 }
 
