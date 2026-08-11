@@ -83,9 +83,10 @@ word. Three rules, per word:
 
 ## Exception lexicon
 
-A deliberately small table (~13 entries) of high-frequency words whose rule
-output reads wrong: ਵਾਹਿਗੁਰੂ → `Waheguru` (rules: *Vaahiguru*), ਖਾਲਸਾ →
-`Khalsa` (*Khaalsaa*), ਸਤਿਗੁਰੂ → `Satguru`, ਫ਼ਤਹਿ/ਫਤਿਹ → `Fateh`, ਨੂੰ → `Noon`.
+A deliberately small table — a dozen or so words, several of them just alternate
+spellings of the same one — covering high-frequency words whose rule output reads
+wrong: ਵਾਹਿਗੁਰੂ → `Waheguru` (rules: *Vaahiguru*), ਖਾਲਸਾ → `Khalsa`
+(*Khaalsaa*), ਸਤਿਗੁਰੂ → `Satguru`, ਫ਼ਤਹਿ/ਫਤਿਹ/ਫਤੇ → `Fateh`, ਨੂੰ → `Noon`.
 A few words the rules already get right (ਗੁਰੂ, ਜੀ, ਸ੍ਰੀ, ਸਿੰਘ, ਅਰਦਾਸ) are pinned
 there too, so a later rule change can't silently alter them.
 

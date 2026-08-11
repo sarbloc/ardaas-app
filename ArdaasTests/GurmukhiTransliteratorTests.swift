@@ -219,6 +219,7 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਨੂੰ", "Noon"),
             ("ਫਤਿਹ", "Fateh"),
             ("ਫਤਹਿ", "Fateh"),
+            ("ਫਤੇ", "Fateh"),  // the Buddha Dal spelling
         ])
         // The nukta spelling of ਫ਼ਤਹਿ resolves to the same entry.
         expect([("\u{0A2B}\u{0A3C}\u{0A24}\u{0A39}\u{0A3F}", "Fateh")])
@@ -292,6 +293,8 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਿਹ॥", "Waheguru Ji Ki Fateh ||"),
             ("ਪ੍ਰਿਥਮ ਭਗੌਤੀ ਸਿਮਰਿ ਕੈ", "Pritham Bhagauti Simar Kai"),
             ("ਦੇਗ ਤੇਗ ਫ਼ਤਹ", "Deg Teg Fateh"),
+            // The Buddha Dal heading, whose Roman layer this engine generates.
+            ("ੴ ਸ੍ਰੀ ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤੇ ॥", "Ik-Onkar Sri Waheguru Ji Ki Fateh ||"),
             ("ਬੋਲੋ ਜੀ ਵਾਹਿਗੁਰੂ॥", "Bolo Ji Waheguru ||"),
             // SGPC layer: "Waheguru Ji Ka Khalsa" — ਕਾ is a kanna, so this
             // engine writes the long vowel: "Kaa".

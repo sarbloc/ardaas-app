@@ -429,6 +429,8 @@ enum GurmukhiTransliterator {
         "ਫ਼ਤਹਿ": "Fateh",         // rules: Fatah
         "ਫਤਿਹ": "Fateh",         // rules: Phatih
         "ਫ਼ਤਿਹ": "Fateh",         // rules: Fatih
+        "ਫਤੇ": "Fateh",          // rules: Phate (the Buddha Dal spelling)
+        "ਫ਼ਤੇ": "Fateh",          // rules: Fate
     ].reduce(into: [String: String]()) { table, entry in
         table[canonicalKey(Array(entry.key.unicodeScalars))] = entry.value
     }
