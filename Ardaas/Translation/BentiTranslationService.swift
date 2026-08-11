@@ -47,6 +47,9 @@ final class BentiTranslationService: ObservableObject {
     /// so the next install waits it out instead of racing it over the same
     /// files. Cleared once awaited.
     private var cancelledInstallTask: Task<Void, Never>?
+    /// Set for the whole of `deleteModel`, which suspends several times; blocks
+    /// a new install from starting into files we are about to remove.
+    private var isDeleting = false
     /// Bumped whenever an install is superseded (cancel, delete, restart), so a
     /// late progress hop from the old one cannot overwrite the new state.
     private var generation = 0
@@ -84,7 +87,7 @@ final class BentiTranslationService: ObservableObject {
     ///   transfer fails with `.cellularNotAllowed` rather than quietly spending
     ///   ~359 MB of the user's data plan.
     func download(allowingCellular: Bool = false) {
-        guard installTask == nil, !state.isReady else { return }
+        guard installTask == nil, !state.isReady, !isDeleting else { return }
         generation += 1
         let token = generation
         state = .downloading(progress: 0)
@@ -139,6 +142,13 @@ final class BentiTranslationService: ObservableObject {
     /// Removes every byte the feature owns — downloads, optimized cache and
     /// any unfinished scratch — and returns to `.notDownloaded`.
     func deleteModel() async {
+        // @MainActor is reentrant at every await below, so without this a
+        // download() started mid-delete would be wiped out by our own
+        // deleteEverything(). download() refuses while it is set.
+        guard !isDeleting else { return }
+        isDeleting = true
+        defer { isDeleting = false }
+
         generation += 1
         let task = installTask
         installTask = nil

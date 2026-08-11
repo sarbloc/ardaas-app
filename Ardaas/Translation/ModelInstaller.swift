@@ -237,10 +237,12 @@ final class ModelInstaller: @unchecked Sendable {
             // count it as reclaimable rather than failing an upgrade or repair
             // on a nearly full device.
             if buildingCache {
+                // removeCache clears exactly the directories cacheBytes counts
+                // (Optimized, Optimized.building, Originals.retiring), so the
+                // space we counted is the space we actually reclaim.
                 let reclaimable = ModelOptimizer.cacheBytes(in: directory)
                 if reclaimable > 0, available + reclaimable >= required {
-                    try? fileManager.removeItem(
-                        at: ModelOptimizer.optimizedDirectory(in: directory))
+                    ModelOptimizer.removeCache(in: directory)
                     return
                 }
             }
