@@ -149,6 +149,14 @@ struct ComposeView: View {
                 translationTask?.cancel()
                 translationTask = nil
             }
+            // The install the user consented to has finished: run the
+            // translation they already asked for rather than making them tap
+            // again. The request is consumed here either way — if the text has
+            // since become untranslatable (emptied, or rewritten in Gurmukhi)
+            // `translate()` no-ops and the button is right there, enabled the
+            // moment the text is translatable again. Holding the request open
+            // instead would mean firing inference on a half-typed sentence
+            // later on, which is worse than one extra tap.
             .onChange(of: translation.state) { _, newState in
                 guard newState.isReady, translateWhenReady else { return }
                 translateWhenReady = false
@@ -267,6 +275,16 @@ struct ComposeView: View {
                         .foregroundStyle(Theme.mist)
                 }
                 .accessibilityElement(children: .combine)
+                // Optimization cannot be interrupted, so this doesn't stop it —
+                // it drops the queued translate, which is what Save is waiting
+                // on. Without it the screen has no way out of the wait, since
+                // Cancel download only exists while downloading.
+                if translateWhenReady {
+                    Button("Don't wait — save without translating") {
+                        translateWhenReady = false
+                    }
+                    .font(.footnote)
+                }
 
             case .ready:
                 translateButton
