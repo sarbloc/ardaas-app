@@ -86,15 +86,15 @@ struct ReaderView: View {
     }
 
     private func reader(for content: ArdaasContent) -> some View {
-        let items = ArdaasComposer.compose(content: content, benti: savedArdaas.bentiText)
+        let items = ArdaasComposer.compose(content: content, benti: savedArdaas.bentiLayers)
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     switch item {
                     case .canonical(let segment):
                         segmentView(segment)
-                    case .benti(let text):
-                        bentiView(text)
+                    case .benti(let layers):
+                        bentiView(interimBentiText(layers))
                     }
                 }
             }
@@ -137,6 +137,18 @@ struct ReaderView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Interim single-layer rendering of the benti. #45 gives it the same
+    /// per-layer toggles as a canonical segment; until then show the first
+    /// populated layer, preferring the recited Gurmukhi, so nothing renders
+    /// blank once #44 starts writing the other layers. Today only English
+    /// is ever populated, so this reproduces the pre-#43 behaviour exactly.
+    /// The composer never emits an all-blank benti, so the fallback is
+    /// unreachable.
+    private func interimBentiText(_ layers: BentiLayers) -> String {
+        [layers.gurmukhi, layers.english, layers.transliteration]
+            .first { !$0.isEmpty } ?? ""
     }
 
     private func bentiView(_ text: String) -> some View {

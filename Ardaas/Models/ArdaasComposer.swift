@@ -3,7 +3,7 @@ import Foundation
 /// One item in the rendered Ardaas: a canonical segment or the user's benti.
 enum RenderItem: Equatable {
     case canonical(ArdaasSegment)
-    case benti(String)
+    case benti(BentiLayers)
 }
 
 enum ArdaasComposer {
@@ -11,22 +11,24 @@ enum ArdaasComposer {
     /// render sequence, with the benti inserted immediately after the
     /// slot segment.
     ///
-    /// - A nil or whitespace-only benti yields the canonical sequence
-    ///   unchanged (reading the plain Ardaas is valid use).
-    /// - The benti is trimmed of surrounding whitespace.
+    /// - A nil benti, or one whose every layer is blank, yields the
+    ///   canonical sequence unchanged (reading the plain Ardaas is valid
+    ///   use). A benti with *any* populated layer is inserted, even if the
+    ///   others are still empty — a benti awaiting translation is real.
+    /// - Each layer is trimmed of surrounding whitespace (by
+    ///   `BentiLayers`), so a whitespace-only layer counts as blank.
     /// - An unknown slot id also yields the canonical sequence; this is
     ///   unreachable for bundled content because
     ///   `ArdaasContent.validate()` rejects it at load.
-    static func compose(content: ArdaasContent, benti: String?) -> [RenderItem] {
+    static func compose(content: ArdaasContent, benti: BentiLayers?) -> [RenderItem] {
         let canonical = content.segments.map(RenderItem.canonical)
-        let trimmed = benti?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !trimmed.isEmpty,
+        guard let benti, !benti.isEmpty,
               let index = content.segments.firstIndex(where: { $0.id == content.bentiSlot.afterSegmentId })
         else {
             return canonical
         }
         var result = canonical
-        result.insert(.benti(trimmed), at: index + 1)
+        result.insert(.benti(benti), at: index + 1)
         return result
     }
 }
