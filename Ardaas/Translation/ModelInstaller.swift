@@ -57,6 +57,10 @@ final class ModelInstaller: @unchecked Sendable {
     /// into place, and re-hashing ~677 MB on every launch would cost seconds
     /// for no new information.
     func currentState() -> ModelState {
+        // `.ready` is a promise that translate() can run. Without the engine
+        // linked it never can, even if a previous ONNX-enabled build left a
+        // complete model directory behind, so never claim ready here.
+        guard optimizer.isAvailable else { return .notDownloaded }
         let vocabularyPresent = catalog.vocabulary.allSatisfy(fileMatchesCatalog)
         if vocabularyPresent && ModelOptimizer.isCacheValid(in: directory, catalog: catalog) {
             return .ready

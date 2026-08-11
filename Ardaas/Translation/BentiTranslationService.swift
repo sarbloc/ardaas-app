@@ -193,7 +193,10 @@ final class BentiTranslationService: ObservableObject {
         _ english: String,
         collectMetrics: Bool = false
     ) async throws -> BentiTranslation {
-        guard state.isReady else { throw TranslationError.notReady }
+        // `state` stays .ready across deleteModel's awaits, so check the delete
+        // flag too — otherwise a translate can race deleteEverything() and
+        // fail on files that vanished mid-flight.
+        guard state.isReady, !isDeleting else { throw TranslationError.notReady }
         let trimmed = english.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return BentiTranslation(

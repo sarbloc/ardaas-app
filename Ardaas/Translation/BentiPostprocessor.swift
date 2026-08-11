@@ -95,22 +95,27 @@ enum BentiPostprocessor {
         s = rightAttach.stringByReplacingMatches(in: s, range: full(), withTemplate: "$1")
 
         // Quotes alternate: odd occurrences attach right, even attach left.
+        // U+FDD0/U+FDD1 are permanent Unicode noncharacters, so they cannot
+        // occur in real input — a benti containing a literal "@RA" (the old
+        // markers) is no longer rewritten into quote characters.
+        let openMarker = "\u{FDD0}"
+        let closeMarker = "\u{FDD1}"
         for quote in ["'", "\"", "`"] {
             var count = 0
             var marked = ""
             for char in s {
                 if String(char) == quote {
-                    marked += count % 2 == 0 ? "@RA" : "@LA"
+                    marked += count % 2 == 0 ? openMarker : closeMarker
                     count += 1
                 } else {
                     marked.append(char)
                 }
             }
             s = marked
-                .replacingOccurrences(of: "@RA ", with: quote)
-                .replacingOccurrences(of: " @LA", with: quote)
-                .replacingOccurrences(of: "@RA", with: quote)
-                .replacingOccurrences(of: "@LA", with: quote)
+                .replacingOccurrences(of: openMarker + " ", with: quote)
+                .replacingOccurrences(of: " " + closeMarker, with: quote)
+                .replacingOccurrences(of: openMarker, with: quote)
+                .replacingOccurrences(of: closeMarker, with: quote)
         }
         return s
     }
