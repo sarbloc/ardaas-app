@@ -95,11 +95,13 @@ enum BentiPostprocessor {
         s = rightAttach.stringByReplacingMatches(in: s, range: full(), withTemplate: "$1")
 
         // Quotes alternate: odd occurrences attach right, even attach left.
-        // U+FDD0/U+FDD1 are permanent Unicode noncharacters, so they cannot
-        // occur in real input — a benti containing a literal "@RA" (the old
-        // markers) is no longer rewritten into quote characters.
-        let openMarker = "\u{FDD0}"
-        let closeMarker = "\u{FDD1}"
+        // Private Use Area scalars: never produced by the model and absent
+        // from real bentis, so a benti containing a literal "@RA" (the old
+        // markers) is no longer rewritten into quote characters. Noncharacters
+        // like U+FDD0 would be a better fit semantically but Swift rejects
+        // them as string literals.
+        let openMarker = "\u{E000}"
+        let closeMarker = "\u{E001}"
         for quote in ["'", "\"", "`"] {
             var count = 0
             var marked = ""
