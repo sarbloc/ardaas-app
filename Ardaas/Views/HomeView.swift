@@ -10,6 +10,9 @@ struct HomeView: View {
 
     @State private var isComposing = false
     @State private var isShowingSources = false
+    #if DEBUG
+    @State private var isShowingBentiLab = false
+    #endif
 
     var body: some View {
         Group {
@@ -29,6 +32,17 @@ struct HomeView: View {
                     Label("About & Sources", systemImage: "info.circle")
                 }
             }
+            #if DEBUG
+            // On-device translation diagnostics (#42) — debug builds only.
+            // The shipping entry point for translation is #44, not this.
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    isShowingBentiLab = true
+                } label: {
+                    Label("Benti Lab", systemImage: "flask")
+                }
+            }
+            #endif
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     isComposing = true
@@ -43,6 +57,11 @@ struct HomeView: View {
         .sheet(isPresented: $isShowingSources) {
             SourcesView()
         }
+        #if DEBUG
+        .sheet(isPresented: $isShowingBentiLab) {
+            BentiLabView()
+        }
+        #endif
     }
 
     private var list: some View {
