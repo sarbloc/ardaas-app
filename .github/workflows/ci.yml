@@ -21,19 +21,25 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      # project-onnx.yml is the one-command switch that links ONNX Runtime and
-      # defines BENTI_ONNX (#42). The shipping configuration is the stock spec,
-      # so that is what gets built and tested below — this step only proves the
-      # overlay still parses and merges, so it cannot rot unnoticed. Generation
-      # resolves no packages and produces no build products; the project it
-      # writes is discarded.
-      - name: Validate the ONNX overlay spec
-        run: |
-          xcodegen generate --spec project-onnx.yml
-          rm -rf Ardaas.xcodeproj
+      # Build what we ship. TestFlight archives with project-onnx.yml (the
+      # engine linked, BENTI_ONNX defined), so CI must too — otherwise a
+      # compile error inside a `#if BENTI_ONNX` block passes here and only
+      # surfaces during a ~150-billed-minute deploy. Costs an SPM resolve of
+      # the onnxruntime xcframework per run; if minutes get tight, this is the
+      # step to reconsider (and the stock spec still has to build, hence the
+      # cheap parse check below).
+      - name: Generate Xcode project (engine linked, as shipped)
+        run: xcodegen generate --spec project-onnx.yml
 
-      - name: Generate Xcode project
-        run: xcodegen generate
+      # The stock spec is still the local default (`xcodegen` with no args),
+      # so prove it keeps generating. Cheap: no packages resolved, project
+      # discarded immediately.
+      - name: Validate the stock spec still generates
+        run: |
+          cp -R Ardaas.xcodeproj /tmp/Ardaas-onnx.xcodeproj
+          xcodegen generate
+          rm -rf Ardaas.xcodeproj
+          cp -R /tmp/Ardaas-onnx.xcodeproj Ardaas.xcodeproj
 
       - name: Build and test (iOS Simulator)
         run: |
