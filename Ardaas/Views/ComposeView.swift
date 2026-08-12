@@ -37,6 +37,17 @@ struct ComposeView: View {
     /// consent copy asks the user to keep the screen open.
     @StateObject private var translation = BentiTranslationService()
 
+    /// Which text input holds the keyboard, so it can be given up. Tracked
+    /// rather than fired blind at `UIResponder` so the tap-to-dismiss gesture
+    /// below can be attached only while a field is actually focused.
+    private enum Field: Hashable {
+        case label
+        case benti
+        case gurmukhi
+    }
+
+    @FocusState private var focusedField: Field?
+
     @State private var label = ""
     @State private var draft = BentiDraft()
     @State private var variantId = ArdaasLibrary.defaultVariantId
@@ -98,6 +109,9 @@ struct ComposeView: View {
             Form {
                 Section("Label") {
                     TextField("e.g. Family ardaas", text: $label)
+                        .focused($focusedField, equals: .label)
+                        .submitLabel(.done)
+                        .onSubmit { focusedField = nil }
                 }
                 .listRowBackground(Theme.raisedFill)
 
@@ -117,6 +131,7 @@ struct ComposeView: View {
                 Section("Benti") {
                     TextEditor(text: $draft.typed)
                         .frame(minHeight: 160)
+                        .focused($focusedField, equals: .benti)
                         .accessibilityLabel("Benti")
                 }
                 .listRowBackground(Theme.raisedFill)
@@ -139,6 +154,29 @@ struct ComposeView: View {
                 .listRowBackground(Theme.raisedFill)
             }
             .themedScreen()
+            // Three ways out of the keyboard, because a Form gives none by
+            // default and a benti is long enough that a stuck keyboard hides
+            // half the screen.
+            //
+            // 1. Drag the list down — standard iOS, costs nothing.
+            .scrollDismissesKeyboard(.interactively)
+            // 2. Tap anywhere else. `simultaneousGesture` so it does not
+            //    consume the tap (buttons and rows still work), and attached
+            //    ONLY while a field is focused: with no gesture installed on
+            //    first tap, focusing a field can never race its own dismissal.
+            .simultaneousGesture(
+                focusedField == nil
+                    ? nil
+                    : TapGesture().onEnded { focusedField = nil }
+            )
+            // 3. An explicit Done above the keyboard — the escape hatch that
+            //    always works, including for VoiceOver and hardware keyboards.
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
+                }
+            }
             .onAppear {
                 if library == nil {
                     library = try? ArdaasLibrary.loadBundled()
@@ -339,6 +377,7 @@ struct ComposeView: View {
                 .frame(minHeight: 110)
                 .font(.title3)
                 .foregroundStyle(Theme.parchment)
+                .focused($focusedField, equals: .gurmukhi)
                 .accessibilityLabel("Gurmukhi benti")
 
             if !draft.transliteration.isEmpty {
