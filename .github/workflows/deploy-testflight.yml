@@ -41,8 +41,12 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate Xcode project
-        run: xcodegen generate
+      # Ships the on-device translation engine (#35): project-onnx.yml is
+      # project.yml plus the ONNX Runtime package and BENTI_ONNX. Without it
+      # Compose hides the Translate action, which is why TestFlight builds
+      # showed no translation despite the feature being on main.
+      - name: Generate Xcode project (engine linked)
+        run: xcodegen generate --spec project-onnx.yml
 
       - name: Write API key
         env:
