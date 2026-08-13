@@ -67,8 +67,13 @@
     },
     {
       "id": "he-deen-dayal",
-      "gurmukhi": "ਹੇ ਦੀਨ ਦਇਆਲ, ਕਰਨ ਕਾਰਨ, ਪਤਿਤ ਪਾਵਨ, ਭਗਤ ਵਛਲੁ, ਕਰੁਣਾ ਨਿਧਾਨ, ਅੰਤਰਜਾਮੀ ਸਤਿਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਮਹਾਰਾਜ, ਸ੍ਰੀ ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ ਮਹਾਰਾਜ, ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਮਹਾਰਾਜ, ਅਕਾਲ ਪੁਰਖ ਵਾਹਿਗੁਰੂ ਗਰੀਬ ਨਿਵਾਜ ਸਚੇ ਪਾਤਿਸ਼ਾਹ! ਆਪ ਜੀ ਦੇ ਹਜ਼ੂਰ…..ਦੀ ਅਰਦਾਸ ਆਪ ਜੀ ਦੇ ਚਰਨ ਕਮਲਾਂ ਪਾਸ, ਸਿੱਖ ਪੜ੍ਹਦੇ ਸੁਣਦੇ ਲਾਹੇਵੰਦ, ਸ੍ਰੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ, ਸ੍ਰੀ ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ, ਚੜ੍ਹਦੀ ਕਲਾ, ਤੇਰੇ ਭਾਣੇ ਸਰਬੱਤ ਦਾ ਭਲਾ ॥",
-      "transliteration": "He Din Daiyaal, Karan Kaaran, Patit Paavan, Bhagat Vachhal, Karunaa Nidhaan, Antarjaami Satguru Naanak Dev Ji Mahaaraaj, Sri Guru Gobind Singh Ji Mahaaraaj, Sri Guru Granth Saahib Ji Mahaaraaj, Akaal Purakh Waheguru Garib Nivaaj Sache Paatishaah! Aap Ji De Hazur…..Di Ardaas Aap Ji De Charan Kamlaa(n) Paas, Sikh Parhde Sunde Laahevand, Sri Guru Naanak Dev Ji, Sri Guru Gobind Singh Ji, Charhdi Kalaa, Tere Bhaane Sarbat Daa Bhalaa ||"
+      "gurmukhi": "ਹੇ ਦੀਨ ਦਇਆਲ, ਕਰਨ ਕਾਰਨ, ਪਤਿਤ ਪਾਵਨ, ਭਗਤ ਵਛਲੁ, ਕਰੁਣਾ ਨਿਧਾਨ, ਅੰਤਰਜਾਮੀ ਸਤਿਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਮਹਾਰਾਜ, ਸ੍ਰੀ ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ ਮਹਾਰਾਜ, ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਮਹਾਰਾਜ, ਅਕਾਲ ਪੁਰਖ ਵਾਹਿਗੁਰੂ ਗਰੀਬ ਨਿਵਾਜ ਸਚੇ ਪਾਤਿਸ਼ਾਹ! ਆਪ ਜੀ ਦੇ ਹਜ਼ੂਰ…..ਦੀ ਅਰਦਾਸ ਆਪ ਜੀ ਦੇ ਚਰਨ ਕਮਲਾਂ ਪਾਸ,",
+      "transliteration": "He Din Daiyaal, Karan Kaaran, Patit Paavan, Bhagat Vachhal, Karunaa Nidhaan, Antarjaami Satguru Naanak Dev Ji Mahaaraaj, Sri Guru Gobind Singh Ji Mahaaraaj, Sri Guru Granth Saahib Ji Mahaaraaj, Akaal Purakh Waheguru Garib Nivaaj Sache Paatishaah! Aap Ji De Hazur…..Di Ardaas Aap Ji De Charan Kamlaa(n) Paas,"
+    },
+    {
+      "id": "sikh-parhde-sunde",
+      "gurmukhi": "ਸਿੱਖ ਪੜ੍ਹਦੇ ਸੁਣਦੇ ਲਾਹੇਵੰਦ, ਸ੍ਰੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ, ਸ੍ਰੀ ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ, ਚੜ੍ਹਦੀ ਕਲਾ, ਤੇਰੇ ਭਾਣੇ ਸਰਬੱਤ ਦਾ ਭਲਾ ॥",
+      "transliteration": "Sikh Parhde Sunde Laahevand, Sri Guru Naanak Dev Ji, Sri Guru Gobind Singh Ji, Charhdi Kalaa, Tere Bhaane Sarbat Daa Bhalaa ||"
     },
     {
       "id": "waheguru-ji-ka-khalsa",
