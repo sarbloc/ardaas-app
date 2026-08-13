@@ -80,6 +80,43 @@ jobs:
             -authenticationKeyID "${API_KEY_ID}" \
             -authenticationKeyIssuerID "${API_ISSUER_ID}"
 
+      # ONNX Runtime ships a STATIC archive inside a framework wrapper (its
+      # binary is an `ar` archive, not a dylib), so its code is linked into the
+      # app binary. Xcode cannot tell the difference and copies the wrapper
+      # into Ardaas.app/Frameworks/ anyway, where App Store validation reads it
+      # as a framework with no usable min-OS load command:
+      #   ITMS-90208 ... does not support the minimum OS Version
+      # `embed: false` in project-onnx.yml did not stop it (builds 30 and 31
+      # were both rejected), so remove it from the archive — but only after
+      # proving nothing actually links against it at runtime. If anything does,
+      # stripping would crash on launch, so fail instead of shipping that.
+      - name: Strip the wrongly-embedded static framework
+        run: |
+          set -euo pipefail
+          APP="build/Ardaas.xcarchive/Products/Applications/Ardaas.app"
+          echo "--- Frameworks/ before:"
+          ls -la "${APP}/Frameworks" 2>/dev/null || echo "(no Frameworks directory)"
+
+          if otool -L "${APP}/Ardaas" | grep -qi onnxruntime; then
+            echo "::error::Ardaas dynamically links onnxruntime — it is not the static build this strip assumes. Do not strip; investigate."
+            otool -L "${APP}/Ardaas" | grep -i onnx
+            exit 1
+          fi
+          echo "Confirmed: no dynamic link against onnxruntime, so its code is static in the app binary."
+
+          if [ -d "${APP}/Frameworks/onnxruntime.framework" ]; then
+            rm -rf "${APP}/Frameworks/onnxruntime.framework"
+            echo "Removed the embedded onnxruntime.framework."
+          else
+            echo "Nothing to remove — project-onnx.yml's embed:false did the job."
+          fi
+
+          # An empty Frameworks/ is itself a validation smell; drop it.
+          rmdir "${APP}/Frameworks" 2>/dev/null && echo "Removed the now-empty Frameworks/." || true
+
+          echo "--- Frameworks/ after:"
+          ls -la "${APP}/Frameworks" 2>/dev/null || echo "(no Frameworks directory)"
+
       - name: Export and upload to TestFlight
         env:
           API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
