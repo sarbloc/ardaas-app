@@ -113,7 +113,7 @@ final class ArdaasComposerTests: XCTestCase {
         try assertBundledSlot(
             variantId: "buddha-dal",
             expectedBefore: "he-deen-dayal",
-            expectedAfter: "waheguru-ji-ka-khalsa"
+            expectedAfter: "sikh-parhde-sunde"
         )
     }
 
