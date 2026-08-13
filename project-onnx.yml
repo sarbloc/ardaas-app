@@ -34,6 +34,15 @@ targets:
     dependencies:
       - package: onnxruntime
         product: onnxruntime
+        # ORT ships a STATIC archive inside a framework wrapper (the binary is
+        # an `ar` archive, not a dylib). Embedding it copies that archive into
+        # Ardaas.app/Frameworks/, where App Store validation reads it as a
+        # framework with no usable min-OS load command and rejects the build:
+        #   ITMS-90208: the bundle Ardaas.app/Frameworks/onnxruntime.framework
+        #   does not support the minimum OS Version specified in the Info.plist
+        # (misleading — the framework declares 15.1, below our 17.0). Static
+        # code belongs in the app binary, so link it and do not embed.
+        embed: false
     settings:
       base:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) BENTI_ONNX
