@@ -74,6 +74,7 @@ jobs:
             -scheme Ardaas \
             -destination 'generic/platform=iOS' \
             -archivePath build/Ardaas.xcarchive \
+            -configuration Release \
             CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
             -allowProvisioningUpdates \
             -authenticationKeyPath "${PWD}/private_keys/AuthKey_${API_KEY_ID}.p8" \
