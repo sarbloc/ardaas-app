@@ -29,6 +29,18 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+      configs:
+        # Archive with a DISTRIBUTION identity. Without this Xcode defaults
+        # CODE_SIGN_IDENTITY to "Apple Development" in every configuration, so
+        # `xcodebuild archive` signed with a development identity and a Team
+        # Provisioning Profile (confirmed in the deploy logs). Each CI runner
+        # is a fresh machine with no keychain, so cloud signing could not reuse
+        # the existing development certificate's private key and minted a new
+        # one per run — twelve runs later the account hit Apple's certificate
+        # limit and deploys wedged (#57). Debug is untouched, so local
+        # development still signs with Apple Development as normal.
+        Release:
+          CODE_SIGN_IDENTITY: "Apple Distribution"
   ArdaasTests:
     type: bundle.unit-test
     platform: iOS
