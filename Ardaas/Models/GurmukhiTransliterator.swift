@@ -99,7 +99,8 @@ import Foundation
 /// Restricting the first rule to word-final position is what keeps the tatsama
 /// borrowings that hold their /əhi/ intact: `ਸਹਿਤ` reads `Sahit`. The words
 /// that *are* reduced mid-word are lexical, not predictable from the spelling,
-/// so they go in the lexicon: `ਰਹਿਤ` → `Rehat`.
+/// so they go in the lexicon: `ਰਹਿਤ` → `Rehat`, `ਰਹਿਰਾਸ` → `Reharaas`,
+/// `ਸਹਿਜ` → `Sehaj`.
 ///
 /// ### Schwa deletion
 ///
@@ -533,10 +534,19 @@ enum GurmukhiTransliterator {
         "ਫ਼ਤਿਹ": "Fateh",         // rules: Fatih
         "ਫਤੇ": "Fateh",          // rules: Phate (the Buddha Dal spelling)
         "ਫ਼ਤੇ": "Fateh",          // rules: Fate
-        // Lexicalized spelling specified by Sarbloc. The ਹ rule is word-final
+        // Lexicalized spellings specified by Sarbloc. The ਹ rule is word-final
         // only, so the rules give "Rahit" — right for the tatsama ਸਹਿਤ →
-        // "Sahit", wrong for this word, which is read /rɛhət/.
+        // "Sahit", wrong for these words, which are read /rɛhət/, /rɛhraas/,
+        // /sɛhəj/. Which mid-word ਹਿ reduces is lexical, not predictable from
+        // the spelling (ਰਹਿਤ is spelled exactly like ਸਹਿਤ), so the table is
+        // the only place these can live.
         "ਰਹਿਤ": "Rehat",         // rules: Rahit
+        "ਰਹਿਰਾਸ": "Reharaas",    // rules: Rahiraas
+        "ਸਹਿਜ": "Sehaj",         // rules: Sahij
+        // Two adjacent deletable schwas: only the rightmost goes and the left
+        // is then blocked, so the rules strand the wrong one (same shape as
+        // ਗੁਰਦਵਾਰਿਆਂ → "Guradvaariyaa(n)").
+        "ਸੁਖਮਨੀ": "Sukhmani",    // rules: Sukhamni
     ].reduce(into: [String: String]()) { table, entry in
         table[canonicalKey(Array(entry.key.unicodeScalars))] = entry.value
     }
