@@ -21,6 +21,11 @@ asserts equality, so the two can never drift: change a rule and CI fails until
 the layer is regenerated (and re-proof-read). Regenerating is mechanical —
 map `GurmukhiTransliterator.transliterate` over each segment's `gurmukhi`.
 
+`Ardaas/Resources/occasions.json` — the list of paaths and occasions that can
+fill the `…..` slot — is generated and pinned the same way, by
+`testBundledTransliterationMatchesTheEngine`, so a chosen occasion and a
+romanized benti read in one voice.
+
 The SGPC layer is human-authored and deliberately **not** pinned this way.
 
 ## House style
@@ -128,15 +133,17 @@ word. Three rules, per word:
 - Two adjacent deletable schwas: only the rightmost goes (the left one is then
   blocked). ਗੁਰਦਵਾਰਿਆਂ → `Guradvaariyaa(n)`, where a reader says
   *gurdvaariyaan*. (The same word spelled ਗੁਰਦੁਆਰਿਆਂ comes out right:
-  `Gurduwaariyaa(n)`.)
+  `Gurduwaariyaa(n)`.) ਸੁਖਮਨੀ had the same shape and is now a lexicon entry,
+  since it reaches bundled content.
 - Rule 1 wrongly silences a final short vowel in the rare modern Punjabi word
   that genuinely ends in one — ਹ aside, which is now exempt.
 - Nothing restores the schwa Punjabi keeps before certain sonorant clusters;
   only the conjunct-cluster case is handled.
 - A word whose *mid-word* ਹਿ is reduced by readers comes out unreduced until it
-  is lexicalized: ਪਹਿਲਾ → `Pahilaa`, ਰਹਿਰਾਸ → `Rahiraas`. Neither is in the
-  canonical text, so this only reaches a user-authored benti; ਰਹਿਤ → `Rehat` is
-  the one such word lexicalized so far.
+  is lexicalized: ਪਹਿਲਾ → `Pahilaa`. The words that reach bundled content are
+  lexicalized instead — ਰਹਿਤ → `Rehat`, and ਰਹਿਰਾਸ → `Reharaas`, ਸਹਿਜ → `Sehaj`
+  for `occasions.json` (#69) — so what is left on the rules only reaches a
+  user-authored benti.
 - A vowel-vowel juncture with no glide is written plain, so ਲਈਂ → `Lai(n)` can
   be misread as the `ai` of ਐ. `La-i(n)` would be no clearer, and the house
   style writes such junctures plain too ("Nau", "Bhagauti").
@@ -147,7 +154,8 @@ A deliberately small table — a dozen or so words, several of them just alterna
 spellings of the same one — covering high-frequency words whose rule output reads
 wrong: ਵਾਹਿਗੁਰੂ → `Waheguru` (rules: *Vaahiguru*), ਖਾਲਸਾ → `Khalsa`
 (*Khaalsaa*), ਸਤਿਗੁਰੂ → `Satguru`, ਫ਼ਤਹਿ/ਫਤਿਹ/ਫਤੇ → `Fateh`, ਨੂੰ → `Noon`,
-ਰਹਿਤ → `Rehat` (*Rahit*).
+ਰਹਿਤ → `Rehat` (*Rahit*), ਰਹਿਰਾਸ → `Reharaas` (*Rahiraas*), ਸਹਿਜ → `Sehaj`
+(*Sahij*), ਸੁਖਮਨੀ → `Sukhmani` (*Sukhamni*).
 A few words the rules already get right (ਗੁਰੂ, ਜੀ, ਸ੍ਰੀ, ਸਿੰਘ, ਅਰਦਾਸ) are pinned
 there too, so a later rule change can't silently alter them.
 
