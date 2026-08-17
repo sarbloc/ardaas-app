@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "sources": [
+    "https://nitnemsahib.com/ardas-in-punjabi-gurmukhi/",
+    "https://pa.wikipedia.org/wiki/%E0%A8%85%E0%A8%B0%E0%A8%A6%E0%A8%BE%E0%A8%B8",
+    "https://pa.wikipedia.org/wiki/%E0%A8%A8%E0%A8%BF%E0%A8%A4%E0%A8%A8%E0%A9%87%E0%A8%AE",
+    "https://pa.wikipedia.org/wiki/%E0%A8%9C%E0%A8%AA%E0%A9%81%E0%A8%9C%E0%A9%80_%E0%A8%B8%E0%A8%BE%E0%A8%B9%E0%A8%BF%E0%A8%AC",
+    "https://pa.wikipedia.org/wiki/%E0%A8%95%E0%A9%80%E0%A8%B0%E0%A8%A4%E0%A8%A8_%E0%A8%B8%E0%A9%8B%E0%A8%B9%E0%A8%BF%E0%A8%B2%E0%A8%BE",
+    "https://pa.wikipedia.org/wiki/%E0%A8%9A%E0%A9%8C%E0%A8%AA%E0%A8%88_%E0%A8%B8%E0%A8%BE%E0%A8%B9%E0%A8%BF%E0%A8%AC",
+    "https://pa.wikipedia.org/wiki/%E0%A8%85%E0%A8%96%E0%A9%B0%E0%A8%A1_%E0%A8%AA%E0%A8%BE%E0%A8%A0",
+    "https://punjabipedia.org/topic.aspx?txt=%E0%A8%85%E0%A8%96%E0%A9%B0%E0%A8%A1+%E0%A8%AA%E0%A8%BE%E0%A8%A0",
+    "https://www.sgpc.net/ — SGPC news items attesting “ਸ੍ਰੀ ਅਖੰਡ ਪਾਠ ਸਾਹਿਬ ਦੇ ਭੋਗ”",
+    "http://www.janshaktinews.com/node/11091 — gurdwara notice attesting “ਸ੍ਰੀ ਸਹਿਜ ਪਾਠ ਦੇ ਭੋਗ” and “ਅੰਤਿਮ ਅਰਦਾਸ”",
+    "https://www.punjabijagran.com/punjab/kapurthala-saheed-divas-8783390.html — attests “ਸਾਹਿਬ ਜੀ ਦੇ ਪਾਠਾਂ ਦੇ ਭੋਗ” and “ਤੰਦਰੁਸਤੀ ਲਈ ਅਰਦਾਸ”",
+    "https://www.punjabitribuneonline.com/ — attests “ਵਿਛੜੀ ਰੂਹ ਦੀ ਸ਼ਾਂਤੀ” and “ਸ਼ੁਕਰਾਨਾ”"
+  ],
+  "occasions": [
+    {
+      "id": "japji-sahib",
+      "category": "paath",
+      "gurmukhi": "ਜਪੁਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+      "transliteration": "Japuji Saahib De Paath",
+      "english": "the recitation of Japji Sahib"
+    },
+    {
+      "id": "jaap-sahib",
+      "category": "paath",
+      "gurmukhi": "ਜਾਪ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+      "transliteration": "Jaap Saahib De Paath",
+      "english": "the recitation of Jaap Sahib"
+    },
+    {
+      "id": "rehras-sahib",
+      "category": "paath",
+      "gurmukhi": "ਰਹਿਰਾਸ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+      "transliteration": "Rahiraas Saahib De Paath",
+      "english": "the recitation of Rehras Sahib"
+    },
+    {
+      "id": "kirtan-sohila",
+      "category": "paath",
+      "gurmukhi": "ਕੀਰਤਨ ਸੋਹਿਲੇ ਦੇ ਪਾਠ",
+      "transliteration": "Kirtan Sohile De Paath",
+      "english": "the recitation of Kirtan Sohila"
+    },
+    {
+      "id": "sukhmani-sahib",
+      "category": "paath",
+      "gurmukhi": "ਸੁਖਮਨੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+      "transliteration": "Sukhamni Saahib De Paath",
+      "english": "the recitation of Sukhmani Sahib"
+    },
+    {
+      "id": "chaupai-sahib",
+      "category": "paath",
+      "gurmukhi": "ਚੌਪਈ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+      "transliteration": "Chaupai Saahib De Paath",
+      "english": "the recitation of Chaupai Sahib"
+    },
+    {
+      "id": "anand-sahib",
+      "category": "paath",
+      "gurmukhi": "ਅਨੰਦ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+      "transliteration": "Anand Saahib De Paath",
+      "english": "the recitation of Anand Sahib"
+    },
+    {
+      "id": "sehaj-paath-bhog",
+      "category": "paath",
+      "gurmukhi": "ਸ੍ਰੀ ਸਹਿਜ ਪਾਠ ਦੇ ਭੋਗ",
+      "transliteration": "Sri Sahij Paath De Bhog",
+      "english": "the completion of a Sehaj Paath"
+    },
+    {
+      "id": "akhand-paath-bhog",
+      "category": "paath",
+      "gurmukhi": "ਸ੍ਰੀ ਅਖੰਡ ਪਾਠ ਸਾਹਿਬ ਦੇ ਭੋਗ",
+      "transliteration": "Sri Akhand Paath Saahib De Bhog",
+      "english": "the completion of an Akhand Paath"
+    },
+    {
+      "id": "birthday",
+      "category": "occasion",
+      "gurmukhi": "ਜਨਮ ਦਿਨ",
+      "transliteration": "Janam Din",
+      "english": "a birthday"
+    },
+    {
+      "id": "new-home",
+      "category": "occasion",
+      "gurmukhi": "ਗ੍ਰਹਿ ਪ੍ਰਵੇਸ਼",
+      "transliteration": "Greh Pravesh",
+      "english": "moving into a new home"
+    },
+    {
+      "id": "recovery",
+      "category": "occasion",
+      "gurmukhi": "ਤੰਦਰੁਸਤੀ",
+      "transliteration": "Tandrusti",
+      "english": "a return to health after illness"
+    },
+    {
+      "id": "studies",
+      "category": "occasion",
+      "gurmukhi": "ਪੜ੍ਹਾਈ ਅਤੇ ਇਮਤਿਹਾਨਾਂ",
+      "transliteration": "Parhaai Ate Imtihaanaa(n)",
+      "english": "studies and exams"
+    },
+    {
+      "id": "bereavement",
+      "category": "occasion",
+      "gurmukhi": "ਵਿਛੜੀ ਰੂਹ ਦੀ ਸ਼ਾਂਤੀ",
+      "transliteration": "Vichhrhi Ruh Di Shaa(n)ti",
+      "english": "peace for a departed soul"
+    },
+    {
+      "id": "thanksgiving",
+      "category": "occasion",
+      "gurmukhi": "ਸ਼ੁਕਰਾਨੇ",
+      "transliteration": "Shukraane",
+      "english": "thanksgiving"
+    }
+  ]
+}
