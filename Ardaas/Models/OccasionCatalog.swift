@@ -12,7 +12,7 @@ enum OccasionCategory: String, Codable, Equatable, CaseIterable {
 /// Every layer is authored in **genitive form**, because the slot sits inside
 /// a genitive construction: SGPC reads `ਆਪ ਦੇ ਹਜ਼ੂਰ…..ਦੀ ਅਰਦਾਸ ਹੈ ਜੀ॥` and
 /// Buddha Dal `ਆਪ ਜੀ ਦੇ ਹਜ਼ੂਰ…..ਦੀ ਅਰਦਾਸ…`. A bare name does not close that
-/// sentence — `ਜਪੁਜੀ ਸਾਹਿਬ` is wrong where `ਜਪੁਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ` is right —
+/// sentence — `ਜਪੁ ਜੀ ਸਾਹਿਬ` is wrong where `ਜਪੁ ਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ` is right —
 /// so each entry is a noun phrase that reads correctly followed by `ਦੀ ਅਰਦਾਸ`.
 /// `OccasionCatalogTests` asserts that against the real bundled sentences.
 ///

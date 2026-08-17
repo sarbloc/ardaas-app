@@ -13,8 +13,8 @@ final class OccasionCatalogTests: XCTestCase {
     private func occasion(
         id: String = "japji-sahib",
         category: OccasionCategory = .paath,
-        gurmukhi: String = "ਜਪੁਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
-        transliteration: String = "Japuji Saahib De Paath",
+        gurmukhi: String = "ਜਪੁ ਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+        transliteration: String = "Jap Ji Saahib De Paath",
         english: String = "the recitation of Japji Sahib"
     ) -> Occasion {
         Occasion(
@@ -72,8 +72,8 @@ final class OccasionCatalogTests: XCTestCase {
 
     /// The whole point of the list: the slot sits **inside** a genitive
     /// construction, so an entry has to read correctly followed by `ਦੀ ਅਰਦਾਸ`.
-    /// A bare name (`ਜਪੁਜੀ ਸਾਹਿਬ`) does not; the genitive form
-    /// (`ਜਪੁਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ`) does.
+    /// A bare name (`ਜਪੁ ਜੀ ਸਾਹਿਬ`) does not; the genitive form
+    /// (`ਜਪੁ ਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ`) does.
     ///
     /// This drops each entry into the real bundled sentence of **both**
     /// variants and asserts the result actually contains `<entry> ਦੀ ਅਰਦਾਸ`,
