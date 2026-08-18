@@ -1,7 +1,10 @@
 # Buddha Dal Ardaas — transcription draft
 
-Source: Nihung Santhiya app (screenshots supplied by Sarbloc, 2026-07-14,
-`photo_1.jpg`–`photo_7.jpg` in this directory). Header in-app:
+Source: Nihung Santhiya app (screenshots supplied by Sarbloc, 2026-07-14).
+The screenshots themselves are not in this repository — they are another
+app's copyrighted material and were removed when the repo was made public.
+This transcription is our own, of traditional liturgy that carries no
+copyright, and is kept as the provenance record for the proof-read. Header in-app:
 **ਅਰਦਾਸ (ਦਲ ਪੰਥ ਦੀ ਮਰਯਾਦਾ ਅਨੁਸਾਰ)**.
 
 Status: transcribed from screenshots, boundary continuity verified (all 6

@@ -13,3 +13,8 @@ build/
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# Third-party app screenshots used only as private proof-read source material.
+docs/sources/**/*.jpg
+docs/sources/**/*.jpeg
+docs/sources/**/*.png
