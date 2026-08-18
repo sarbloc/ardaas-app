@@ -3,11 +3,12 @@ import SwiftData
 import UIKit
 
 /// Reads a saved Ardaas in situ: the canonical segments with the personal
-/// benti composed in at the bundled slot. Pushed inside the Home screen's
-/// NavigationStack.
+/// benti composed in at the bundled slot and the chosen occasion spliced
+/// into the "….." (#67). Pushed inside the Home screen's NavigationStack.
 struct ReaderView: View {
     /// Bindable: the Reader's variant picker writes straight back to the
     /// record (operator decision — the switch persists, not per-session).
+    /// The occasion picker in `OccasionEditorSheet` persists the same way.
     @Bindable var savedArdaas: SavedArdaas
 
     @AppStorage("reader.showGurmukhi") private var showGurmukhi = true
@@ -18,6 +19,14 @@ struct ReaderView: View {
     /// Loaded once on appear; `.failure` means a broken bundle (a build
     /// defect) — surfaced, never swallowed.
     @State private var loadResult: Result<ArdaasLibrary, Error>?
+
+    /// Loaded once on appear. Failure leaves the "….." exactly as authored
+    /// and hides the occasion picker — the Ardaas still reads, which is what
+    /// this screen is for. The scripture's own load failure is the one that
+    /// takes the screen (above).
+    @State private var occasionCatalog: OccasionCatalog?
+
+    @State private var isEditingOccasion = false
 
     private static let fontScaleRange = 0.7...1.6
     private static let fontScaleStep = 0.1
@@ -31,14 +40,34 @@ struct ReaderView: View {
             .navigationTitle(savedArdaas.label)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Its own control, ahead of the gear: what the prayer is for
+                // is content, not a display preference, and burying it in a
+                // menu of layer toggles and text size would say otherwise.
+                if canEditOccasion {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        occasionButton
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     displayMenu
+                }
+            }
+            .sheet(isPresented: $isEditingOccasion) {
+                if let occasionCatalog {
+                    OccasionEditorSheet(
+                        savedArdaas: savedArdaas,
+                        catalog: occasionCatalog,
+                        content: loadedContent
+                    )
                 }
             }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
                 if loadResult == nil {
                     loadResult = Result { try ArdaasLibrary.loadBundled() }
+                }
+                if occasionCatalog == nil {
+                    occasionCatalog = try? OccasionCatalog.loadBundled()
                 }
                 // Heal records whose variant was removed from the bundle:
                 // rewrite to the default so the stored id, the rendered
@@ -106,13 +135,17 @@ struct ReaderView: View {
     }
 
     private func reader(for content: ArdaasContent) -> some View {
-        let items = ArdaasComposer.compose(content: content, benti: savedArdaas.bentiLayers)
+        // The whole composition — benti and occasion both — is one call on
+        // the record, so what this screen renders is exactly what the tests
+        // assert (`SavedArdaas.renderItems(in:catalog:)`).
+        let items = savedArdaas.renderItems(in: content, catalog: occasionCatalog)
+        let occasionSlotId = content.occasionSlot?.inSegmentId
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
                 ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     switch item {
                     case .canonical(let segment):
-                        segmentView(segment)
+                        segmentView(segment, isOccasionSlot: segment.id == occasionSlotId)
                     case .benti(let layers):
                         bentiView(layers)
                     }
@@ -130,7 +163,7 @@ struct ReaderView: View {
     // MARK: - Rows
 
     @ViewBuilder
-    private func segmentView(_ segment: ArdaasSegment) -> some View {
+    private func segmentView(_ segment: ArdaasSegment, isOccasionSlot: Bool) -> some View {
         // `renderedLayers` carries the never-blank guard: if the persisted
         // toggles leave this variant with nothing to show (e.g. Gurmukhi off
         // + only layers it lacks on), Gurmukhi renders anyway. It reasons
@@ -158,8 +191,39 @@ struct ReaderView: View {
                     .lineSpacing(5 * fontScale)
                     .foregroundStyle(Theme.mist)
             }
+            if isOccasionSlot, occasionWillNotAppear {
+                strandedOccasionNote
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The chosen occasion lands in no layer this variant carries, so the
+    /// reader is looking at the dots and would have no idea why — see
+    /// `OccasionChoice.willNotAppear(in:catalog:)` and #72.
+    ///
+    /// Compose warns about this while choosing, but the Reader can *create*
+    /// it: switching variants moves free text onto an Ardaas that cannot show
+    /// it. Same condition and same words as the picker, said at the slot
+    /// itself, and it opens the picker so it can be fixed where it is read.
+    private var occasionWillNotAppear: Bool {
+        guard let loadedContent, let occasionCatalog else { return false }
+        return savedArdaas.occasionChoice.willNotAppear(in: loadedContent, catalog: occasionCatalog)
+    }
+
+    private var strandedOccasionNote: some View {
+        Button {
+            isEditingOccasion = true
+        } label: {
+            Label(OccasionCopy.willNotAppear, systemImage: "exclamationmark.triangle")
+                .font(.footnote)
+                .foregroundStyle(Theme.kesri)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 4)
+        .accessibilityHint("Opens the occasion picker")
     }
 
     /// The benti, rendered layer by layer exactly as a canonical segment is
@@ -270,6 +334,25 @@ struct ReaderView: View {
 
     // MARK: - Toolbar
 
+    /// Only when there is something to pick *and* somewhere to put it: a
+    /// catalog that loaded, and a variant that declares an occasion slot. A
+    /// picker that could never change a word would be a lie.
+    private var canEditOccasion: Bool {
+        occasionCatalog != nil && loadedContent?.occasionSlot != nil
+    }
+
+    /// Opens the occasion picker. Kept out of `displayMenu` — that menu is
+    /// display preferences (which layers, how big); this changes the words of
+    /// the Ardaas itself, and it is the one thing on this screen a reader may
+    /// want to change between two recitations.
+    private var occasionButton: some View {
+        Button {
+            isEditingOccasion = true
+        } label: {
+            Label("Occasion", systemImage: "tag")
+        }
+    }
+
     private var displayMenu: some View {
         Menu {
             if case .success(let library) = loadResult, library.variants.count > 1 {
@@ -342,7 +425,8 @@ struct ReaderView: View {
         label: "Morning Ardaas",
         bentiText: "Please bless the family with health and chardi kala.",
         bentiGurmukhi: "ਪਰਿਵਾਰ ਨੂੰ ਤੰਦਰੁਸਤੀ ਅਤੇ ਚੜ੍ਹਦੀ ਕਲਾ ਬਖ਼ਸ਼ੋ ਜੀ।",
-        bentiTransliteration: "parivār nūṃ tandarustī ate charhdī kalā bakhsho jī."
+        bentiTransliteration: "parivār nūṃ tandarustī ate charhdī kalā bakhsho jī.",
+        occasion: .catalog(id: "japji-sahib")
     )
     container.mainContext.insert(sample)
     return NavigationStack {
