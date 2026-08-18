@@ -28,6 +28,16 @@ import SwiftUI
 ///
 /// Saving writes all three layers. Saving without translating writes English
 /// only, exactly as before this screen could translate.
+///
+/// ## The occasion slot (#66)
+///
+/// The Ardaas carries one "….." the reciter fills in aloud. This screen
+/// explains what it is, offers the bundled list (#64) plus free text, and
+/// quotes the slot sentence back with the choice spliced in — through
+/// `ArdaasComposer`, the same substitution the Reader performs (#65), so the
+/// preview cannot promise something the Reader won't render. Only the
+/// *choice* is saved (`SavedArdaas.occasionChoice`); the words come from the
+/// bundle at render time.
 struct ComposeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -44,6 +54,7 @@ struct ComposeView: View {
         case label
         case benti
         case gurmukhi
+        case occasion
     }
 
     @FocusState private var focusedField: Field?
@@ -51,10 +62,16 @@ struct ComposeView: View {
     @State private var label = ""
     @State private var draft = BentiDraft()
     @State private var variantId = ArdaasLibrary.defaultVariantId
+    @State private var occasion = OccasionDraft()
 
     /// Loaded once; failure hides the picker and saves fall back to the
     /// default variant (a broken bundle already surfaces in the Reader).
     @State private var library: ArdaasLibrary?
+
+    /// Loaded once; failure hides the occasion section entirely, leaving the
+    /// slot unset — which renders the canonical dots, exactly as before this
+    /// screen could fill them.
+    @State private var occasionCatalog: OccasionCatalog?
 
     @State private var isShowingConsent = false
     @State private var isConfirmingStaleSave = false
@@ -104,6 +121,13 @@ struct ComposeView: View {
             && (!draft.isTypedInGurmukhi || translation.state.isWorking)
     }
 
+    /// The text of the variant currently selected, once the bundle has
+    /// loaded. Drives the occasion preview and its warning, so both follow
+    /// the variant picker immediately.
+    private var selectedContent: ArdaasContent? {
+        library?.resolvedVariant(id: variantId).content
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -126,6 +150,10 @@ struct ComposeView: View {
                         .accessibilityLabel("Ardaas variant")
                     }
                     .listRowBackground(Theme.raisedFill)
+                }
+
+                if let occasionCatalog {
+                    occasionSection(catalog: occasionCatalog)
                 }
 
                 Section("Benti") {
@@ -180,6 +208,9 @@ struct ComposeView: View {
             .onAppear {
                 if library == nil {
                     library = try? ArdaasLibrary.loadBundled()
+                }
+                if occasionCatalog == nil {
+                    occasionCatalog = try? OccasionCatalog.loadBundled()
                 }
                 translation.refresh()
             }
@@ -252,6 +283,117 @@ struct ComposeView: View {
                     .disabled(!canSave)
                 }
             }
+        }
+    }
+
+    // MARK: - Occasion
+
+    /// The "….." slot: what it is, what can go in it, and how the sentence
+    /// will read once something does.
+    ///
+    /// Sits directly under the Ardaas picker because the two belong together
+    /// — this is a property of the canonical text (which sentence, and what
+    /// it names), not of the user's benti — and because the preview and the
+    /// no-English warning below both depend on the selected variant.
+    private func occasionSection(catalog: OccasionCatalog) -> some View {
+        Section("Occasion") {
+            Text("Partway through the Ardaas there's a gap, written as “…..”. It's where you name what the prayer is for — the paath (scripture reading) you've just finished, or an occasion like a birthday, a new home, or someone's recovery. Leaving it unfilled is completely normal; the dots stay as they are.")
+                .font(.footnote)
+                .foregroundStyle(Theme.mist)
+
+            // Titled as a sentence rather than "Occasion" again: the row
+            // reads "What it's for — None" under the section header.
+            Picker("What it's for", selection: $occasion.selection) {
+                Text("None").tag(OccasionSelection.unset)
+
+                Section("After a paath") {
+                    ForEach(catalog.occasions(in: .paath)) { entry in
+                        occasionRow(entry).tag(OccasionSelection.catalog(id: entry.id))
+                    }
+                }
+
+                Section("Occasions") {
+                    ForEach(catalog.occasions(in: .occasion)) { entry in
+                        occasionRow(entry).tag(OccasionSelection.catalog(id: entry.id))
+                    }
+                }
+
+                Text("Other…").tag(OccasionSelection.custom)
+            }
+            // Pushed rather than a menu: seventeen rows, each two lines
+            // (Gurmukhi over English), is a list, not a popover.
+            .pickerStyle(.navigationLink)
+
+            if occasion.isCustom {
+                TextField("e.g. my daughter's first birthday", text: $occasion.customText)
+                    .focused($focusedField, equals: .occasion)
+                    .submitLabel(.done)
+                    .onSubmit { focusedField = nil }
+                    .accessibilityLabel("Your own occasion")
+
+                Text("Write it in Gurmukhi and it goes into the Gurmukhi text; write it in English and it goes into the English. It isn't translated for you.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.mist)
+            }
+
+            if let content = selectedContent {
+                if let preview = occasion.preview(in: content, catalog: catalog) {
+                    occasionPreview(preview)
+                }
+                // The one combination the text cannot render — see #72. Said
+                // plainly here rather than accepted silently, because the
+                // choice is saved either way and would otherwise just seem to
+                // do nothing.
+                if occasion.willNotAppear(in: content, catalog: catalog) {
+                    Label(
+                        "This Ardaas has no English line, so an occasion written in English has nowhere to go — the “…..” would stay as it is. Write it in Gurmukhi instead, or pick one from the list.",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(Theme.kesri)
+                }
+            }
+        }
+        .listRowBackground(Theme.raisedFill)
+    }
+
+    /// One catalog row: the Gurmukhi as it will appear in the Ardaas, with
+    /// its English underneath for anyone who doesn't read Gurmukhi.
+    private func occasionRow(_ entry: Occasion) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(entry.gurmukhi)
+                .foregroundStyle(Theme.parchment)
+            Text(entry.english)
+                .font(.footnote)
+                .foregroundStyle(Theme.mist)
+        }
+    }
+
+    /// The slot sentence quoted back, in the layer the choice landed in —
+    /// the same substitution the Reader will perform (`ArdaasComposer`), so
+    /// this is a promise the Reader keeps.
+    private func occasionPreview(_ preview: OccasionPreview) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(preview.isFilled ? "How it will read" : "Where it goes")
+                .font(.caption)
+                .foregroundStyle(Theme.mist)
+            Text(preview.text)
+                .font(.callout)
+                .italic(preview.layer == .transliteration)
+                .foregroundStyle(Self.color(for: preview.layer))
+                .textSelection(.enabled)
+        }
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+    }
+
+    /// The Reader's layer colours, so a line looks the same in the preview as
+    /// it will in the Ardaas itself.
+    private static func color(for layer: LayerKind) -> Color {
+        switch layer {
+        case .gurmukhi: return Theme.parchment
+        case .transliteration: return Theme.sand
+        case .english: return Theme.mist
         }
     }
 
@@ -470,7 +612,8 @@ struct ComposeView: View {
                 bentiText: layers.english,
                 variantId: variantId,
                 bentiGurmukhi: layers.gurmukhi,
-                bentiTransliteration: layers.transliteration
+                bentiTransliteration: layers.transliteration,
+                occasion: occasion.choice
             )
         )
         dismiss()
