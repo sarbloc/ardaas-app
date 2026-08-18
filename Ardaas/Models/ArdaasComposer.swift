@@ -44,6 +44,22 @@ enum ArdaasComposer {
         return result
     }
 
+    /// The slot segment alone, as it reads with `occasion` spliced into it —
+    /// nil when the variant declares no occasion slot, or names a segment
+    /// that isn't there.
+    ///
+    /// Exists so the Compose picker (#66) can quote the sentence back to the
+    /// user through the *same* substitution `compose` performs, rather than
+    /// re-implementing the splice and drifting from what the Reader renders.
+    static func occasionSlotSegment(
+        of content: ArdaasContent,
+        occasion: OccasionLayers?
+    ) -> ArdaasSegment? {
+        let filled = substituting(occasion, into: content)
+        guard let slot = filled.occasionSlot else { return nil }
+        return filled.segments.first { $0.id == slot.inSegmentId }
+    }
+
     /// A copy of `content` with the chosen occasion spliced into the slot
     /// segment, layer by layer.
     ///
