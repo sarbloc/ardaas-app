@@ -184,6 +184,25 @@ final class OccasionCatalogTests: XCTestCase {
         }
     }
 
+    /// `custom` is how a saved record says "the occasion is the text I
+    /// typed" (see `OccasionChoice`), so no bundled entry may answer to it.
+    func testValidateRejectsTheReservedCustomId() {
+        let clashing = catalog([occasion(id: OccasionChoice.customId)])
+        XCTAssertThrowsError(try clashing.validate()) { error in
+            XCTAssertEqual(
+                error as? OccasionCatalogError, .reservedOccasionId(OccasionChoice.customId)
+            )
+        }
+    }
+
+    func testLookupByIdFindsBundledEntriesAndNothingElse() throws {
+        let catalog = try OccasionCatalog.loadBundled()
+        XCTAssertEqual(catalog.occasion(id: "japji-sahib")?.category, .paath)
+        XCTAssertEqual(catalog.occasion(id: "birthday")?.category, .occasion)
+        XCTAssertNil(catalog.occasion(id: "no-such-occasion"))
+        XCTAssertNil(catalog.occasion(id: OccasionChoice.customId))
+    }
+
     func testValidateAcceptsAWellFormedCatalog() throws {
         try catalog([occasion(), occasion(id: "birthday", category: .occasion)]).validate()
     }

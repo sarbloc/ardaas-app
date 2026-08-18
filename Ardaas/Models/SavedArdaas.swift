@@ -28,6 +28,23 @@ final class SavedArdaas {
     /// The Roman transliteration of `bentiGurmukhi` — empty until it is
     /// generated. Defaulted so pre-three-layer records migrate implicitly.
     var bentiTransliteration: String = ""
+    /// Which entry fills the Ardaas's "….." slot: a bundled occasion's id,
+    /// `OccasionChoice.customId` when the user typed their own, or **empty
+    /// for "nothing chosen"** — which is also what every pre-occasion record
+    /// migrates to, so those keep rendering the canonical dots.
+    ///
+    /// Defaulted, like `variantId` and the benti layers, so SwiftData's
+    /// lightweight migration covers existing stores with no migration plan.
+    var occasionId: String = ""
+    /// The user's own words for the slot, used only when `occasionId` is
+    /// `OccasionChoice.customId`. Free text has no id and cannot come from
+    /// the bundle, so it is stored verbatim and in its own field — see
+    /// `OccasionChoice` for why it is not squeezed into `occasionId`.
+    ///
+    /// The pair is written only through `OccasionChoice` (here and in
+    /// `occasionChoice`'s setter), so it can never hold an impossible
+    /// combination like an id with a stale free-text draft beside it.
+    var occasionCustom: String = ""
 
     init(
         label: String,
@@ -35,7 +52,8 @@ final class SavedArdaas {
         createdAt: Date = .now,
         variantId: String = ArdaasLibrary.defaultVariantId,
         bentiGurmukhi: String = "",
-        bentiTransliteration: String = ""
+        bentiTransliteration: String = "",
+        occasion: OccasionChoice = .unset
     ) {
         self.label = label
         self.bentiText = bentiText
@@ -43,6 +61,8 @@ final class SavedArdaas {
         self.variantId = variantId
         self.bentiGurmukhi = bentiGurmukhi
         self.bentiTransliteration = bentiTransliteration
+        self.occasionId = occasion.storedId
+        self.occasionCustom = occasion.storedCustomText
     }
 }
 
@@ -52,6 +72,18 @@ extension SavedArdaas {
     var bentiEnglish: String {
         get { bentiText }
         set { bentiText = newValue }
+    }
+
+    /// The two persisted occasion fields as the one value the pickers
+    /// (#66/#67) and the composer reason about. Setting it keeps the pair
+    /// consistent — in particular it clears `occasionCustom` for any choice
+    /// that is not free text.
+    var occasionChoice: OccasionChoice {
+        get { OccasionChoice(occasionId: occasionId, occasionCustom: occasionCustom) }
+        set {
+            occasionId = newValue.storedId
+            occasionCustom = newValue.storedCustomText
+        }
     }
 
     /// The persisted layers as the value type the composer and Reader use.
