@@ -4,6 +4,10 @@ import XCTest
 /// Bundled-content tests run against the real JSON via the library —
 /// CI-level protection of the content invariants the app relies on.
 final class ArdaasContentTests: XCTestCase {
+    /// The slot marker as the bundled variants spell it: one ellipsis
+    /// character followed by two full stops (U+2026 ".."), not five dots.
+    private static let slotMarker = "\u{2026}.."
+
     func testBundledLibraryLoadsAndValidates() throws {
         let library = try ArdaasLibrary.loadBundled()
         XCTAssertEqual(library.variants.map(\.id), ["sgpc", "buddha-dal"])
@@ -110,6 +114,136 @@ final class ArdaasContentTests: XCTestCase {
         XCTAssertFalse(content.hasEnglish)
     }
 
+    // MARK: - The occasion slot
+
+    /// Both bundled variants must declare the slot: the marker is optional in
+    /// the model (a future variant may have none), so only this assertion
+    /// stops a dropped or typo'd `occasionSlot` key shipping as "the picker
+    /// silently does nothing". `loadBundled()` above already ran
+    /// `validate()`, which pins each declared placeholder to the real text.
+    func testBundledVariantsDeclareTheOccasionSlot() throws {
+        for variant in try ArdaasLibrary.loadBundled().variants {
+            let slot = try XCTUnwrap(
+                variant.content.occasionSlot, "\(variant.id) declares no occasion slot"
+            )
+            // The occasion sits inside the same sentence the benti follows.
+            XCTAssertEqual(slot.inSegmentId, variant.content.bentiSlot.afterSegmentId)
+            XCTAssertEqual(slot.placeholder.gurmukhi, Self.slotMarker)
+        }
+    }
+
+    /// The two variants do not spell the marker the same way in every layer,
+    /// which is exactly why it is declared per layer: SGPC's human-authored
+    /// Roman layer has a bare `…`, and its English carries an instruction to
+    /// the reader that has to disappear along with the dots.
+    func testBundledPlaceholdersAreDeclaredPerLayer() throws {
+        let library = try ArdaasLibrary.loadBundled()
+        let sgpc = try XCTUnwrap(library.variant(id: "sgpc")).content.occasionSlot
+        XCTAssertEqual(sgpc?.placeholder.transliteration, "\u{2026}")
+        XCTAssertEqual(
+            sgpc?.placeholder.english,
+            "\(Self.slotMarker) (mention here the paath recited or the occasion)"
+        )
+        let buddhaDal = try XCTUnwrap(library.variant(id: "buddha-dal")).content.occasionSlot
+        XCTAssertEqual(buddhaDal?.placeholder.transliteration, Self.slotMarker)
+        // No attested English layer, so no English placeholder may be
+        // declared — validate() would reject one.
+        XCTAssertNil(buddhaDal?.placeholder.english)
+    }
+
+    func testValidateRejectsUnknownOccasionSlotSegment() {
+        let content = ArdaasContent.fixture(
+            segments: [.fixture(id: "a")], slotAfter: "a",
+            occasionSlot: OccasionSlot(
+                inSegmentId: "missing",
+                placeholder: OccasionPlaceholder(
+                    gurmukhi: Self.slotMarker, transliteration: nil, english: nil
+                )
+            )
+        )
+        XCTAssertThrowsError(try content.validate()) {
+            XCTAssertEqual($0 as? ArdaasContentError, .invalidOccasionSlot("missing"))
+        }
+    }
+
+    /// The point of declaring the placeholder: a declaration that no longer
+    /// matches the text fails the build instead of silently substituting
+    /// nothing.
+    func testValidateRejectsAPlaceholderThatIsNotInTheText() {
+        let content = ArdaasContent.fixture(
+            segments: [ArdaasSegment(
+                id: "a", gurmukhi: "ਹਜ਼ੂਰ\(Self.slotMarker)ਦੀ",
+                transliteration: "Hazur Di", english: nil
+            )],
+            slotAfter: "a",
+            occasionSlot: .fixture(inSegmentId: "a", transliteration: Self.slotMarker)
+        )
+        XCTAssertThrowsError(try content.validate()) {
+            XCTAssertEqual(
+                $0 as? ArdaasContentError,
+                .occasionPlaceholderNotFound(segmentId: "a", layer: .transliteration)
+            )
+        }
+    }
+
+    /// Declaring a placeholder for a layer the variant does not carry is the
+    /// same defect — there is no text for it to be absent from.
+    func testValidateRejectsAPlaceholderForAnAbsentLayer() {
+        let content = ArdaasContent.fixture(
+            segments: [ArdaasSegment(
+                id: "a", gurmukhi: "ਹਜ਼ੂਰ\(Self.slotMarker)ਦੀ",
+                transliteration: nil, english: nil
+            )],
+            slotAfter: "a",
+            occasionSlot: .fixture(inSegmentId: "a", english: Self.slotMarker)
+        )
+        XCTAssertThrowsError(try content.validate()) {
+            XCTAssertEqual(
+                $0 as? ArdaasContentError,
+                .occasionPlaceholderNotFound(segmentId: "a", layer: .english)
+            )
+        }
+    }
+
+    /// Two markers in one layer make "the slot" ambiguous, and substitution
+    /// would fill only the first.
+    func testValidateRejectsADuplicatedPlaceholder() {
+        let content = ArdaasContent.fixture(
+            segments: [ArdaasSegment(
+                id: "a", gurmukhi: "ਹਜ਼ੂਰ\(Self.slotMarker)ਦੀ\(Self.slotMarker)ਅਰਦਾਸ",
+                transliteration: nil, english: nil
+            )],
+            slotAfter: "a",
+            occasionSlot: .fixture(inSegmentId: "a")
+        )
+        XCTAssertThrowsError(try content.validate()) {
+            XCTAssertEqual(
+                $0 as? ArdaasContentError,
+                .occasionPlaceholderNotUnique(segmentId: "a", layer: .gurmukhi)
+            )
+        }
+    }
+
+    func testValidateRejectsAnEmptyPlaceholder() {
+        let content = ArdaasContent.fixture(
+            segments: [.fixture(id: "a")], slotAfter: "a",
+            occasionSlot: .fixture(inSegmentId: "a", gurmukhi: "")
+        )
+        XCTAssertThrowsError(try content.validate()) {
+            XCTAssertEqual(
+                $0 as? ArdaasContentError, .emptyOccasionPlaceholder(layer: .gurmukhi)
+            )
+        }
+    }
+
+    /// A variant with no occasion slot at all stays valid — the slot is
+    /// optional, and such a variant simply never substitutes.
+    func testVariantWithoutAnOccasionSlotValidates() throws {
+        let content = ArdaasContent.fixture(segments: [.fixture(id: "a")], slotAfter: "a")
+        XCTAssertNil(content.occasionSlot)
+        XCTAssertNoThrow(try content.validate())
+    }
+
     func testLibraryValidateRejectsDuplicateVariantIds() {
         let variant = ArdaasVariant(
             id: "sgpc",
@@ -144,9 +278,32 @@ extension ArdaasSegment {
     }
 }
 
+extension OccasionSlot {
+    /// A slot declaring the real marker for Gurmukhi, and nothing for the
+    /// other layers unless the test asks for it.
+    static func fixture(
+        inSegmentId: String,
+        gurmukhi: String = "\u{2026}..",
+        transliteration: String? = nil,
+        english: String? = nil
+    ) -> OccasionSlot {
+        OccasionSlot(
+            inSegmentId: inSegmentId,
+            placeholder: OccasionPlaceholder(
+                gurmukhi: gurmukhi, transliteration: transliteration, english: english
+            )
+        )
+    }
+}
+
 extension ArdaasContent {
-    static func fixture(segments: [ArdaasSegment], slotAfter: String) -> ArdaasContent {
+    static func fixture(
+        segments: [ArdaasSegment],
+        slotAfter: String,
+        occasionSlot: OccasionSlot? = nil
+    ) -> ArdaasContent {
         ArdaasContent(version: 1, sources: ["test"], segments: segments,
-                      bentiSlot: BentiSlot(afterSegmentId: slotAfter))
+                      bentiSlot: BentiSlot(afterSegmentId: slotAfter),
+                      occasionSlot: occasionSlot)
     }
 }

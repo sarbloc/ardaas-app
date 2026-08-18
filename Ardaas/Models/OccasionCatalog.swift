@@ -44,12 +44,21 @@ enum OccasionCatalogError: Error, Equatable {
     case noOccasions
     case duplicateOccasionIds
     case emptyLayer(occasionId: String)
+    /// A bundled entry claims `OccasionChoice.customId`, which is reserved
+    /// for the user's free-text occasion.
+    case reservedOccasionId(String)
 }
 
 extension OccasionCatalog {
     /// Entries of one category, in bundled order (which is display order).
     func occasions(in category: OccasionCategory) -> [Occasion] {
         occasions.filter { $0.category == category }
+    }
+
+    /// The entry with this id, or nil — a saved record can name an entry a
+    /// later bundle has retired (see `OccasionChoice.layers(in:)`).
+    func occasion(id: String) -> Occasion? {
+        occasions.first { $0.id == id }
     }
 
     /// Loads and validates the bundled catalog. Throws — a broken bundle is a
@@ -72,6 +81,12 @@ extension OccasionCatalog {
         let ids = occasions.map(\.id)
         guard Set(ids).count == ids.count else {
             throw OccasionCatalogError.duplicateOccasionIds
+        }
+        // The sentinel id is how a saved record says "my occasion is the
+        // free text I typed" (see `OccasionChoice`), so no bundled entry may
+        // answer to it.
+        if ids.contains(OccasionChoice.customId) {
+            throw OccasionCatalogError.reservedOccasionId(OccasionChoice.customId)
         }
         // Unlike a variant's optional layers, all three are required here:
         // the picker shows whichever the reader has turned on, so a missing

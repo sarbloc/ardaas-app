@@ -122,5 +122,13 @@
   ],
   "bentiSlot": {
     "afterSegmentId": "nimaniyan-de-maan"
+  },
+  "occasionSlot": {
+    "inSegmentId": "nimaniyan-de-maan",
+    "placeholder": {
+      "gurmukhi": "…..",
+      "transliteration": "…",
+      "english": "….. (mention here the paath recited or the occasion)"
+    }
   }
 }

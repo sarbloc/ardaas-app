@@ -88,5 +88,12 @@
   ],
   "bentiSlot": {
     "afterSegmentId": "he-deen-dayal"
+  },
+  "occasionSlot": {
+    "inSegmentId": "he-deen-dayal",
+    "placeholder": {
+      "gurmukhi": "…..",
+      "transliteration": "….."
+    }
   }
 }
