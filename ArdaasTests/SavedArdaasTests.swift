@@ -65,14 +65,22 @@ final class SavedArdaasTests: XCTestCase {
         XCTAssertEqual(saved.occasionChoice, .unset)
     }
 
-    func testOccasionChoiceReadsBothStoredFields() {
-        let picked = SavedArdaas(label: "Morning", bentiText: "b", occasionId: "japji-sahib")
+    /// The choice is the only way in, so the two columns can never hold an
+    /// impossible pair — an id with a stale free-text draft beside it, or
+    /// free text with no sentinel id to reach it by.
+    func testTheInitialiserStoresTheChoiceAsAConsistentPair() {
+        let picked = SavedArdaas(
+            label: "Morning", bentiText: "b", occasion: .catalog(id: "japji-sahib")
+        )
+        XCTAssertEqual(picked.occasionId, "japji-sahib")
+        XCTAssertEqual(picked.occasionCustom, "")
         XCTAssertEqual(picked.occasionChoice, .catalog(id: "japji-sahib"))
 
         let typed = SavedArdaas(
-            label: "Morning", bentiText: "b",
-            occasionId: OccasionChoice.customId, occasionCustom: "my niece's birth"
+            label: "Morning", bentiText: "b", occasion: .custom(text: "my niece's birth")
         )
+        XCTAssertEqual(typed.occasionId, OccasionChoice.customId)
+        XCTAssertEqual(typed.occasionCustom, "my niece's birth")
         XCTAssertEqual(typed.occasionChoice, .custom(text: "my niece's birth"))
     }
 
@@ -99,7 +107,7 @@ final class SavedArdaasTests: XCTestCase {
         context.insert(
             SavedArdaas(
                 label: "Akhand Paath", bentiText: "my benti",
-                occasionId: OccasionChoice.customId, occasionCustom: "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"
+                occasion: .custom(text: "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ")
             )
         )
         try context.save()

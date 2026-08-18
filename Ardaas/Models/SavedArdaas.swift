@@ -40,6 +40,10 @@ final class SavedArdaas {
     /// `OccasionChoice.customId`. Free text has no id and cannot come from
     /// the bundle, so it is stored verbatim and in its own field — see
     /// `OccasionChoice` for why it is not squeezed into `occasionId`.
+    ///
+    /// The pair is written only through `OccasionChoice` (here and in
+    /// `occasionChoice`'s setter), so it can never hold an impossible
+    /// combination like an id with a stale free-text draft beside it.
     var occasionCustom: String = ""
 
     init(
@@ -49,8 +53,7 @@ final class SavedArdaas {
         variantId: String = ArdaasLibrary.defaultVariantId,
         bentiGurmukhi: String = "",
         bentiTransliteration: String = "",
-        occasionId: String = "",
-        occasionCustom: String = ""
+        occasion: OccasionChoice = .unset
     ) {
         self.label = label
         self.bentiText = bentiText
@@ -58,8 +61,8 @@ final class SavedArdaas {
         self.variantId = variantId
         self.bentiGurmukhi = bentiGurmukhi
         self.bentiTransliteration = bentiTransliteration
-        self.occasionId = occasionId
-        self.occasionCustom = occasionCustom
+        self.occasionId = occasion.storedId
+        self.occasionCustom = occasion.storedCustomText
     }
 }
 

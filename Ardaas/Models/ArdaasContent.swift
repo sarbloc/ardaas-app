@@ -135,6 +135,14 @@ extension ArdaasContent {
     /// claims to describe — exactly once, in every layer it is declared for.
     /// Substitution is a silent no-op when it isn't, so without this a typo
     /// would ship as "the picker does nothing" rather than a failed build.
+    ///
+    /// What this cannot decide is whether a declaration that *is* present
+    /// covers everything that should disappear: a shortened SGPC English
+    /// declaration would still match, and would leave the parenthetical
+    /// instruction stranded after the chosen occasion. That is circular here
+    /// — the declaration is the only statement of what the slot is — so it is
+    /// pinned instead by `ArdaasContentTests`, which asserts the bundled
+    /// declarations character for character.
     private func validateOccasionSlot() throws {
         guard let slot = occasionSlot else { return }
         guard let segment = segments.first(where: { $0.id == slot.inSegmentId }) else {
