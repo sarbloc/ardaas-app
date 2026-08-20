@@ -69,20 +69,57 @@ struct OccasionDraft: Equatable {
         OccasionPreview(content: content, occasion: choice.layers(in: catalog))
     }
 
+    /// The #72 warning for the row currently selected — see
+    /// `OccasionChoice.willNotAppear(in:catalog:)`, which both pickers and the
+    /// Reader's slot share.
+    func willNotAppear(in content: ArdaasContent, catalog: OccasionCatalog) -> Bool {
+        choice.willNotAppear(in: content, catalog: catalog)
+    }
+}
+
+extension OccasionDraft {
+    /// The picker's state for a choice already saved — how the Reader's
+    /// picker (#67) opens on the record's current occasion.
+    ///
+    /// The inverse of `choice`, except for the one state `choice` collapses:
+    /// "Other…" with nothing typed stores as `.unset` and so reopens as
+    /// "None". Nothing is lost — an abandoned draft was never saved — and the
+    /// row shown and the record stay in agreement.
+    ///
+    /// Declared in an extension so the memberwise initialiser survives. It
+    /// also bypasses `selection`'s `didSet` (initialisation never triggers
+    /// one), which is what lets the free text be set alongside `.custom`.
+    init(choice: OccasionChoice) {
+        switch choice {
+        case .unset:
+            self.init()
+        case .catalog(let id):
+            self.init(selection: .catalog(id: id))
+        case .custom(let text):
+            self.init(selection: .custom, customText: text)
+        }
+    }
+}
+
+extension OccasionChoice {
     /// A choice has been made but it lands in no layer this variant carries,
     /// so the reader would still see the dots.
     ///
     /// Today this is reachable in exactly one combination: Buddha Dal has no
     /// English layer, and free text that is not in Gurmukhi script becomes the
     /// English layer and nothing else (see `OccasionLayers.init(freeText:)`),
-    /// so it has nowhere to appear. That is the known gap #72; the Compose
-    /// screen says so inline rather than accepting the choice silently.
+    /// so it has nowhere to appear. That is the known gap #72; the pickers say
+    /// so inline rather than accepting the choice silently, and the Reader
+    /// repeats it at the slot itself — where switching variants can strand
+    /// free text that was fine on the variant it was written for.
     ///
     /// Phrased as "did the substitution change anything" rather than as a
     /// hard-coded variant/script pair, so it stays true if either the bundled
     /// texts or the free-text rules change.
     func willNotAppear(in content: ArdaasContent, catalog: OccasionCatalog) -> Bool {
-        guard choice != .unset, let line = preview(in: content, catalog: catalog) else {
+        guard self != .unset,
+              let line = OccasionPreview(content: content, occasion: layers(in: catalog))
+        else {
             return false
         }
         return !line.isFilled

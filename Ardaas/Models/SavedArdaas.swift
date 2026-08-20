@@ -94,4 +94,29 @@ extension SavedArdaas {
             english: bentiText
         )
     }
+
+    /// The chosen occasion's words, resolved through the bundled catalog.
+    ///
+    /// Nil — the canonical dots, untouched — for nothing chosen, for an id a
+    /// later bundle has retired (`OccasionChoice.layers(in:)`), and for a nil
+    /// catalog, which is a bundle that failed to load. A broken bundle must
+    /// cost the reader the substitution, never the Ardaas.
+    func occasionLayers(in catalog: OccasionCatalog?) -> OccasionLayers? {
+        guard let catalog else { return nil }
+        return occasionChoice.layers(in: catalog)
+    }
+
+    /// Exactly what the Reader draws: this record's benti composed into
+    /// `content`, with its chosen occasion spliced into the "….." slot.
+    ///
+    /// The Reader calls nothing else, so this one function is the whole
+    /// composition path and the tests that cover it cannot drift from the
+    /// screen.
+    func renderItems(in content: ArdaasContent, catalog: OccasionCatalog?) -> [RenderItem] {
+        ArdaasComposer.compose(
+            content: content,
+            benti: bentiLayers,
+            occasion: occasionLayers(in: catalog)
+        )
+    }
 }

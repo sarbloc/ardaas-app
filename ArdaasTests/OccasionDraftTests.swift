@@ -87,6 +87,41 @@ final class OccasionDraftTests: XCTestCase {
         XCTAssertEqual(draft.customText, "a new job")
     }
 
+    // MARK: - Storage → selection (the Reader's picker opens on a saved choice)
+
+    func testADraftSeededFromNothingChosenIsTheDefault() {
+        XCTAssertEqual(OccasionDraft(choice: .unset), OccasionDraft())
+    }
+
+    func testADraftSeededFromACatalogChoiceSelectsThatRow() {
+        let draft = OccasionDraft(choice: .catalog(id: "birthday"))
+        XCTAssertEqual(draft.selection, .catalog(id: "birthday"))
+        XCTAssertEqual(draft.customText, "")
+        XCTAssertFalse(draft.isCustom)
+    }
+
+    /// Seeding must survive `selection`'s `didSet`, which clears the free
+    /// text for every row but "Other…" — initialisation does not trigger it,
+    /// which is exactly why the seeding initialiser is written the way it is.
+    func testADraftSeededFromFreeTextKeepsTheWords() {
+        let draft = OccasionDraft(choice: .custom(text: "a new home"))
+        XCTAssertEqual(draft.selection, .custom)
+        XCTAssertTrue(draft.isCustom)
+        XCTAssertEqual(draft.customText, "a new home")
+    }
+
+    /// Round-tripping a saved choice through the picker and back changes
+    /// nothing, so opening the Reader's picker cannot by itself rewrite a
+    /// record.
+    func testSeedingRoundTripsEveryStorableChoice() {
+        let choices: [OccasionChoice] = [
+            .unset, .catalog(id: "japji-sahib"), .custom(text: "ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"),
+        ]
+        for choice in choices {
+            XCTAssertEqual(OccasionDraft(choice: choice).choice, choice)
+        }
+    }
+
     // MARK: - The in-context preview
 
     /// Nothing chosen shows the sentence exactly as authored — dots included.
