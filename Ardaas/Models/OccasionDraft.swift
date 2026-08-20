@@ -89,12 +89,23 @@ extension OccasionDraft {
     /// Declared in an extension so the memberwise initialiser survives. It
     /// also bypasses `selection`'s `didSet` (initialisation never triggers
     /// one), which is what lets the free text be set alongside `.custom`.
-    init(choice: OccasionChoice) {
+    /// - Parameter catalog: when given, a stored id the catalog no longer
+    ///   carries normalises to "None". A record can outlive the entry it
+    ///   points at if a later bundle retires one; the picker has no row for a
+    ///   retired id, so opening with it selected would tick nothing while the
+    ///   text renders the canonical dots. "None" is what is actually being
+    ///   rendered. Omitting the catalog keeps the stored id untouched, for
+    ///   callers that cannot resolve it and must not silently discard it.
+    init(choice: OccasionChoice, catalog: OccasionCatalog? = nil) {
         switch choice {
         case .unset:
             self.init()
         case .catalog(let id):
-            self.init(selection: .catalog(id: id))
+            if let catalog, catalog.occasion(id: id) == nil {
+                self.init()
+            } else {
+                self.init(selection: .catalog(id: id))
+            }
         case .custom(let text):
             self.init(selection: .custom, customText: text)
         }
@@ -117,7 +128,12 @@ extension OccasionChoice {
     /// hard-coded variant/script pair, so it stays true if either the bundled
     /// texts or the free-text rules change.
     func willNotAppear(in content: ArdaasContent, catalog: OccasionCatalog) -> Bool {
-        guard self != .unset,
+        // A retired catalog id also resolves to no layers, but that is a
+        // different fault with a different remedy — the record simply falls
+        // back to the dots, and telling the reader "this Ardaas has no English
+        // line" would misdiagnose it, on variants that plainly do have one.
+        // Only a choice that genuinely resolves to words can fail to land.
+        guard self != .unset, layers(in: catalog) != nil,
               let line = OccasionPreview(content: content, occasion: layers(in: catalog))
         else {
             return false

@@ -45,7 +45,12 @@ struct OccasionEditorSheet: View {
         self.savedArdaas = savedArdaas
         self.catalog = catalog
         self.content = content
-        _draft = State(initialValue: OccasionDraft(choice: savedArdaas.occasionChoice))
+        // With the catalog in hand, a choice pointing at an entry that a later
+        // bundle retired opens as "None" — which is what the text is actually
+        // rendering, rather than a row that no longer exists.
+        _draft = State(
+            initialValue: OccasionDraft(choice: savedArdaas.occasionChoice, catalog: catalog)
+        )
     }
 
     var body: some View {

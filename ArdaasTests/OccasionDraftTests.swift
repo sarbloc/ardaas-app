@@ -93,6 +93,28 @@ final class OccasionDraftTests: XCTestCase {
         XCTAssertEqual(OccasionDraft(choice: .unset), OccasionDraft())
     }
 
+    /// A record can outlive the catalog entry it points at. The picker has no
+    /// row for a retired id, so the draft normalises to None — which is what
+    /// the text renders — rather than opening with nothing ticked.
+    func testRetiredCatalogIdNormalisesToNoneWhenCatalogGiven() throws {
+        let catalog = try OccasionCatalog.loadBundled()
+        let retired = OccasionChoice.catalog(id: "no-such-occasion-any-more")
+        XCTAssertEqual(OccasionDraft(choice: retired, catalog: catalog), OccasionDraft())
+        // Without a catalog the id is kept: a caller that cannot resolve it
+        // must not silently discard the user's choice.
+        XCTAssertEqual(OccasionDraft(choice: retired).choice, retired)
+    }
+
+    /// A retired id resolves to no layers, but that is not the #72 no-English
+    /// gap and must not raise its warning on a variant that has English.
+    func testRetiredCatalogIdDoesNotRaiseTheNoEnglishWarning() throws {
+        let catalog = try OccasionCatalog.loadBundled()
+        let sgpc = try XCTUnwrap(ArdaasLibrary.loadBundled().variant(id: "sgpc")).content
+        let retired = OccasionChoice.catalog(id: "no-such-occasion-any-more")
+        XCTAssertFalse(retired.willNotAppear(in: sgpc, catalog: catalog))
+    }
+
+
     func testADraftSeededFromACatalogChoiceSelectsThatRow() {
         let draft = OccasionDraft(choice: .catalog(id: "birthday"))
         XCTAssertEqual(draft.selection, .catalog(id: "birthday"))

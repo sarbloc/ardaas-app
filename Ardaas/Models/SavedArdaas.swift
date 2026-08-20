@@ -97,12 +97,21 @@ extension SavedArdaas {
 
     /// The chosen occasion's words, resolved through the bundled catalog.
     ///
-    /// Nil — the canonical dots, untouched — for nothing chosen, for an id a
-    /// later bundle has retired (`OccasionChoice.layers(in:)`), and for a nil
-    /// catalog, which is a bundle that failed to load. A broken bundle must
-    /// cost the reader the substitution, never the Ardaas.
+    /// Nil — the canonical dots, untouched — for nothing chosen and for an id
+    /// a later bundle has retired (`OccasionChoice.layers(in:)`). A broken
+    /// bundle must cost the reader the substitution, never the Ardaas.
+    ///
+    /// A **free-text** occasion is stored whole on this record and needs no
+    /// catalog, so it survives a catalog that failed to load. Dropping the
+    /// user's own words because an unrelated bundled file is missing would be
+    /// the wrong trade.
     func occasionLayers(in catalog: OccasionCatalog?) -> OccasionLayers? {
-        guard let catalog else { return nil }
+        guard let catalog else {
+            if case .custom(let text) = occasionChoice {
+                return OccasionLayers(freeText: text)
+            }
+            return nil
+        }
         return occasionChoice.layers(in: catalog)
     }
 
