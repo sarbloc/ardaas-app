@@ -204,33 +204,52 @@ final class OccasionDraftTests: XCTestCase {
         XCTAssertNil(OccasionDraft().preview(in: noSlot, catalog: try bundledCatalog()))
     }
 
-    // MARK: - The Buddha Dal + Latin gap (#72)
+    // MARK: - The no-English gap (#72)
 
-    /// Buddha Dal carries no English layer, and free text that isn't in
-    /// Gurmukhi script becomes the English layer and nothing else — so it has
-    /// nowhere to appear and the reader would still see the dots.
+    /// A variant with no English layer, spelled as a fixture: since #60 both
+    /// bundled variants carry English, so nothing shipped reaches this state —
+    /// but the rule is the model's, not Buddha Dal's, and a future
+    /// Gurmukhi-only variant would hit it again.
+    private static let noEnglishVariant = ArdaasContent.fixture(
+        segments: [ArdaasSegment(
+            id: "slot",
+            gurmukhi: "ਆਪ ਜੀ ਦੇ ਹਜ਼ੂਰ\u{2026}..ਦੀ ਅਰਦਾਸ",
+            transliteration: "Aap Ji De Hazur\u{2026}..Di Ardaas",
+            english: nil
+        )],
+        slotAfter: "slot",
+        occasionSlot: .fixture(inSegmentId: "slot", transliteration: "\u{2026}..")
+    )
+
+    /// Free text that isn't in Gurmukhi script becomes the English layer and
+    /// nothing else, so on a variant carrying no English it has nowhere to
+    /// appear and the reader would still see the dots.
     func testLatinFreeTextOnAVariantWithoutEnglishIsFlagged() throws {
-        let buddhaDal = try content(id: "buddha-dal")
         let catalog = try bundledCatalog()
         var draft = OccasionDraft()
         draft.selection = .custom
         draft.customText = "my daughter's first birthday"
 
-        XCTAssertTrue(draft.willNotAppear(in: buddhaDal, catalog: catalog))
-        XCTAssertEqual(draft.preview(in: buddhaDal, catalog: catalog)?.isFilled, false)
+        XCTAssertTrue(draft.willNotAppear(in: Self.noEnglishVariant, catalog: catalog))
+        XCTAssertEqual(
+            draft.preview(in: Self.noEnglishVariant, catalog: catalog)?.isFilled, false
+        )
         // The choice is still recorded — the words are the user's, and #72 is
         // about where they can be shown, not about discarding them.
         XCTAssertEqual(draft.choice, .custom(text: "my daughter's first birthday"))
     }
 
-    /// The same text on a variant that does carry English is fine.
+    /// The same text on a variant that does carry English is fine — which,
+    /// since #60, is both bundled variants.
     func testLatinFreeTextOnAVariantWithEnglishIsNotFlagged() throws {
         var draft = OccasionDraft()
         draft.selection = .custom
         draft.customText = "my daughter's first birthday"
-        XCTAssertFalse(
-            draft.willNotAppear(in: try content(id: "sgpc"), catalog: try bundledCatalog())
-        )
+        for id in ["sgpc", "buddha-dal"] {
+            XCTAssertFalse(
+                draft.willNotAppear(in: try content(id: id), catalog: try bundledCatalog()), id
+            )
+        }
     }
 
     /// Gurmukhi free text and every bundled entry reach Buddha Dal's Gurmukhi
@@ -270,7 +289,7 @@ final class OccasionDraftTests: XCTestCase {
         draft.selection = .custom
         draft.customText = "   "
         XCTAssertFalse(
-            draft.willNotAppear(in: try content(id: "buddha-dal"), catalog: try bundledCatalog())
+            draft.willNotAppear(in: Self.noEnglishVariant, catalog: try bundledCatalog())
         )
     }
 }

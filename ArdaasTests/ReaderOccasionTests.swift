@@ -235,20 +235,49 @@ final class ReaderOccasionTests: XCTestCase {
     /// that carries English, then the variant picker moves it to one that
     /// does not. The choice is kept — the words are the user's — but the
     /// reader sees the dots, so the Reader says so at the slot.
+    ///
+    /// Since #60 both bundled variants carry English, so the destination is a
+    /// fixture rather than Buddha Dal: no shipped pair of variants can strand
+    /// free text today, but the Reader's warning is a rule about layers, not
+    /// about one variant, and it still has to hold.
     func testSwitchingToAVariantWithoutEnglishStrandsLatinFreeText() throws {
         let catalog = try bundledCatalog()
         let saved = record(occasion: .custom(text: "my daughter's first birthday"))
 
         XCTAssertFalse(saved.occasionChoice.willNotAppear(in: try content(id: "sgpc"), catalog: catalog))
 
-        saved.variantId = "buddha-dal"
-        let buddhaDal = try content(id: "buddha-dal")
-        XCTAssertTrue(saved.occasionChoice.willNotAppear(in: buddhaDal, catalog: catalog))
+        let noEnglish = ArdaasContent.fixture(
+            segments: [ArdaasSegment(
+                id: "slot",
+                gurmukhi: "ਆਪ ਜੀ ਦੇ ਹਜ਼ੂਰ\(marker)ਦੀ ਅਰਦਾਸ",
+                transliteration: "Aap Ji De Hazur\(marker)Di Ardaas",
+                english: nil
+            )],
+            slotAfter: "slot",
+            occasionSlot: .fixture(inSegmentId: "slot", transliteration: marker)
+        )
+        XCTAssertTrue(saved.occasionChoice.willNotAppear(in: noEnglish, catalog: catalog))
         // And the warning is honest: the slot really does still read as
         // authored.
-        let segment = try slotSegment(of: saved, in: buddhaDal, catalog: catalog)
+        let segment = try slotSegment(of: saved, in: noEnglish, catalog: catalog)
         XCTAssertTrue(segment.gurmukhi.contains(marker), segment.gurmukhi)
         XCTAssertEqual(saved.occasionChoice, .custom(text: "my daughter's first birthday"))
+    }
+
+    /// The gap #72 describes is closed for everything that ships: Latin free
+    /// text now lands in Buddha Dal's English layer.
+    func testLatinFreeTextReachesEveryBundledVariant() throws {
+        let catalog = try bundledCatalog()
+        let saved = record(occasion: .custom(text: "my daughter's first birthday"))
+        for id in ["sgpc", "buddha-dal"] {
+            let variant = try content(id: id)
+            saved.variantId = id
+            XCTAssertFalse(saved.occasionChoice.willNotAppear(in: variant, catalog: catalog), id)
+            let segment = try slotSegment(of: saved, in: variant, catalog: catalog)
+            let english = try XCTUnwrap(segment.english, id)
+            XCTAssertTrue(english.contains("my daughter's first birthday"), english)
+            XCTAssertFalse(english.contains(marker), english)
+        }
     }
 
     /// Catalog entries and Gurmukhi free text reach Buddha Dal's Gurmukhi

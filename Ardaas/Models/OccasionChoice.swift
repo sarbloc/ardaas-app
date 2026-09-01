@@ -56,11 +56,13 @@ extension OccasionLayers {
     ///
     /// The layers left empty keep their dots (see `ArdaasComposer`), so a
     /// typed occasion never blanks the slot in the layers it cannot speak to.
-    /// The corner of that: on a variant with no English layer at all (Buddha
-    /// Dal), Latin free text has nowhere to appear and the reader still sees
-    /// the dots. Putting Roman words into a Gurmukhi scripture line would be
-    /// worse, so the text behaves as written and the *picker* is where the
-    /// user should be told — see #72.
+    /// The corner of that: on a variant with no English layer at all, Latin
+    /// free text has nowhere to appear and the reader still sees the dots.
+    /// Putting Roman words into a Gurmukhi scripture line would be worse, so
+    /// the text behaves as written and the *picker* is where the user should
+    /// be told — see #72. Since #60 both bundled variants carry English, so
+    /// nothing shipped reaches that corner; the warning stays because the rule
+    /// is about layers, not about one variant.
     ///
     /// Returns nil for text that is empty or whitespace-only — there is
     /// nothing to say, which is "nothing chosen".

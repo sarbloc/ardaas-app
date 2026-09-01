@@ -89,7 +89,7 @@ struct OccasionSection<Focus: Hashable>: View {
                 if let preview = draft.preview(in: content, catalog: catalog) {
                     previewRow(preview)
                 }
-                // The one combination the text cannot render — see #72. Said
+                // A choice the text cannot render — see #72. Said
                 // plainly here rather than accepted silently, because the
                 // choice is kept either way and would otherwise just seem to
                 // do nothing.

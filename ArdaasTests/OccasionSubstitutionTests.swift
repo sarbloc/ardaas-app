@@ -251,8 +251,16 @@ final class OccasionSubstitutionTests: XCTestCase {
             try XCTUnwrap(segment.transliteration)
                 .contains("Hazur Jap Ji Saahib De Paath Di Ardaas")
         )
-        // No attested English layer, and none is invented.
-        XCTAssertNil(segment.english)
+        // Since #60 there is an English layer, and its placeholder swallows
+        // the same parenthetical instruction SGPC's does.
+        let english = try XCTUnwrap(segment.english)
+        XCTAssertTrue(
+            english.hasSuffix(
+                "the prayer of the recitation of Japji Sahib is laid at your lotus feet,"
+            ),
+            english
+        )
+        XCTAssertFalse(english.contains("mention here"))
     }
 
     /// Every bundled entry has to read into every bundled variant, in every

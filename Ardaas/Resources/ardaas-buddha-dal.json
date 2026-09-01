@@ -2,88 +2,106 @@
   "version": 1,
   "sources": [
     "Nihung Santhiya app — ਅਰਦਾਸ (ਦਲ ਪੰਥ ਦੀ ਮਰਯਾਦਾ ਅਨੁਸਾਰ), transcribed from operator-supplied screenshots (docs/sources/buddha-dal/)",
-    "https://archive.org/details/budha-dal-ardaas"
+    "https://archive.org/details/budha-dal-ardaas",
+    "https://api.banidb.com/v2/angs/268 and /383 — BaniDB (Khalis Foundation); the published English of the two opening SGGS saloks (Sukhmani Sahib, Ang 268; Aasa M5, Ang 383), as carried there from Dr. Sant Singh Khalsa’s translation",
+    "ardaas-sgpc.json — the SGPC English layer (discoversikhism.com / nitnemsahib.com), borrowed for every passage that coincides with the Standard (SGPC) text; the passages where Buddha Dal diverges are rendered fresh for this app in the same register"
   ],
   "segments": [
     {
       "id": "tu-thakur",
       "gurmukhi": "ਤੂ ਠਾਕੁਰੁ ਤੁਮ ਪਹਿ ਅਰਦਾਸਿ ॥ ਜੀਉ ਪਿੰਡੁ ਸਭੁ ਤੇਰੀ ਰਾਸਿ ॥ ਤੁਮ ਮਾਤ ਪਿਤਾ ਹਮ ਬਾਰਿਕ ਤੇਰੇ ॥ ਤੁਮਰੀ ਕ੍ਰਿਪਾ ਮਹਿ ਸੂਖ ਘਨੇਰੇ ॥ ਕੋਇ ਨ ਜਾਨੈ ਤੁਮਰਾ ਅੰਤੁ ॥ ਊਚੇ ਤੇ ਊਚਾ ਭਗਵੰਤ ॥ ਸਗਲ ਸਮਗ੍ਰੀ ਤੁਮਰੈ ਸੂਤ੍ਰਿ ਧਾਰੀ ॥ ਤੁਮ ਤੇ ਹੋਇ ਸੁ ਆਗਿਆਕਾਰੀ ॥ ਤੁਮਰੀ ਗਤਿ ਮਿਤਿ ਤੁਮ ਹੀ ਜਾਨੀ ॥ ਨਾਨਕ ਦਾਸ ਸਦਾ ਕੁਰਬਾਨੀ ॥੮॥੪॥",
-      "transliteration": "Tu Thaakur Tum Peh Ardaas || Jiyou Pind Sabh Teri Raas || Tum Maat Pitaa Ham Baarik Tere || Tumri Kripaa Meh Sukh Ghanere || Koi Na Jaanai Tumraa Ant || Uche Te Uchaa Bhagvant || Sagal Samagri Tumrai Sutr Dhaari || Tum Te Hoi Su Aagiyaakaari || Tumri Gat Mit Tum Hi Jaani || Naanak Daas Sadaa Kurbaani || 8 || 4 ||"
+      "transliteration": "Tu Thaakur Tum Peh Ardaas || Jiyou Pind Sabh Teri Raas || Tum Maat Pitaa Ham Baarik Tere || Tumri Kripaa Meh Sukh Ghanere || Koi Na Jaanai Tumraa Ant || Uche Te Uchaa Bhagvant || Sagal Samagri Tumrai Sutr Dhaari || Tum Te Hoi Su Aagiyaakaari || Tumri Gat Mit Tum Hi Jaani || Naanak Daas Sadaa Kurbaani || 8 || 4 ||",
+      "english": "You are our Lord and Master; to You, I offer this prayer. This body and soul are all Your property. You are our mother and father; we are Your children. In Your Grace, there are so many joys! No one knows Your limits. O Highest of the High, Most Generous God, the whole creation is strung on Your thread. That which has come from You is under Your Command. You alone know Your state and extent. Nanak, Your slave, is forever a sacrifice."
     },
     {
       "id": "tudh-agai-ardaas",
       "gurmukhi": "ਤੁਧੁ ਆਗੈ ਅਰਦਾਸਿ ਹਮਾਰੀ ਜੀਉ ਪਿੰਡੁ ਸਭੁ ਤੇਰਾ ॥ ਕਹੁ ਨਾਨਕ ਸਭ ਤੇਰੀ ਵਡਿਆਈ ਕੋਈ ਨਾਉ ਨ ਜਾਨੈ ਮੇਰਾ ॥੪॥੧੦॥੪੯॥",
-      "transliteration": "Tudh Aagai Ardaas Hamaari Jiyou Pind Sabh Teraa || Kahu Naanak Sabh Teri Vadiyaai Koi Naau Na Jaanai Meraa || 4 || 10 || 49 ||"
+      "transliteration": "Tudh Aagai Ardaas Hamaari Jiyou Pind Sabh Teraa || Kahu Naanak Sabh Teri Vadiyaai Koi Naau Na Jaanai Meraa || 4 || 10 || 49 ||",
+      "english": "I offer my prayer to You; my body and soul are all Yours. Says Nanak, this is all Your greatness; no one even knows my name."
     },
     {
       "id": "vaar-bhagauti-heading",
       "gurmukhi": "ੴ ਸ੍ਰੀ ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤੇ ॥ ਸ੍ਰੀ ਭਗਉਤੀ ਜੀ ਸਹਾਇ ॥ ਵਾਰ ਸ੍ਰੀ ਭਗਉਤੀ ਜੀ ਕੀ ॥ ਪਾਤਿਸਾਹੀ ੧੦ ॥",
-      "transliteration": "Ik-Onkar Sri Waheguru Ji Ki Fateh || Sri Bhagauti Ji Sahaai || Vaar Sri Bhagauti Ji Ki || Paatisaahi 10 ||"
+      "transliteration": "Ik-Onkar Sri Waheguru Ji Ki Fateh || Sri Bhagauti Ji Sahaai || Vaar Sri Bhagauti Ji Ki || Paatisaahi 10 ||",
+      "english": "God is One. All victory is of the respected wondrous Guru (God). May the respected sword (God in the form of the destroyer of evil doers) help us! Ode of the respected sword recited by the Tenth Guru."
     },
     {
       "id": "pritham-bhagauti",
       "gurmukhi": "ਪ੍ਰਿਥਮ ਭਗੌਤੀ ਸਿਮਰਕੈ ਗੁਰ ਨਾਨਕ ਲਈਂ ਧਿਆਇ ॥ ਫਿਰ ਅੰਗਦ ਗੁਰ ਤੇ ਅਮਰਦਾਸ ਰਾਮਦਾਸੈ ਹੋਈ ਸਹਾਇ ॥ ਅਰਜਨ ਹਰਿਗੋਬਿੰਦ ਨੂ ਸਿਮਰੌ ਸ੍ਰੀ ਹਰਿਰਾਇ ॥ ਸ੍ਰੀ ਹਰਿਕ੍ਰਿਸਨ ਧਿਆਈਐ ਜਿਸੁ ਡਿੱਠੇ ਸਭ ਦੁਖ ਜਾਇ ॥ ਤੇਗ ਬਹਾਦਰ ਸਿਮਰੀਐ ਘਰ ਨਉ ਨਿਧ ਆਵੈ ਧਾਇ ॥ ਸਭ ਥਾਈਂ ਹੋਇਂ ਸਹਾਇ ॥",
-      "transliteration": "Pritham Bhagauti Simarkai Gur Naanak Lai(n) Dhiyaai || Phir Angad Gur Te Amardaas Raamdaasai Hoi Sahaai || Arjan Harigobind Nu Simrau Sri Hariraai || Sri Harikrisan Dhiyaaiyai Jis Dithe Sabh Dukh Jaai || Teg Bahaadar Simriyai Ghar Nau Nidh Aavai Dhaai || Sabh Thaai(n) Hoi(n) Sahaai ||"
+      "transliteration": "Pritham Bhagauti Simarkai Gur Naanak Lai(n) Dhiyaai || Phir Angad Gur Te Amardaas Raamdaasai Hoi Sahaai || Arjan Harigobind Nu Simrau Sri Hariraai || Sri Harikrisan Dhiyaaiyai Jis Dithe Sabh Dukh Jaai || Teg Bahaadar Simriyai Ghar Nau Nidh Aavai Dhaai || Sabh Thaai(n) Hoi(n) Sahaai ||",
+      "english": "First remember the sword (God in the form of destroyer of evil doers); then remember and meditate upon Guru Nanak. Then remember and meditate upon Guru Angad, Guru Amar Das and Guru Ram Das: May they help us! Remember and meditate upon Guru Arjan, Guru Hargobind and Respected Guru Har Rai. Remember and meditate upon respected Guru Harkrishan, by having the sight of whom, all pains vanish. Remember and meditate upon Guru Tegh Bahadur; and then nine sources of wealth will come hastening to your home. Oh Respected Gurus! kindly help us everywhere."
     },
     {
       "id": "dasven-patshah",
       "gurmukhi": "ਦਸਵੇਂ ਪਾਤਿਸਾਹ ਸ੍ਰੀ ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ ਮਹਾਰਾਜ, ਅੰਮ੍ਰਿਤ ਕੇ ਦਾਤੇ, ਜਗਤ ਗੁਰੂ, ਪੰਥ ਦੇ ਵਾਲੀ, ਸਭ ਥਾਈਂ ਹੋਣਾ ਜੀ ਸਹਾਇ ॥",
-      "transliteration": "Dasve(n) Paatisaah Sri Guru Gobind Singh Ji Mahaaraaj, Amrit Ke Daate, Jagat Guru, Panth De Vaali, Sabh Thaai(n) Honaa Ji Sahaai ||"
+      "transliteration": "Dasve(n) Paatisaah Sri Guru Gobind Singh Ji Mahaaraaj, Amrit Ke Daate, Jagat Guru, Panth De Vaali, Sabh Thaai(n) Honaa Ji Sahaai ||",
+      "english": "May the respected Tenth Guru Gobind Singh Ji Maharaj, the giver of Amrit, the Guru of the world, the protector of the Panth, assist us everywhere."
     },
     {
       "id": "tin-darbar-jot",
       "gurmukhi": "ਦਸੋਂ ਪਾਤਿਸ਼ਾਹੀਆਂ ਕੇ ਗਿਆਨ ਸਰੂਪ, ਜਾਗਦੀ ਜੋਤ, ਕਲਿਜੁਗ ਕੀ ਓਟ, ਬਾਣੀ ਕੇ ਬੋਹਿਥ, ਚਵਰ ਤਖਤ ਦੇ ਮਾਲਕ, ਪ੍ਰਤੱਖ ਸਤਿਗੁਰੂ, ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਆਦਿ ਦਰਬਾਰ ਜੀ, ਦਸਮ ਦਰਬਾਰ ਜੀ, ਸ੍ਰੀ ਸਰਬਲੋਹ ਦਰਬਾਰ ਜੀ ਕੇ ਪਾਠ ਦਰਸ਼ਨ ਉਪਦੇਸ਼ ਜੀ ਕਾ ਧਿਆਨ ਧਰ ਖਾਲਸਾ ਜੀ ਸਾਹਿਬ ਬੋਲੋ ਜੀ ਵਾਹਿਗੁਰੂ ॥",
-      "transliteration": "Daso(n) Paatishaahiyaa(n) Ke Giyaan Sarup, Jaagdi Jot, Kalijug Ki Ot, Baani Ke Bohith, Chavar Takhat De Maalak, Pratakh Satguru, Sri Guru Granth Saahib Ji Aad Darbaar Ji, Dasam Darbaar Ji, Sri Sarabloh Darbaar Ji Ke Paath Darshan Updesh Ji Kaa Dhiyaan Dhar Khalsa Ji Saahib Bolo Ji Waheguru ||"
+      "transliteration": "Daso(n) Paatishaahiyaa(n) Ke Giyaan Sarup, Jaagdi Jot, Kalijug Ki Ot, Baani Ke Bohith, Chavar Takhat De Maalak, Pratakh Satguru, Sri Guru Granth Saahib Ji Aad Darbaar Ji, Dasam Darbaar Ji, Sri Sarabloh Darbaar Ji Ke Paath Darshan Updesh Ji Kaa Dhiyaan Dhar Khalsa Ji Saahib Bolo Ji Waheguru ||",
+      "english": "The embodiment of the wisdom of the Ten Kings, the living light, the shelter of the dark age, the ship of the Word, the master of the chaur and the throne, the True Guru made manifest: turn your thoughts to the recitation, the sight and the teaching of the respected Guru Granth Sahib, the Aad Darbar, the Dasam Darbar and the respected Sarbloh Darbar; Khalsa Ji, utter Waheguru (wondrous God)!"
     },
     {
       "id": "sahibzade-panj-piare",
       "gurmukhi": "ਸਤਿਗੁਰਾਂ ਦੇ ਚਾਰ ਸਾਹਿਬਜ਼ਾਦੇ, ਸਾਹਿਬ ਅਜੀਤ ਸਿੰਘ ਜੀ, ਸਾਹਿਬ ਜੁਝਾਰ ਸਿੰਘ ਜੀ, ਸਾਹਿਬ ਜ਼ੋਰਾਵਰ ਸਿੰਘ ਜੀ, ਸਾਹਿਬ ਫਤਿਹ ਸਿੰਘ ਜੀ, ਪੰਜ ਪਿਆਰੇ, ਪਿਆਰੇ ਦਇਆ ਸਿੰਘ ਜੀ, ਪਿਆਰੇ ਧਰਮ ਸਿੰਘ ਜੀ, ਪਿਆਰੇ ਹਿੰਮਤ ਸਿੰਘ ਜੀ, ਪਿਆਰੇ ਮੁਹਕਮ ਸਿੰਘ ਜੀ, ਪਿਆਰੇ ਸਾਹਿਬ ਸਿੰਘ ਜੀ, ਪੰਜ ਬੀਰ, ਚਾਲੀ ਮੁਕਤੇ, ਹਠੀਆਂ, ਤਪੀਆਂ, ਚਿੱਤਾਂ ਗੁਪਤਾਂ ਨਿਹੰਗ ਸਿੰਘਾਂ, ਭੁਝੰਗ ਸਿੰਘਾਂ, ਸਰਬੱਤ ਗੁਰੂ ਖਾਲਸੇ ਜੀ ਦੀ ਕਮਾਈ ਦਾ ਧਿਆਨ ਧਰ ਕੇ ਬੋਲੋ ਜੀ ਸ੍ਰੀ ਵਾਹਿਗੁਰੂ ॥",
-      "transliteration": "Satiguraa(n) De Chaar Saahibzaade, Saahib Ajit Singh Ji, Saahib Jujhaar Singh Ji, Saahib Zoraavar Singh Ji, Saahib Fateh Singh Ji, Panj Piyaare, Piyaare Daiyaa Singh Ji, Piyaare Dharam Singh Ji, Piyaare Himat Singh Ji, Piyaare Muhkam Singh Ji, Piyaare Saahib Singh Ji, Panj Bir, Chaali Mukte, Hathiyaa(n), Tapiyaa(n), Chittaa(n) Guptaa(n) Nihang Singhaa(n), Bhujhang Singhaa(n), Sarbat Guru Khaalse Ji Di Kamaai Daa Dhiyaan Dhar Ke Bolo Ji Sri Waheguru ||"
+      "transliteration": "Satiguraa(n) De Chaar Saahibzaade, Saahib Ajit Singh Ji, Saahib Jujhaar Singh Ji, Saahib Zoraavar Singh Ji, Saahib Fateh Singh Ji, Panj Piyaare, Piyaare Daiyaa Singh Ji, Piyaare Dharam Singh Ji, Piyaare Himat Singh Ji, Piyaare Muhkam Singh Ji, Piyaare Saahib Singh Ji, Panj Bir, Chaali Mukte, Hathiyaa(n), Tapiyaa(n), Chittaa(n) Guptaa(n) Nihang Singhaa(n), Bhujhang Singhaa(n), Sarbat Guru Khaalse Ji Di Kamaai Daa Dhiyaan Dhar Ke Bolo Ji Sri Waheguru ||",
+      "english": "Think of the deeds of the True Guru's four sons: Sahib Ajit Singh Ji, Sahib Jujhar Singh Ji, Sahib Zorawar Singh Ji, Sahib Fateh Singh Ji; of the Five Beloved Ones: Piara Daya Singh Ji, Piara Dharam Singh Ji, Piara Himmat Singh Ji, Piara Mohkam Singh Ji, Piara Sahib Singh Ji; of the Five Braves; of the Forty Martyrs; of the Sikhs of indomitable determination; of the devotees steeped in austerity; of the Nihang Singhs, seen and unseen; of the Bhujang Singhs, the young of the Khalsa; and of the entire Guru Khalsa; utter the respected Waheguru (wondrous God)!"
     },
     {
       "id": "shaheed-singhan",
       "gurmukhi": "ਜਿਨ੍ਹਾਂ ਗੁਰਮੁਖ ਪਿਆਰਿਆਂ ਨੇ ਨਾਮੁ ਜਪਿਆ, ਵੰਡ ਛਕਿਆ, ਦੇਗ਼ ਚਲਾਈ, ਤੇਗ਼ ਵਾਹੀ, ਧਰਮ ਹੇਤ ਸੀਸ ਦਿੱਤੇ, ਦੇਖ ਕੇ ਅਣਡਿੱਠ ਕੀਤਾ, ਤਿਨ੍ਹਾਂ ਸ਼ਹੀਦ ਸਿੰਘਾਂ ਦੀ ਕਮਾਈ ਦਾ ਧਿਆਨ ਧਰ ਕੇ ਬੋਲੋ ਜੀ ਸ੍ਰੀ ਵਾਹਿਗੁਰੂ ॥",
-      "transliteration": "Jinhaa(n) Gurmukh Piyaariyaa(n) Ne Naam Japiyaa, Vand Chhakiyaa, Degh Chalaai, Tegh Vaahi, Dharam Het Sis Ditte, Dekh Ke Andith Kitaa, Tinhaa(n) Shahid Singhaa(n) Di Kamaai Daa Dhiyaan Dhar Ke Bolo Ji Sri Waheguru ||"
+      "transliteration": "Jinhaa(n) Gurmukh Piyaariyaa(n) Ne Naam Japiyaa, Vand Chhakiyaa, Degh Chalaai, Tegh Vaahi, Dharam Het Sis Ditte, Dekh Ke Andith Kitaa, Tinhaa(n) Shahid Singhaa(n) Di Kamaai Daa Dhiyaan Dhar Ke Bolo Ji Sri Waheguru ||",
+      "english": "Think of the deeds of those beloved Gurmukhs who remembered the Name and shared their food in companionship; who started free kitchens; who wielded their swords (for preserving truth); who gave their heads for the faith; who overlooked others shortcomings; think of the deeds of those martyred Singhs; utter the respected Waheguru (wondrous God)!"
     },
     {
       "id": "jahan-jahan-khalsa",
       "gurmukhi": "ਜਹਾਂ ਜਹਾਂ ਗੁਰੂ ਖਾਲਸਾ ਜੀ ਸਾਹਿਬ, ਤਹਾਂ ਤਹਾਂ ਰਛਿਆ ਰਿਆਇਤ, ਦੇਗ਼ ਤੇਗ਼ ਫ਼ਤਿਹ, ਸ੍ਰੀ ਸਾਹਿਬ ਜੀ ਸਹਾਇ, ਗੁਰੂ ਖਾਲਸਾ ਜੀ ਕੇ ਬੋਲ ਬਾਲੇ, ਬੋਲੋ ਜੀ ਸ੍ਰੀ ਵਾਹਿਗੁਰੂ ॥",
-      "transliteration": "Jahaa(n) Jahaa(n) Guru Khalsa Ji Saahib, Tahaa(n) Tahaa(n) Rachhiyaa Riyaait, Degh Tegh Fateh, Sri Saahib Ji Sahaai, Guru Khalsa Ji Ke Bol Baale, Bolo Ji Sri Waheguru ||"
+      "transliteration": "Jahaa(n) Jahaa(n) Guru Khalsa Ji Saahib, Tahaa(n) Tahaa(n) Rachhiyaa Riyaait, Degh Tegh Fateh, Sri Saahib Ji Sahaai, Guru Khalsa Ji Ke Bol Baale, Bolo Ji Sri Waheguru ||",
+      "english": "Wherever the respected Guru Khalsa is present, give Your protection and grace; may the free kitchen and sword never fail; may the respected sword always come to our assistance; may the Guru Khalsa always get honours; utter the respected Waheguru (wondrous God)!"
     },
     {
       "id": "panjvan-takht-buddha-dal",
       "gurmukhi": "ਚਾਰ ਤਖਤਾਂ, ਪੰਜਵਾਂ ਤਖਤ ਬੁੱਢਾ ਦਲ ਛਿਆਨਵੇਂ ਕ੍ਰੋੜ ਦੀ ਕਮਾਈ ਦਾ ਧਿਆਨ ਧਰ ਕੇ ਬੋਲੋ ਜੀ ਵਾਹਿਗੁਰੂ ॥",
-      "transliteration": "Chaar Takhtaa(n), Panjvaa(n) Takhat Budhaa Dal Chhiyaanve(n) Krorh Di Kamaai Daa Dhiyaan Dhar Ke Bolo Ji Waheguru ||"
+      "transliteration": "Chaar Takhtaa(n), Panjvaa(n) Takhat Budhaa Dal Chhiyaanve(n) Krorh Di Kamaai Daa Dhiyaan Dhar Ke Bolo Ji Waheguru ||",
+      "english": "Turn your thoughts to the deeds of the four Takhts, and of the fifth Takht, the Buddha Dal of the ninety-six crore; utter Waheguru (wondrous God)!"
     },
     {
       "id": "sarbat-gurdwarian",
       "gurmukhi": "ਸਰਬੱਤ ਗੁਰਦੁਆਰਿਆਂ, ਤੀਰਥਾਂ, ਧਾਮਾਂ, ਨਿਸ਼ਾਨਾਂ, ਧੌਂਸਿਆਂ, ਬੁੰਗਿਆਂ ਦੇ ਦਰਸ਼ਨ ਦੀਦਾਰ ਜੋੜ ਮੇਲਿਆਂ ਦੀ ਕਮਾਈ ਦਾ ਧਿਆਨ ਧਰ ਕੇ ਬੋਲੋ ਜੀ ਵਾਹਿਗੁਰੂ ॥",
-      "transliteration": "Sarbat Gurduwaariyaa(n), Tirthaa(n), Dhaamaa(n), Nishaanaa(n), Dhau(n)siyaa(n), Bungiyaa(n) De Darshan Didaar Jorh Meliyaa(n) Di Kamaai Daa Dhiyaan Dhar Ke Bolo Ji Waheguru ||"
+      "transliteration": "Sarbat Gurduwaariyaa(n), Tirthaa(n), Dhaamaa(n), Nishaanaa(n), Dhau(n)siyaa(n), Bungiyaa(n) De Darshan Didaar Jorh Meliyaa(n) Di Kamaai Daa Dhiyaan Dhar Ke Bolo Ji Waheguru ||",
+      "english": "Turn your thoughts to the merit earned in the sight and the vision of all the Gurdwaras, the places of pilgrimage, the holy abodes, the standards, the battle drums and the bungas, and in the great gatherings; utter Waheguru (wondrous God)!"
     },
     {
       "id": "naam-daan",
       "gurmukhi": "ਗੁਰੂ ਖਾਲਸਾ ਜੀ ਕੋ ਨਾਮ ਦਾਨ, ਬਿਬੇਕ ਦਾਨ, ਰਹਿਤ ਦਾਨ, ਭਰੋਸਾ ਦਾਨ, ਸਿਦਕ ਦਾਨ, ਸ੍ਰੀ ਅੰਮ੍ਰਿਤਸਰ ਜੀ ਦੇ ਦਰਸ਼ਨ ਇਸ਼ਨਾਨ ਦੀਦਾਰ ਦਾ ਧਿਆਨ ਧਰ ਕੇ ਬੋਲੋ ਜੀ ਵਾਹਿਗੁਰੂ ॥",
-      "transliteration": "Guru Khalsa Ji Ko Naam Daan, Bibek Daan, Rehat Daan, Bharosaa Daan, Sidak Daan, Sri Amritsar Ji De Darshan Ishnaan Didaar Daa Dhiyaan Dhar Ke Bolo Ji Waheguru ||"
+      "transliteration": "Guru Khalsa Ji Ko Naam Daan, Bibek Daan, Rehat Daan, Bharosaa Daan, Sidak Daan, Sri Amritsar Ji De Darshan Ishnaan Didaar Daa Dhiyaan Dhar Ke Bolo Ji Waheguru ||",
+      "english": "Kindly confer upon the Guru Khalsa the gift of the Name, the gift of divine knowledge, the gift of observing Sikh laws, the gift of belief and the gift of firm faith; turn your thoughts to the sight, the bathing and the vision of respected Amritsar; utter Waheguru (wondrous God)!"
     },
     {
       "id": "he-deen-dayal",
       "gurmukhi": "ਹੇ ਦੀਨ ਦਇਆਲ, ਕਰਨ ਕਾਰਨ, ਪਤਿਤ ਪਾਵਨ, ਭਗਤ ਵਛਲੁ, ਕਰੁਣਾ ਨਿਧਾਨ, ਅੰਤਰਜਾਮੀ ਸਤਿਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ ਮਹਾਰਾਜ, ਸ੍ਰੀ ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ ਮਹਾਰਾਜ, ਸ੍ਰੀ ਗੁਰੂ ਗ੍ਰੰਥ ਸਾਹਿਬ ਜੀ ਮਹਾਰਾਜ, ਅਕਾਲ ਪੁਰਖ ਵਾਹਿਗੁਰੂ ਗਰੀਬ ਨਿਵਾਜ ਸਚੇ ਪਾਤਿਸ਼ਾਹ! ਆਪ ਜੀ ਦੇ ਹਜ਼ੂਰ…..ਦੀ ਅਰਦਾਸ ਆਪ ਜੀ ਦੇ ਚਰਨ ਕਮਲਾਂ ਪਾਸ,",
-      "transliteration": "He Din Daiyaal, Karan Kaaran, Patit Paavan, Bhagat Vachhal, Karunaa Nidhaan, Antarjaami Satguru Naanak Dev Ji Mahaaraaj, Sri Guru Gobind Singh Ji Mahaaraaj, Sri Guru Granth Saahib Ji Mahaaraaj, Akaal Purakh Waheguru Garib Nivaaj Sache Paatishaah! Aap Ji De Hazur…..Di Ardaas Aap Ji De Charan Kamlaa(n) Paas,"
+      "transliteration": "He Din Daiyaal, Karan Kaaran, Patit Paavan, Bhagat Vachhal, Karunaa Nidhaan, Antarjaami Satguru Naanak Dev Ji Mahaaraaj, Sri Guru Gobind Singh Ji Mahaaraaj, Sri Guru Granth Saahib Ji Mahaaraaj, Akaal Purakh Waheguru Garib Nivaaj Sache Paatishaah! Aap Ji De Hazur…..Di Ardaas Aap Ji De Charan Kamlaa(n) Paas,",
+      "english": "O Merciful to the meek, Cause of causes, Purifier of the fallen, Lover of the devotees, Treasure of compassion, Knower of all hearts; True Guru Nanak Dev Ji Maharaj, respected Guru Gobind Singh Ji Maharaj, respected Guru Granth Sahib Ji Maharaj, Akal Purakh Waheguru, Cherisher of the poor, True King! In your presence the prayer of ….. (mention here the paath recited or the occasion) is laid at your lotus feet,"
     },
     {
       "id": "sikh-parhde-sunde",
       "gurmukhi": "ਸਿੱਖ ਪੜ੍ਹਦੇ ਸੁਣਦੇ ਲਾਹੇਵੰਦ, ਸ੍ਰੀ ਗੁਰੂ ਨਾਨਕ ਦੇਵ ਜੀ, ਸ੍ਰੀ ਗੁਰੂ ਗੋਬਿੰਦ ਸਿੰਘ ਜੀ, ਚੜ੍ਹਦੀ ਕਲਾ, ਤੇਰੇ ਭਾਣੇ ਸਰਬੱਤ ਦਾ ਭਲਾ ॥",
-      "transliteration": "Sikh Parhde Sunde Laahevand, Sri Guru Naanak Dev Ji, Sri Guru Gobind Singh Ji, Charhdi Kalaa, Tere Bhaane Sarbat Daa Bhalaa ||"
+      "transliteration": "Sikh Parhde Sunde Laahevand, Sri Guru Naanak Dev Ji, Sri Guru Gobind Singh Ji, Charhdi Kalaa, Tere Bhaane Sarbat Daa Bhalaa ||",
+      "english": "May the Sikhs who recite it and the Sikhs who hear it profit by it. Respected Guru Nanak Dev Ji, respected Guru Gobind Singh Ji: may the spirit be ever rising, and may all prosper according to Your will."
     },
     {
       "id": "waheguru-ji-ka-khalsa",
       "gurmukhi": "ਵਾਹਿਗੁਰੂ ਜੀ ਕਾ ਖਾਲਸਾ ॥ ਵਾਹਿਗੁਰੂ ਜੀ ਕੀ ਫਤਹ ॥",
-      "transliteration": "Waheguru Ji Kaa Khalsa || Waheguru Ji Ki Fateh ||"
+      "transliteration": "Waheguru Ji Kaa Khalsa || Waheguru Ji Ki Fateh ||",
+      "english": "The Pure belong to the Wonderful Lord, victory is the Wonderful Lord's."
     },
     {
       "id": "jaikara",
       "gurmukhi": "ਗੱਜ ਕੇ ਜੈਕਾਰਾ ਗਜਾਵੇ, ਫ਼ਤਹਿ ਪਾਵੇ, ਨਿਹਾਲ ਜੋ ਜਾਵੇ; ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ॥",
-      "transliteration": "Gaj Ke Jaikaaraa Gajaave, Fateh Paave, Nihaal Jo Jaave; Sat Sri Akaal ||"
+      "transliteration": "Gaj Ke Jaikaaraa Gajaave, Fateh Paave, Nihaal Jo Jaave; Sat Sri Akaal ||",
+      "english": "Let whoever raises the jaikara with a roar obtain victory and be fulfilled: the eternal timeless being [God] is the ultimate truth!"
     }
   ],
   "bentiSlot": {
@@ -93,7 +111,8 @@
     "inSegmentId": "he-deen-dayal",
     "placeholder": {
       "gurmukhi": "…..",
-      "transliteration": "….."
+      "transliteration": "…..",
+      "english": "….. (mention here the paath recited or the occasion)"
     }
   }
 }
