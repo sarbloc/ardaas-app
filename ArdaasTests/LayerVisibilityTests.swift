@@ -187,8 +187,9 @@ final class LayerAvailabilityTests: XCTestCase {
         english: "my benti"
     )
 
-    /// A variant like Buddha Dal: Gurmukhi + transliteration, no attested
-    /// English.
+    /// A variant carrying Gurmukhi + transliteration but no English. No
+    /// bundled variant is like this since #60 gave Buddha Dal an English
+    /// layer; the rule is the model's, so it is still spelled out here.
     private let noEnglishVariant = ArdaasContent.fixture(
         segments: [ArdaasSegment(id: "a", gurmukhi: "ਗ", transliteration: "g", english: nil)],
         slotAfter: "a"

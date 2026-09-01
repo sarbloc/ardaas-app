@@ -116,13 +116,17 @@ extension OccasionChoice {
     /// A choice has been made but it lands in no layer this variant carries,
     /// so the reader would still see the dots.
     ///
-    /// Today this is reachable in exactly one combination: Buddha Dal has no
-    /// English layer, and free text that is not in Gurmukhi script becomes the
-    /// English layer and nothing else (see `OccasionLayers.init(freeText:)`),
-    /// so it has nowhere to appear. That is the known gap #72; the pickers say
-    /// so inline rather than accepting the choice silently, and the Reader
-    /// repeats it at the slot itself — where switching variants can strand
-    /// free text that was fine on the variant it was written for.
+    /// It takes a variant with no English layer: free text that is not in
+    /// Gurmukhi script becomes the English layer and nothing else (see
+    /// `OccasionLayers.init(freeText:)`), so it has nowhere to appear. That is
+    /// the gap #72 describes; the pickers say so inline rather than accepting
+    /// the choice silently, and the Reader repeats it at the slot itself —
+    /// where switching variants can strand free text that was fine on the
+    /// variant it was written for.
+    ///
+    /// Since #60 gave Buddha Dal an English layer, no bundled combination
+    /// reaches it. Kept because it is a rule about what a variant carries, and
+    /// a later Gurmukhi-only variant would need it again.
     ///
     /// Phrased as "did the substitution change anything" rather than as a
     /// hard-coded variant/script pair, so it stays true if either the bundled

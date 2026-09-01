@@ -106,9 +106,8 @@ final class ArdaasComposerTests: XCTestCase {
         )
     }
 
-    /// The Buddha Dal variant carries no attested English, but the benti's
-    /// layers are stored and composed identically — the variant decides
-    /// what is *shown*, never what is *kept*.
+    /// The benti's layers are stored and composed identically on either
+    /// variant — the variant decides what is *shown*, never what is *kept*.
     func testBundledBuddhaDalComposesAtCanonicalPoint() throws {
         try assertBundledSlot(
             variantId: "buddha-dal",

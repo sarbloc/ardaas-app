@@ -132,8 +132,8 @@ struct LayerAvailability: Equatable {
     /// operational: because the benti renders its English regardless of the
     /// variant's attestation, the English control must be reachable
     /// regardless too, or the user could neither hide nor restore their own
-    /// words on a variant like Buddha Dal (Gurmukhi + transliteration, no
-    /// attested English).
+    /// words on a variant carrying Gurmukhi + transliteration and no
+    /// English.
     static func screen(content: ArdaasContent?, benti: BentiLayers) -> LayerAvailability {
         let variant = canonical(content)
         return LayerAvailability(
