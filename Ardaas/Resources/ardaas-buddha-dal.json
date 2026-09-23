@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sources": [
-    "Nihung Santhiya app — ਅਰਦਾਸ (ਦਲ ਪੰਥ ਦੀ ਮਰਯਾਦਾ ਅਨੁਸਾਰ), transcribed from operator-supplied screenshots (docs/sources/buddha-dal/)",
+    "Nihung Santhiya app — ਅਰਦਾਸ (ਦਲ ਪੰਥ ਦੀ ਮਰਯਾਦਾ ਅਨੁਸਾਰ), transcribed by hand from the text as published there",
     "https://archive.org/details/budha-dal-ardaas",
     "https://api.banidb.com/v2/angs/268 and /383 — BaniDB (Khalis Foundation); the published English of the two opening SGGS saloks (Sukhmani Sahib, Ang 268; Aasa M5, Ang 383), as carried there from Dr. Sant Singh Khalsa’s translation",
     "ardaas-sgpc.json — the SGPC English layer (discoversikhism.com / nitnemsahib.com), borrowed for every passage that coincides with the Standard (SGPC) text; the passages where Buddha Dal diverges are rendered fresh for this app in the same register"

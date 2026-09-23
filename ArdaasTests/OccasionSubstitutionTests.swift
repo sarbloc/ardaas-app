@@ -231,7 +231,7 @@ final class OccasionSubstitutionTests: XCTestCase {
         )
         XCTAssertTrue(
             try XCTUnwrap(segment.transliteration)
-                .contains("Hazur Jap Ji Saahib De Paath Di Ardas Hai Ji")
+                .contains("Hazur Jap Ji Saahib De Paath Di Ardaas Hai Ji")
         )
         // The English placeholder swallows the parenthetical instruction:
         // once an occasion is named, "(mention here …)" is stale.
