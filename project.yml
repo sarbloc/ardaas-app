@@ -16,6 +16,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.sarbloc.ardaas
+        # iPhone only. Left unset this defaults to universal (1,2), which
+        # claims iPad support the app has never been run against — and the
+        # App Store then requires iPad screenshots and reviews it on iPad.
+        # Quoted so YAML keeps it a string, not the integer 1.
+        TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_CFBundleDisplayName: Ardaas
         # App Store validation (ITMS-90474) requires explicit orientations;
