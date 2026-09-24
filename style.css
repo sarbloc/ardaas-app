@@ -1,0 +1,153 @@
+:root {
+  --navy-top: #18264a;
+  --navy-bottom: #0c1328;
+  --kesri: #ff9933;
+  --parchment: #f2eadb;
+  --sand: #d9a868;
+  --mist: #93a0bc;
+  --raised: rgba(255, 255, 255, 0.06);
+  --hairline: rgba(255, 255, 255, 0.12);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: linear-gradient(to bottom, var(--navy-top), var(--navy-bottom)) no-repeat;
+  background-attachment: fixed;
+  color: var(--parchment);
+  font: 17px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  padding: 0 20px 72px;
+}
+
+.wrap {
+  max-width: 44rem;
+  margin: 0 auto;
+}
+
+header {
+  padding: 56px 0 8px;
+}
+
+.eyebrow {
+  color: var(--kesri);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+h1 {
+  font-size: clamp(2rem, 7vw, 2.75rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+}
+
+.lede {
+  color: var(--mist);
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+h2 {
+  font-size: 1.3rem;
+  letter-spacing: -0.01em;
+  margin: 44px 0 4px;
+  padding-top: 28px;
+  border-top: 1px solid var(--hairline);
+}
+
+h2:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+h3 {
+  font-size: 1.02rem;
+  margin: 26px 0 2px;
+  color: var(--sand);
+}
+
+p,
+li {
+  color: var(--parchment);
+}
+
+p.note,
+.muted {
+  color: var(--mist);
+}
+
+a {
+  color: var(--kesri);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+ul {
+  padding-left: 1.15rem;
+}
+
+li {
+  margin: 6px 0;
+}
+
+.card {
+  background: var(--raised);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin: 24px 0;
+}
+
+.card p:first-child {
+  margin-top: 0;
+}
+
+.card p:last-child {
+  margin-bottom: 0;
+}
+
+.verdict {
+  border-left: 3px solid var(--kesri);
+}
+
+.gurmukhi {
+  font-size: 1.15rem;
+  line-height: 1.9;
+}
+
+footer {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hairline);
+  color: var(--mist);
+  font-size: 0.9rem;
+}
+
+footer a {
+  margin-right: 18px;
+  display: inline-block;
+}
+
+code {
+  background: var(--raised);
+  border-radius: 5px;
+  padding: 1px 6px;
+  font-size: 0.9em;
+}

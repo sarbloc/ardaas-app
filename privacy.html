@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ardaas — Privacy Policy</title>
+<meta name="description" content="Privacy policy for Ardaas, an iPhone app for composing a personal benti into the Sikh Ardaas. The app collects no personal data.">
+<meta name="color-scheme" content="dark">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">Ardaas for iPhone</p>
+  <h1>Privacy Policy</h1>
+  <p class="lede">Last updated 24 September 2026</p>
+</header>
+
+<div class="card verdict">
+  <p><strong>Ardaas collects no personal data.</strong> There are no accounts, no analytics, no
+  advertising, and no tracking of any kind. Your benti is never uploaded anywhere.</p>
+</div>
+
+<h2>What the app stores, and where</h2>
+
+<p>Everything you create in Ardaas — the label you give a saved Ardaas, the benti you write, its
+Gurmukhi and transliteration, and the occasion you choose — is stored locally on your iPhone. It is
+not sent to any server, and the app does not use iCloud sync, so the data does not leave your device
+except through your own encrypted device backups, which are controlled entirely by you in iOS.</p>
+
+<p>Deleting the app deletes all of it.</p>
+
+<h2>The one network request the app makes</h2>
+
+<p>Ardaas can translate an English benti into Gurmukhi. That translation runs on your iPhone, using a
+model the app downloads the first time you ask for a translation. The download is the only network
+request Ardaas makes, and it goes to Hugging Face:</p>
+
+<div class="card">
+  <p><code>huggingface.co/naklitechie/indictrans2-en-indic-dist-200M-ONNX-int8</code></p>
+  <p class="muted">Pinned to a fixed revision and checked against known SHA-256 hashes before use.</p>
+</div>
+
+<p>This request downloads model files <em>to</em> your phone. It sends none of your content. Your
+benti, your labels and your saved Ardaas are never part of it, and translation itself happens
+entirely offline once the model is present.</p>
+
+<p>As with any internet request, the server receiving it can see your IP address and the standard
+information your device sends when fetching a file. That data is handled by Hugging Face under
+<a href="https://huggingface.co/privacy">their privacy policy</a>, not by this app. If you never use
+the translation feature, the app makes no network requests at all.</p>
+
+<h2>What the app does not do</h2>
+
+<ul>
+  <li>No analytics, telemetry, crash reporting or usage measurement</li>
+  <li>No advertising and no advertising identifiers</li>
+  <li>No third-party SDKs that collect data</li>
+  <li>No accounts, sign-in, email collection or contact access</li>
+  <li>No location, camera, microphone, photo or contacts access</li>
+  <li>No selling or sharing of data, because none is gathered to sell or share</li>
+</ul>
+
+<h2>Children</h2>
+
+<p>Ardaas is suitable for all ages and collects no data from anyone, children included.</p>
+
+<h2>Changes to this policy</h2>
+
+<p>If the app ever changes in a way that affects this policy, the policy will be updated here and the
+date at the top will change. The app's full history is public, so any such change is auditable in the
+<a href="https://github.com/sarbloc/ardaas-app">source repository</a>.</p>
+
+<h2>Contact</h2>
+
+<p>Questions about this policy can be raised at
+<a href="https://github.com/sarbloc/ardaas-app/issues">github.com/sarbloc/ardaas-app/issues</a>.</p>
+
+<footer>
+  <a href="./">Support</a>
+  <a href="privacy.html">Privacy Policy</a>
+  <a href="https://github.com/sarbloc/ardaas-app">Source code</a>
+</footer>
+
+</div>
+</body>
+</html>
