@@ -33,12 +33,32 @@ jobs:
         run: |
           set -euo pipefail
           BASE="origin/${BASE_REF}"
-          FILES=$(git diff --name-only "${BASE}...HEAD")
+          CHANGED="${RUNNER_TEMP}/changed-files.z"
+
+          # -z keeps paths NUL-delimited and therefore literal. Without it Git
+          # quotes and escapes any non-ASCII path, so a Gurmukhi-named source
+          # (Ardaas/ਪੰਜਾਬੀ.swift) arrives as "\340\250\252..." — the Ardaas/
+          # prefix stops matching and the build is skipped. This repo ships
+          # Gurmukhi, so that is a live case, not a hypothetical.
+          #
+          # --no-renames because a detected rename reports only its
+          # destination: moving a file OUT of Ardaas/ into docs/ would read as
+          # a non-iOS change while actually removing a source from the target.
+          git diff -z --name-only --no-renames "${BASE}...HEAD" > "${CHANGED}"
+
           echo "Changed files:"
-          echo "${FILES}" | sed 's/^/  /'
+          tr '\0' '\n' < "${CHANGED}" | sed 's/^/  /'
+
+          # Matched from a file, never through a pipe. `echo "$FILES" | grep -q`
+          # looks equivalent but is not: grep exits at the first match, the
+          # writer dies of SIGPIPE (141), and `pipefail` turns that into a
+          # failed pipeline — so a MATCH reads as "no iOS changes". A diff with
+          # an iOS file near the top and a few thousand Android files after it
+          # would skip the build and still pass the required gate.
+          #
           # Ardaas/Resources/** sits inside Ardaas/**, so a scripture
           # correction still builds iOS — as it must.
-          if echo "${FILES}" | grep -qE '^(Ardaas/|ArdaasTests/|project\.yml$|project-onnx\.yml$|deploy/|\.github/workflows/ci\.yml$)'; then
+          if grep -qzE '^(Ardaas/|ArdaasTests/|project\.yml$|project-onnx\.yml$|deploy/|\.github/workflows/ci\.yml$)' "${CHANGED}"; then
             echo "ios=true" >> "$GITHUB_OUTPUT"
             echo "::notice::iOS-affecting changes found — running the macOS build."
           else
