@@ -18,3 +18,10 @@ build/
 docs/sources/**/*.jpg
 docs/sources/**/*.jpeg
 docs/sources/**/*.png
+
+# Android / Gradle (build/ is already ignored above)
+.gradle/
+.kotlin/
+local.properties
+.idea/
+*.iml

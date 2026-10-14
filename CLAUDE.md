@@ -16,6 +16,12 @@ Compilation is verified by:
 
 Never claim "it builds" from the Linux host — point at the CI run.
 
+**Android is different: it builds on the host.** JDK 21 and the Android SDK
+are installed user-space (`~/.local/opt/jdk-21`, `~/android-sdk`, exported
+from `~/.zshenv`). Run `cd android && ./gradlew assembleDebug test` before
+pushing; Android CI (`.github/workflows/android-ci.yml`, Linux, 1x) repeats
+it on every PR touching `android/`.
+
 ## Project generation
 
 The `.xcodeproj` is **generated, not committed**. Source of truth is
@@ -35,9 +41,15 @@ pick it up.
 - `Ardaas/` — app target sources (SwiftUI)
 - `ArdaasTests/` — unit tests (XCTest), test target hosted by the app
 - `project.yml` — XcodeGen project definition
-- `.github/workflows/ci.yml` — build + test on iOS Simulator
+- `android/` — Android app (Kotlin, Jetpack Compose, Material 3), Gradle
+  build with version catalog at `android/gradle/libs.versions.toml`
+- `.github/workflows/ci.yml` — build + test on iOS Simulator; a Linux
+  change-detection job skips the macOS build when no iOS path changed
+- `.github/workflows/android-ci.yml` — assemble + unit test on Linux
 - `.github/workflows/deploy-testflight.yml` — archive + upload to
-  TestFlight on every main merge; build number = commit count on main;
+  TestFlight; automatic main-merge deploys are OFF (`TESTFLIGHT_ENABLED`
+  repo variable), a manual "Run workflow" always deploys; build number =
+  commit count on main;
   signing via App Store Connect API key (repo secrets
   `APP_STORE_CONNECT_API_KEY_P8` / `_KEY_ID` / `_ISSUER_ID`)
 - `deploy/ExportOptions.plist` — app-store-connect export, upload
