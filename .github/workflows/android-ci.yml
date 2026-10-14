@@ -1,0 +1,49 @@
+name: Android CI
+
+# Linux runners bill at 1x (macOS at 10x), so this runs on every PR that
+# touches the Android app — and only those. iOS-only changes never fire it;
+# Android-only changes never fire the macOS build (ci.yml's change gate).
+on:
+  pull_request:
+    paths:
+      - 'android/**'
+      - '.github/workflows/android-ci.yml'
+
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # NOT named `build-test`: that name is the iOS required status check, and a
+  # second check run with the same name would muddle branch protection.
+  android-build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      # The wrapper jar is executable code committed to the repo. Prove it is
+      # byte-identical to the one Gradle publishes for the pinned version
+      # before running it. Plain curl + sha256sum, no third-party action.
+      - name: Verify Gradle wrapper jar
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -oE 'gradle-[0-9.]+-bin\.zip' gradle/wrapper/gradle-wrapper.properties | sed -E 's/gradle-(.*)-bin\.zip/\1/')
+          EXPECTED=$(curl -fsSL "https://services.gradle.org/distributions/gradle-${VERSION}-wrapper.jar.sha256")
+          echo "${EXPECTED}  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle/libs.versions.toml
+            android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Build and unit test
+        run: ./gradlew assembleDebug test --console=plain --stacktrace
