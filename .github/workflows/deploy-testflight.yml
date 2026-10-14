@@ -3,6 +3,20 @@ name: TestFlight
 on:
   push:
     branches: [main]
+    # Only deploy when something the iOS app actually ships has changed.
+    # Without this, an Android-only merge costs ~150 billed macOS minutes,
+    # consumes a build number, and mints another Development certificate —
+    # which is what wedged the deploy twice already (#57).
+    #
+    # Ardaas/Resources/** is inside Ardaas/**, so a scripture correction still
+    # deploys, as it must.
+    paths:
+      - 'Ardaas/**'
+      - 'ArdaasTests/**'
+      - 'project.yml'
+      - 'project-onnx.yml'
+      - 'deploy/**'
+      - '.github/workflows/deploy-testflight.yml'
   workflow_dispatch:
 
 # Queue uploads, never kill one mid-flight.

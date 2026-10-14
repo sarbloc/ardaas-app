@@ -11,8 +11,66 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-test:
-    # macOS minutes bill at 10x on private repos — keep this job lean.
+  # Decide whether anything iOS-affecting changed. Runs on Linux (1x) so the
+  # decision itself is near-free. Deliberately no third-party action: a plain
+  # `git diff` against the base ref has no supply-chain surface and no version
+  # to keep current.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ios: ${{ steps.filter.outputs.ios }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need the base commit present to diff against it.
+          fetch-depth: 0
+
+      - name: Detect iOS-affecting changes
+        id: filter
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          BASE="origin/${BASE_REF}"
+          CHANGED="${RUNNER_TEMP}/changed-files.z"
+
+          # -z keeps paths NUL-delimited and therefore literal. Without it Git
+          # quotes and escapes any non-ASCII path, so a Gurmukhi-named source
+          # (Ardaas/ਪੰਜਾਬੀ.swift) arrives as "\340\250\252..." — the Ardaas/
+          # prefix stops matching and the build is skipped. This repo ships
+          # Gurmukhi, so that is a live case, not a hypothetical.
+          #
+          # --no-renames because a detected rename reports only its
+          # destination: moving a file OUT of Ardaas/ into docs/ would read as
+          # a non-iOS change while actually removing a source from the target.
+          git diff -z --name-only --no-renames "${BASE}...HEAD" > "${CHANGED}"
+
+          echo "Changed files:"
+          tr '\0' '\n' < "${CHANGED}" | sed 's/^/  /'
+
+          # Matched from a file, never through a pipe. `echo "$FILES" | grep -q`
+          # looks equivalent but is not: grep exits at the first match, the
+          # writer dies of SIGPIPE (141), and `pipefail` turns that into a
+          # failed pipeline — so a MATCH reads as "no iOS changes". A diff with
+          # an iOS file near the top and a few thousand Android files after it
+          # would skip the build and still pass the required gate.
+          #
+          # Ardaas/Resources/** sits inside Ardaas/**, so a scripture
+          # correction still builds iOS — as it must.
+          if grep -qzE '^(Ardaas/|ArdaasTests/|project\.yml$|project-onnx\.yml$|deploy/|\.github/workflows/ci\.yml$)' "${CHANGED}"; then
+            echo "ios=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::iOS-affecting changes found — running the macOS build."
+          else
+            echo "ios=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No iOS-affecting changes — skipping the macOS build."
+          fi
+
+  ios-build:
+    needs: changes
+    if: needs.changes.outputs.ios == 'true'
+    # macOS minutes bill at 10x — keep this job lean, and only reach it when
+    # something it compiles has actually changed.
     runs-on: macos-26
     timeout-minutes: 30
     steps:
@@ -59,3 +117,47 @@ jobs:
             -destination "platform=iOS Simulator,name=${DEVICE}" \
             CODE_SIGNING_ALLOWED=NO \
             build test
+
+  # The required status check (branch protection, strict: true).
+  #
+  # It must ALWAYS run and always report, which is why it is a separate Linux
+  # job rather than the macOS build itself. A plain `paths:` filter on the
+  # workflow would leave this check permanently pending on an Android-only PR,
+  # and branch protection would block the merge forever.
+  #
+  # `if: always()` so it still reports when ios-build is skipped; the explicit
+  # result check is because a skipped or cancelled dependency must not be
+  # mistaken for a pass.
+  build-test:
+    needs: [changes, ios-build]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Gate on the macOS build
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          IOS_RESULT: ${{ needs.ios-build.result }}
+          IOS_NEEDED: ${{ needs.changes.outputs.ios }}
+        run: |
+          set -euo pipefail
+          echo "changes=${CHANGES_RESULT} ios-build=${IOS_RESULT} ios-needed=${IOS_NEEDED}"
+
+          if [ "${CHANGES_RESULT}" != "success" ]; then
+            echo "::error::Change detection did not succeed — refusing to pass the gate."
+            exit 1
+          fi
+
+          if [ "${IOS_NEEDED}" = "true" ]; then
+            if [ "${IOS_RESULT}" != "success" ]; then
+              echo "::error::iOS build did not succeed (${IOS_RESULT})."
+              exit 1
+            fi
+            echo "iOS build passed."
+          else
+            if [ "${IOS_RESULT}" != "skipped" ]; then
+              echo "::error::iOS build was not needed but reported '${IOS_RESULT}' — unexpected, failing loudly."
+              exit 1
+            fi
+            echo "No iOS-affecting changes; macOS build correctly skipped."
+          fi
