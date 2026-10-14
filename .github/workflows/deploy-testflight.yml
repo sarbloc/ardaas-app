@@ -26,11 +26,15 @@ concurrency:
 
 jobs:
   upload:
-    # Kill switch: deploys run only while the repo variable
-    # TESTFLIGHT_ENABLED is "true" (repo Settings → Secrets and variables
-    # → Actions → Variables, or `gh variable set TESTFLIGHT_ENABLED
-    # --body true`). Unset/false → the job skips at zero cost.
-    if: vars.TESTFLIGHT_ENABLED == 'true'
+    # Kill switch for AUTOMATIC deploys: a main merge deploys only while the
+    # repo variable TESTFLIGHT_ENABLED is "true" (`gh variable set
+    # TESTFLIGHT_ENABLED --body true`). Unset/false → the push run skips at
+    # zero cost. Off by default since launch: releases are deliberate.
+    #
+    # A manual "Run workflow" always deploys, regardless of the switch — so
+    # shipping a release never means flipping it on and remembering to flip
+    # it back off. Dispatch from main only (see the build-number note below).
+    if: github.event_name == 'workflow_dispatch' || vars.TESTFLIGHT_ENABLED == 'true'
     # macOS minutes bill at 10x — this job costs ~150 billed minutes per
     # main merge. Pause with the kill switch when minutes matter.
     runs-on: macos-26
