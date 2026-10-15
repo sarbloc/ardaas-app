@@ -59,23 +59,27 @@ class TranslationEngine(
         catalog: ModelCatalog,
         graphDirectory: File,
         vocabularyDirectory: File,
-    ): BentiTranslation = mutex.withLock {
-        withContext(dispatcher) {
-            try {
-                dropIfReleaseRequested()
-                // Pre-flight before anything is allocated: a low-memory kill
-                // mid-decode is the one failure the user cannot be told about.
-                MemoryGuard.check(memoryProbe.read())
-                loadedTranslator(catalog, graphDirectory, vocabularyDirectory).translate(english)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // Everything the caller sees is a TranslationError.
-                throw TranslationError.wrap(e)
-            } finally {
-                dropIfReleaseRequested()
+    ): BentiTranslation = try {
+        mutex.withLock {
+            withContext(dispatcher) {
+                try {
+                    dropIfReleaseRequested()
+                    // Pre-flight before anything is allocated: a low-memory kill
+                    // mid-decode is the one failure the user cannot be told about.
+                    MemoryGuard.check(memoryProbe.read())
+                    loadedTranslator(catalog, graphDirectory, vocabularyDirectory).translate(english)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Everything the caller sees is a TranslationError.
+                    throw TranslationError.wrap(e)
+                }
             }
         }
+    } finally {
+        // After unlocking, not before: a release() that arrived while the
+        // lock was still held failed its tryLock and is left to us.
+        honourPendingRelease()
     }
 
     /**
@@ -89,13 +93,7 @@ class TranslationEngine(
      */
     fun release() {
         releaseRequested.set(true)
-        if (mutex.tryLock()) {
-            try {
-                dropIfReleaseRequested()
-            } finally {
-                mutex.unlock()
-            }
-        }
+        honourPendingRelease()
     }
 
     /**
@@ -109,6 +107,22 @@ class TranslationEngine(
         @Suppress("DEPRECATION") // Deprecated from API 34, still delivered on the 26–33 minSdk covers.
         val threshold = ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW
         if (level >= threshold) release()
+    }
+
+    /**
+     * Drops now if a release is pending and nobody holds [mutex]. Both
+     * [release] (after setting the flag) and every translation (after
+     * unlocking) call this, so a request is never stranded: either its own
+     * tryLock wins, or the holder it lost to sees the flag on the way out, or
+     * the next translation to take the lock drops on the way in.
+     */
+    private fun honourPendingRelease() {
+        if (!releaseRequested.get() || !mutex.tryLock()) return
+        try {
+            dropIfReleaseRequested()
+        } finally {
+            mutex.unlock()
+        }
     }
 
     /** Must be called with [mutex] held. */
