@@ -27,4 +27,34 @@ object OccasionCopy {
     const val WILL_NOT_APPEAR =
         "This Ardaas has no English line, so an occasion written in English has nowhere to go — the “…..” " +
             "stays as it is. Write it in Gurmukhi instead, or pick one from the list."
+
+    // The picker's own labels, verbatim from `OccasionSection` /
+    // `OccasionEditorSheet`, so Compose and the Reader present one picker.
+
+    /** The picker's title — iOS's section header and sheet title. */
+    const val TITLE = "Occasion"
+
+    /** The row that leaves the slot as authored. */
+    const val NONE = "None"
+
+    /** Header over the [OccasionCategory.PAATH] entries. */
+    const val PAATH_HEADER = "After a paath"
+
+    /** Header over the [OccasionCategory.OCCASION] entries. */
+    const val OCCASIONS_HEADER = "Occasions"
+
+    /** The free-text row. */
+    const val OTHER = "Other…"
+
+    /** The free-text field's placeholder. */
+    const val CUSTOM_PLACEHOLDER = "e.g. my daughter's first birthday"
+
+    /** The free-text field's name — iOS's accessibility label, shown as the field label here. */
+    const val CUSTOM_LABEL = "Your own occasion"
+
+    /** Over the preview once the choice has landed in the sentence. */
+    const val PREVIEW_FILLED = "How it will read"
+
+    /** Over the preview while the slot still reads as authored. */
+    const val PREVIEW_UNFILLED = "Where it goes"
 }
