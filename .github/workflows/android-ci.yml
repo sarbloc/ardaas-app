@@ -7,6 +7,9 @@ on:
   pull_request:
     paths:
       - 'android/**'
+      # Android packages the scripture straight from the iOS resources (#82),
+      # so a correction there must rebuild and re-test Android too.
+      - 'Ardaas/Resources/**'
       - '.github/workflows/android-ci.yml'
 
 concurrency:
