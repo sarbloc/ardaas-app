@@ -35,6 +35,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -71,7 +72,9 @@ import io.sarbloc.ardaas.ui.ReaderTextStyles
 import io.sarbloc.ardaas.ui.components.GroupedSection
 import io.sarbloc.ardaas.ui.components.SectionDivider
 import io.sarbloc.ardaas.ui.components.ardaasTopAppBarColors
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Port of Ardaas/Views/ComposeView.swift, without its translation engine (v1
 // Android has none): the user types Gurmukhi directly instead.
@@ -119,7 +122,11 @@ fun ComposeScreen(
     var bentiTyped by rememberSaveable { mutableStateOf("") }
     var bentiGurmukhi by rememberSaveable { mutableStateOf("") }
     var variantId by rememberSaveable { mutableStateOf(ArdaasLibrary.DEFAULT_VARIANT_ID) }
-    var isSaving by remember { mutableStateOf(false) }
+    // Saveable, so an activity recreated mid-insert knows a save was under
+    // way and does not offer Save again (which would write a duplicate).
+    var isSaving by rememberSaveable { mutableStateOf(false) }
+    // Whether *this* composition started the save — false after recreation.
+    var ownsSave by remember { mutableStateOf(false) }
 
     val benti = BentiDraft(typed = bentiTyped, gurmukhi = bentiGurmukhi)
     val draft = ComposeDraft(label = label, benti = benti, variantId = variantId, occasion = occasion)
@@ -132,17 +139,25 @@ fun ComposeScreen(
         if (isSaving) return@save
         val record = draft.toSavedArdaas() ?: return@save
         isSaving = true
+        ownsSave = true
         scope.launch {
-            if (onSave(record)) {
+            // The insert runs to completion even if this screen is torn down
+            // mid-write, so the outcome below is never left half-done.
+            if (withContext(NonCancellable) { onSave(record) }) {
                 onClose()
             } else {
                 isSaving = false
+                ownsSave = false
                 snackbarHostState.showSnackbar(saveFailed)
             }
         }
     }
-    // Leaving mid-insert would cancel it; the write takes milliseconds, so
-    // Back simply waits for it.
+    // Restored with a save in flight that an earlier composition started:
+    // the non-cancellable insert above finishes it, so finish leaving too.
+    LaunchedEffect(Unit) {
+        if (isSaving && !ownsSave) onClose()
+    }
+    // The write takes milliseconds; Back simply waits for it.
     BackHandler(enabled = isSaving) {}
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
