@@ -569,6 +569,11 @@ class GurmukhiTransliteratorTest {
         data class Case(val rule: String, val gurmukhi: String, val expected: String)
     }
 
+    private companion object {
+        /** Unknown keys (the fixture's `_meta`) are skipped, as Swift's Decodable does. */
+        val fixtureJson = Json { ignoreUnknownKeys = true }
+    }
+
     /**
      * The iOS suite asserts the same file
      * (`ArdaasTests/Fixtures/transliteration-parity.json`, #84), so a rule
@@ -582,9 +587,7 @@ class GurmukhiTransliteratorTest {
         val path = requireNotNull(System.getProperty("ardaas.transliterationParityFixture")) {
             "ardaas.transliterationParityFixture not set — run through Gradle"
         }
-        // Unknown keys (the fixture's _meta) are skipped, as Swift's Decodable does.
-        val fixture = Json { ignoreUnknownKeys = true }
-            .decodeFromString<ParityFixture>(File(path).readText(Charsets.UTF_8))
+        val fixture = fixtureJson.decodeFromString<ParityFixture>(File(path).readText(Charsets.UTF_8))
         assertTrue("only ${fixture.cases.size} cases", fixture.cases.size >= 600)
         for (case in fixture.cases) {
             assertEquals(
