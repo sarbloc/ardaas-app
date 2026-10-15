@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -54,7 +55,10 @@ class ModelInstallerTest {
 
     private fun exists(name: String) = File(root, name).exists()
 
-    private fun partial(name: String) = File(root, "Partial/$name.part")
+    private fun partial(name: String): File {
+        val sha = model.catalog.artifact(name)?.sha256 ?: error("no artifact $name")
+        return File(root, "Partial/$name.${sha.take(16)}.part")
+    }
 
     /** Collects every phase the installer reports, from whatever thread. */
     private class PhaseLog {
@@ -199,6 +203,46 @@ class ModelInstallerTest {
         assertTrue(installer.installOrThrow() is TranslationError.OptimizationFailed)
         assertEquals(ModelState.NotDownloaded, installer.currentState())
         for (name in model.catalog.graphNames) assertTrue("the originals are kept for a rebuild", exists(name))
+    }
+
+    // Catalog upgrades
+
+    /**
+     * An app update that re-pins a file at the same byte count must not keep
+     * the superseded bytes just because the size matches.
+     */
+    @Test
+    fun aRepinnedFileOfTheSameSizeIsFetchedAgain() = runBlocking {
+        makeInstaller().install(false) {}
+        val name = "dict.TGT.json"
+        val old = model.payload(name)
+        val new = "{\"dict\":null}".toByteArray()
+        assertEquals("the scenario needs a same-size re-pin", old.size, new.size)
+
+        val repinned = model.catalog.copy(
+            artifacts = model.catalog.artifacts.map {
+                if (it.name == name) it.copy(sha256 = ModelCatalog.sha256Hex(new)) else it
+            },
+        )
+        fetcher.setPayload(name, new)
+        val upgraded = ModelInstaller(repinned, root, fetcher, optimizer, { 10_000_000L }, RecordingLogger())
+
+        assertEquals(ModelState.NotDownloaded, upgraded.currentState())
+        upgraded.install(false) {}
+        assertEquals(ModelState.Ready, upgraded.currentState())
+        assertArrayEquals(new, File(root, name).readBytes())
+    }
+
+    @Test
+    fun aPartialForASupersededPinIsDiscardedNotResumed() = runBlocking {
+        val stale = File(root, "Partial/encoder_model.onnx.0000000000000000.part")
+        stale.parentFile?.mkdirs()
+        stale.writeBytes(ByteArray(8))
+
+        makeInstaller().install(false) {}
+
+        assertFalse(stale.exists())
+        assertFalse(fetcher.requests.first { it.name == "encoder_model.onnx" }.hadPartial)
     }
 
     // Hash verification
