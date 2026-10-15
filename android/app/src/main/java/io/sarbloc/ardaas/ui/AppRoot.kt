@@ -59,7 +59,7 @@ fun AppRoot(container: AppContainer) {
         version = version,
         onDelete = container::delete,
         onUpdate = container::update,
-        onInsert = container::insert,
+        onInsert = container::insertOnce,
     )
 }
 
@@ -77,7 +77,7 @@ fun AppNavHost(
     version: String,
     onDelete: suspend (SavedArdaas) -> Boolean,
     onUpdate: suspend (SavedArdaas) -> Boolean,
-    onInsert: suspend (SavedArdaas) -> Boolean,
+    onInsert: suspend (saveKey: String, record: SavedArdaas) -> Boolean,
 ) {
     val backStack = rememberSaveable(saver = BackStack.Saver) { BackStack() }
     val screenState = rememberSaveableStateHolder()

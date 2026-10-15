@@ -72,9 +72,8 @@ import io.sarbloc.ardaas.ui.ReaderTextStyles
 import io.sarbloc.ardaas.ui.components.GroupedSection
 import io.sarbloc.ardaas.ui.components.SectionDivider
 import io.sarbloc.ardaas.ui.components.ardaasTopAppBarColors
-import kotlinx.coroutines.NonCancellable
+import java.util.UUID
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 // Port of Ardaas/Views/ComposeView.swift, without its translation engine (v1
 // Android has none): the user types Gurmukhi directly instead.
@@ -101,8 +100,11 @@ import kotlinx.coroutines.withContext
  *   free-text field.
  * @param onEditOccasion opens the occasion picker. Null hides the "What it's
  *   for" row.
- * @param onSave inserts the record; false (after the host has logged why)
- *   keeps the screen open with the draft intact.
+ * @param onSave inserts the record, at most once per `saveKey`: a screen
+ *   restored mid-save calls it again with the same key and must get the
+ *   original write's outcome, not a second record (`AppContainer.insertOnce`).
+ *   False (after the host has logged why) keeps the screen open with the
+ *   draft intact.
  * @param onClose leaves the screen: after a successful save, or Cancel. No
  *   confirmation for unsaved input, exactly as iOS's Cancel.
  */
@@ -114,7 +116,7 @@ fun ComposeScreen(
     occasion: OccasionDraft,
     onOccasionChange: (OccasionDraft) -> Unit,
     onEditOccasion: (() -> Unit)?,
-    onSave: suspend (SavedArdaas) -> Boolean,
+    onSave: suspend (saveKey: String, record: SavedArdaas) -> Boolean,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -122,11 +124,11 @@ fun ComposeScreen(
     var bentiTyped by rememberSaveable { mutableStateOf("") }
     var bentiGurmukhi by rememberSaveable { mutableStateOf("") }
     var variantId by rememberSaveable { mutableStateOf(ArdaasLibrary.DEFAULT_VARIANT_ID) }
-    // Saveable, so an activity recreated mid-insert knows a save was under
-    // way and does not offer Save again (which would write a duplicate).
-    var isSaving by rememberSaveable { mutableStateOf(false) }
-    // Whether *this* composition started the save — false after recreation.
-    var ownsSave by remember { mutableStateOf(false) }
+    // The save under way, by key; null when none is. Saveable, so an activity
+    // recreated mid-insert rejoins the same write (see below) instead of
+    // offering Save again and writing a duplicate.
+    var saveKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val isSaving = saveKey != null
 
     val benti = BentiDraft(typed = bentiTyped, gurmukhi = bentiGurmukhi)
     val draft = ComposeDraft(label = label, benti = benti, variantId = variantId, occasion = occasion)
@@ -135,27 +137,34 @@ fun ComposeScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val saveFailed = stringResource(R.string.compose_save_failed)
-    val save: () -> Unit = save@{
-        if (isSaving) return@save
-        val record = draft.toSavedArdaas() ?: return@save
-        isSaving = true
-        ownsSave = true
-        scope.launch {
-            // The insert runs to completion even if this screen is torn down
-            // mid-write, so the outcome below is never left half-done.
-            if (withContext(NonCancellable) { onSave(record) }) {
-                onClose()
-            } else {
-                isSaving = false
-                ownsSave = false
-                snackbarHostState.showSnackbar(saveFailed)
+    val runSave: (String) -> Unit = { key ->
+        val record = draft.toSavedArdaas()
+        if (record == null) {
+            saveKey = null
+        } else {
+            scope.launch {
+                if (onSave(key, record)) {
+                    onClose()
+                } else {
+                    saveKey = null
+                    snackbarHostState.showSnackbar(saveFailed)
+                }
             }
         }
     }
-    // Restored with a save in flight that an earlier composition started:
-    // the non-cancellable insert above finishes it, so finish leaving too.
+    val save: () -> Unit = {
+        if (!isSaving && draft.canSave) {
+            val key = UUID.randomUUID().toString()
+            saveKey = key
+            runSave(key)
+        }
+    }
+    // Restored with a save in flight: ask for it again under the same key,
+    // which the host answers with the original write's outcome — so the
+    // screen leaves only once the record is really stored, and keeps the
+    // draft if it was not.
     LaunchedEffect(Unit) {
-        if (isSaving && !ownsSave) onClose()
+        saveKey?.let(runSave)
     }
     // The write takes milliseconds; Back simply waits for it.
     BackHandler(enabled = isSaving) {}
@@ -428,7 +437,7 @@ private fun ComposeScreenPreview() {
                 occasion = OccasionDraft(),
                 onOccasionChange = {},
                 onEditOccasion = null,
-                onSave = { true },
+                onSave = { _, _ -> true },
                 onClose = {},
             )
         }
