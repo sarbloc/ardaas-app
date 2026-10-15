@@ -59,7 +59,7 @@ object BentiPostprocessor {
     // Placeholder restore (spec section 5.2)
 
     /** Puts back every text the preprocessor hid, whichever registered spelling the model echoed. */
-    fun restorePlaceholders(text: String, placeholders: List<BentiPlaceholder>): String =
+    fun restorePlaceholders(text: String, placeholders: List<BentiPreprocessor.Placeholder>): String =
         placeholders.fold(text) { acc, placeholder ->
             acc.swiftReplacingOccurrences(placeholder.alias, placeholder.original)
         }

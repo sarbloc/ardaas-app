@@ -121,25 +121,32 @@ class BentiPostprocessorTest {
         assertEquals("ਓ'ਸ", BentiPostprocessor.cleanUpTokenizationSpaces("ਓ ' ਸ"))
     }
 
-    // Placeholder restore (spec section 5.2)
+    // Placeholder wrap/restore round trip (spec sections 2.3 + 5.2)
 
-    /**
-     * The restore half of iOS's `testPlaceholderRoundTrip`: the model may echo
-     * the placeholder in any registered spelling. The wrap half (and
-     * `testShortNumeralsAreNotWrapped`) exercise `BentiPreprocessor`, ported
-     * separately; until then the placeholders are what it produces for
-     * "Grant success starting on 2026-08-15, and keep pride away."
-     */
     @Test
-    fun placeholderRestoreAcceptsEveryRegisteredSpelling() {
-        val placeholders = placeholdersFor(serial = 1, original = "2026-08-15")
+    fun placeholderRoundTrip() {
+        val wrapped = BentiPreprocessor.wrapWithPlaceholders(
+            "Grant success starting on 2026-08-15, and keep pride away.",
+        )
+        assertTrue(wrapped.text.contains("<ID1>"))
+        assertFalse(wrapped.text.contains("2026-08-15"))
+
+        // The model may echo the placeholder in any registered spelling.
         for (spelling in listOf("<ID1>", "< ID1 >", "[ID1]", "<id1>")) {
             assertEquals(
                 "failed to restore spelling $spelling",
                 "ਸਫਲਤਾ 2026-08-15 ਨੂੰ",
-                BentiPostprocessor.restorePlaceholders("ਸਫਲਤਾ $spelling ਨੂੰ", placeholders),
+                BentiPostprocessor.restorePlaceholders("ਸਫਲਤਾ $spelling ਨੂੰ", wrapped.placeholders),
             )
         }
+    }
+
+    @Test
+    fun shortNumeralsAreNotWrapped() {
+        // "9:30" minus " .:" is 3 chars — under the reference's threshold.
+        val wrapped = BentiPreprocessor.wrapWithPlaceholders("Meet at 9:30 today.")
+        assertFalse(wrapped.text.contains("<ID"))
+        assertTrue(wrapped.placeholders.isEmpty())
     }
 
     // Script purity gate (spec section 5.5)
@@ -190,12 +197,4 @@ class BentiPostprocessorTest {
         assertTrue(BentiPostprocessor.isGurmukhiPure(""))
         assertTrue(BentiPostprocessor.isGurmukhiPure("ਜੀ॥ ! ? -"))
     }
-
-    /** The 16 alias spellings `BentiPreprocessor.wrapWithPlaceholders` registers for one match. */
-    private fun placeholdersFor(serial: Int, original: String): List<BentiPlaceholder> = listOf(
-        "<ID$serial>", "< ID$serial >", "[ID$serial]", "[ ID$serial ]",
-        "[ID $serial]", "<ID$serial]", "< ID$serial]", "<ID$serial ]",
-        "<id$serial>", "< id$serial >", "[id$serial]", "[ id$serial ]",
-        "[id $serial]", "<id$serial]", "< id$serial]", "<id$serial ]",
-    ).map { BentiPlaceholder(alias = it, original = original) }
 }
