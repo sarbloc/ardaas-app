@@ -72,7 +72,6 @@ import io.sarbloc.ardaas.ui.ReaderTextStyles
 import io.sarbloc.ardaas.ui.components.GroupedSection
 import io.sarbloc.ardaas.ui.components.SectionDivider
 import io.sarbloc.ardaas.ui.components.ardaasTopAppBarColors
-import java.util.UUID
 import kotlinx.coroutines.launch
 
 // Port of Ardaas/Views/ComposeView.swift, without its translation engine (v1
@@ -100,12 +99,8 @@ import kotlinx.coroutines.launch
  *   free-text field.
  * @param onEditOccasion opens the occasion picker. Null hides the "What it's
  *   for" row.
- * @param onSave inserts the record under a fresh `saveKey`, in a scope that
- *   outlives this screen (`AppContainer.insertOnce`). False (after the host
- *   has logged why) keeps the screen open with the draft intact.
- * @param onRejoinSave the outcome of the [onSave] already started under
- *   `saveKey`, for a screen restored mid-save; null when the host never
- *   started it in this process (`AppContainer.rejoinInsert`).
+ * @param onSave inserts the record. False (after the host has logged why)
+ *   keeps the screen open with the draft intact.
  * @param onClose leaves the screen: after a successful save, or Cancel. No
  *   confirmation for unsaved input, exactly as iOS's Cancel.
  */
@@ -117,8 +112,7 @@ fun ComposeScreen(
     occasion: OccasionDraft,
     onOccasionChange: (OccasionDraft) -> Unit,
     onEditOccasion: (() -> Unit)?,
-    onSave: suspend (saveKey: String, record: SavedArdaas) -> Boolean,
-    onRejoinSave: suspend (saveKey: String) -> Boolean?,
+    onSave: suspend (record: SavedArdaas) -> Boolean,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -126,11 +120,7 @@ fun ComposeScreen(
     var bentiTyped by rememberSaveable { mutableStateOf("") }
     var bentiGurmukhi by rememberSaveable { mutableStateOf("") }
     var variantId by rememberSaveable { mutableStateOf(ArdaasLibrary.DEFAULT_VARIANT_ID) }
-    // The save under way, by key; null when none is. Saveable, so an activity
-    // recreated mid-insert rejoins the same write (see below) instead of
-    // offering Save again and writing a duplicate.
-    var saveKey by rememberSaveable { mutableStateOf<String?>(null) }
-    val isSaving = saveKey != null
+    var isSaving by remember { mutableStateOf(false) }
 
     val benti = BentiDraft(typed = bentiTyped, gurmukhi = bentiGurmukhi)
     val draft = ComposeDraft(label = label, benti = benti, variantId = variantId, occasion = occasion)
@@ -139,34 +129,22 @@ fun ComposeScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val saveFailed = stringResource(R.string.compose_save_failed)
-    // Leaves on success; on failure keeps the draft and says so.
-    suspend fun finishSave(stored: Boolean) {
-        if (stored) {
-            onClose()
-        } else {
-            saveKey = null
-            snackbarHostState.showSnackbar(saveFailed)
-        }
-    }
     val save: () -> Unit = {
-        // `saveKey` is read live, not through `isSaving`, so a second tap
+        // `isSaving` is snapshot state read at tap time, so a second tap
         // landing before recomposition is still refused.
         val record = draft.toSavedArdaas()
-        if (saveKey == null && record != null) {
-            val key = UUID.randomUUID().toString()
-            saveKey = key
-            scope.launch { finishSave(onSave(key, record)) }
+        if (!isSaving && record != null) {
+            isSaving = true
+            scope.launch {
+                if (onSave(record)) {
+                    onClose()
+                } else {
+                    // Keep the draft and say so.
+                    isSaving = false
+                    snackbarHostState.showSnackbar(saveFailed)
+                }
+            }
         }
-    }
-    // Restored with a save in flight: rejoin the write under its key, so the
-    // screen leaves only once the record is really stored and keeps the
-    // draft if it was not. Unknown to the host (the process was restarted,
-    // or the write never started) means the outcome cannot be known — then
-    // nothing is written automatically, and the draft stays for the user.
-    LaunchedEffect(Unit) {
-        val key = saveKey ?: return@LaunchedEffect
-        val stored = onRejoinSave(key)
-        if (stored == null) saveKey = null else finishSave(stored)
     }
     // The write takes milliseconds; Back simply waits for it.
     BackHandler(enabled = isSaving) {}
@@ -439,8 +417,7 @@ private fun ComposeScreenPreview() {
                 occasion = OccasionDraft(),
                 onOccasionChange = {},
                 onEditOccasion = null,
-                onSave = { _, _ -> true },
-                onRejoinSave = { null },
+                onSave = { true },
                 onClose = {},
             )
         }

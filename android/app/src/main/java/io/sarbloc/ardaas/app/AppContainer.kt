@@ -86,18 +86,6 @@ class AppContainer(context: Context, scope: CoroutineScope) {
         false
     }
 
-    private val insertsByKey = InsertOnce(scope, ::insert)
-
-    /**
-     * [insert], at most once per [key] and in the process's scope — how
-     * Compose saves, so an activity recreated mid-save rejoins the same write
-     * rather than duplicating or abandoning it. See [InsertOnce].
-     */
-    suspend fun insertOnce(key: String, saved: SavedArdaas): Boolean = insertsByKey(key, saved)
-
-    /** The outcome of [insertOnce] under [key], or null if this process never ran it. See [InsertOnce.rejoin]. */
-    suspend fun rejoinInsert(key: String): Boolean? = insertsByKey.rejoin(key)
-
     /**
      * Deletes [saved]. Returns false — after logging why — if the database
      * refused, so the caller can put the row back rather than pretend.
