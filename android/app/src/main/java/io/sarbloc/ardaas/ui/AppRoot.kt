@@ -23,8 +23,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.platform.LocalContext
@@ -38,7 +38,10 @@ import io.sarbloc.ardaas.ui.compose.ComposeScreen
 import io.sarbloc.ardaas.ui.compose.OccasionDraftSaver
 import io.sarbloc.ardaas.ui.home.HomeScreen
 import io.sarbloc.ardaas.ui.navigation.BackStack
+import io.sarbloc.ardaas.persistence.occasionChoice
 import io.sarbloc.ardaas.ui.navigation.Destination
+import io.sarbloc.ardaas.ui.occasion.OccasionPickerDialog
+import io.sarbloc.ardaas.ui.occasion.withPickedOccasion
 import io.sarbloc.ardaas.ui.sources.SourcesScreen
 import io.sarbloc.ardaas.ui.sources.appVersionString
 
@@ -156,6 +159,8 @@ private fun ReaderDestination(
     onBack: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    // Saveable, so the picker is still open after the activity is recreated.
+    var editingOccasion by rememberSaveable { mutableStateOf(false) }
     when (savedArdaas) {
         LoadState.Loading -> Unit
         is LoadState.Loaded -> {
@@ -170,15 +175,35 @@ private fun ReaderDestination(
             val catalog = bundledContent.occasionCatalog
             when {
                 library is LoadState.Failed -> ReaderTextUnavailable(record.label, library.error, onBack)
-                library is LoadState.Loaded && catalog !is LoadState.Loading -> ReaderScreen(
-                    savedArdaas = record,
-                    library = library.value,
-                    occasionCatalog = catalog.valueOrNull,
-                    onBack = onBack,
-                    onVariantChange = { variantId ->
-                        scope.launch { onUpdate(record.copy(variantId = variantId)) }
-                    },
-                )
+                library is LoadState.Loaded && catalog !is LoadState.Loading -> {
+                    val occasionCatalog = catalog.valueOrNull
+                    ReaderScreen(
+                        savedArdaas = record,
+                        library = library.value,
+                        occasionCatalog = occasionCatalog,
+                        onBack = onBack,
+                        onVariantChange = { variantId ->
+                            scope.launch { onUpdate(record.copy(variantId = variantId)) }
+                        },
+                        onEditOccasion = { editingOccasion = true },
+                    )
+                    if (editingOccasion && occasionCatalog != null) {
+                        OccasionPickerDialog(
+                            catalog = occasionCatalog,
+                            choice = record.occasionChoice,
+                            ardaasContent = library.value.resolvedVariant(record.variantId).content,
+                            // Persisted on Done, like the variant picker
+                            // writes straight to the record; Cancel keeps it.
+                            onDone = { picked ->
+                                editingOccasion = false
+                                record.withPickedOccasion(picked, occasionCatalog)?.let { updated ->
+                                    scope.launch { onUpdate(updated) }
+                                }
+                            },
+                            onCancel = { editingOccasion = false },
+                        )
+                    }
+                }
                 else -> Unit
             }
         }
