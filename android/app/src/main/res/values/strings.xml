@@ -25,7 +25,33 @@
     <string name="sources_support_link">Help &amp; support</string>
     <string name="sources_version">Version</string>
 
-    <!-- Placeholders until the Reader and Compose screens land -->
+    <!-- Reader -->
     <string name="reader_text_unavailable">Ardaas Text Unavailable</string>
-    <string name="compose_placeholder_body">Composing an Ardaas is coming soon.</string>
+
+    <!-- Compose (port of ComposeView.swift) -->
+    <string name="compose_title">New Ardaas</string>
+    <string name="compose_cancel">Cancel</string>
+    <string name="compose_save">Save</string>
+    <string name="compose_save_failed">Couldn\'t save this Ardaas. Try again.</string>
+    <string name="compose_label_header">Label</string>
+    <string name="compose_label_placeholder">e.g. Family ardaas</string>
+    <string name="compose_variant_header">Ardaas</string>
+    <string name="compose_variant_row">Ardaas</string>
+    <string name="compose_variant_choose">Choose the Ardaas variant</string>
+    <string name="compose_occasion_header">Occasion</string>
+    <string name="compose_occasion_row">What it\'s for</string>
+    <string name="compose_occasion_choose">Choose what it\'s for</string>
+    <string name="compose_occasion_none">None</string>
+    <string name="compose_occasion_other">Other…</string>
+    <string name="compose_occasion_custom_placeholder">e.g. my daughter\'s first birthday</string>
+    <string name="compose_occasion_preview_filled">How it will read</string>
+    <string name="compose_occasion_preview_unfilled">Where it goes</string>
+    <string name="compose_benti_header">Benti</string>
+    <string name="compose_benti_placeholder">Your benti, in English</string>
+    <string name="compose_gurmukhi_header">Gurmukhi</string>
+    <string name="compose_gurmukhi_placeholder">Your benti, in Gurmukhi (optional)</string>
+    <string name="compose_gurmukhi_typed_in_benti">Your benti is written in Gurmukhi, so it\'s saved as the Gurmukhi text.</string>
+    <string name="compose_transliteration_note">Transliteration generated from your Gurmukhi. Saved alongside it so you can read the Ardaas in either script.</string>
+    <string name="compose_keyboard_tip_title">Type in Gurmukhi</string>
+    <string name="compose_keyboard_tip_body">Add the Punjabi keyboard to Gboard: Gboard → Settings → Languages → Add keyboard → Punjabi. Then switch to it with the globe key.</string>
 </resources>

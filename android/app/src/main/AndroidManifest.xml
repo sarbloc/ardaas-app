@@ -14,11 +14,15 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.NoActionBar">
 
-        <!-- Portrait only, matching iOS. Phone only (#93): no tablet layouts. -->
+        <!-- Portrait only, matching iOS. Phone only (#93): no tablet layouts.
+             adjustResize: the keyboard arrives as an inset Compose pads for
+             (imePadding), so a focused field is scrolled clear of it rather
+             than the window being panned on older Android versions. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

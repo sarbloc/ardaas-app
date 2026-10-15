@@ -72,6 +72,21 @@ class AppContainer(context: Context, scope: CoroutineScope) {
             .stateIn(scope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), LoadState.Loading)
 
     /**
+     * Saves [saved] as a new record (its id left 0). Returns false — after
+     * logging why — if the database refused, so Compose can stay open with
+     * the user's words rather than lose them.
+     */
+    suspend fun insert(saved: SavedArdaas): Boolean = try {
+        savedArdaasDao.insert(saved)
+        true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.e(TAG, "Inserting a new saved Ardaas failed", e)
+        false
+    }
+
+    /**
      * Deletes [saved]. Returns false — after logging why — if the database
      * refused, so the caller can put the row back rather than pretend.
      */
