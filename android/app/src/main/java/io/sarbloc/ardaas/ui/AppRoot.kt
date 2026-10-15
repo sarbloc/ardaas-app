@@ -113,18 +113,34 @@ fun AppNavHost(
                         // Hoisted here, not inside the screen, so the occasion
                         // picker (#90) can write its choice back.
                         var occasion by rememberSaveable(stateSaver = OccasionDraftSaver) { mutableStateOf(OccasionDraft()) }
+                        var editingOccasion by rememberSaveable { mutableStateOf(false) }
+                        val occasionCatalog = bundledContent.occasionCatalog.valueOrNull
                         ComposeScreen(
                             library = bundledContent.library.valueOrNull,
-                            occasionCatalog = bundledContent.occasionCatalog.valueOrNull,
+                            occasionCatalog = occasionCatalog,
                             occasion = occasion,
                             onOccasionChange = { occasion = it },
-                            onEditOccasion = null,
+                            onEditOccasion = occasionCatalog?.let { { editingOccasion = true } },
                             onSave = onInsert,
                             // As iOS dismisses the sheet: back to Home, where
                             // the new record leads the list. Only while this
                             // screen is still on top.
                             onClose = { if (backStack.current == destination) goBack() },
                         )
+                        if (editingOccasion && occasionCatalog != null) {
+                            // No ardaasContent: Compose shows its own live
+                            // "Where it goes" preview, for the variant chosen
+                            // on that screen, right under the row.
+                            OccasionPickerDialog(
+                                catalog = occasionCatalog,
+                                choice = occasion.choice,
+                                onDone = { picked ->
+                                    editingOccasion = false
+                                    occasion = OccasionDraft.from(picked, occasionCatalog)
+                                },
+                                onCancel = { editingOccasion = false },
+                            )
+                        }
                     }
                     is Destination.Reader -> ReaderDestination(
                         savedArdaas = savedArdaas.map { all -> all.firstOrNull { it.id == destination.savedArdaasId } },
