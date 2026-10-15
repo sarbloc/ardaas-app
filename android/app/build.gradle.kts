@@ -163,6 +163,13 @@ tasks.withType<Test>().configureEach {
     inputs.file(translationGoldenFixture).withPathSensitivity(PathSensitivity.NONE)
     inputs.property("ardaas.modelDir", modelDirectory)
     systemProperty("ardaas.modelDir", modelDirectory.get())
+    // The files' contents too, so swapping a model in place re-runs the test
+    // rather than reusing a pass recorded against the old artifacts.
+    modelDirectory.get().takeIf { it.isNotEmpty() }?.let { path ->
+        inputs.files(fileTree(path) { include("*.onnx", "*.json") })
+            .withPropertyName("ardaas.modelFiles")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
 }
 
 // Host tests run ONNX Runtime from the desktop JVM artifact. The Android AAR's
