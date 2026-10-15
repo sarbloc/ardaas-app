@@ -2,6 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
+      On-device translation (#117): the model is fetched only when the user
+      opts in. ACCESS_NETWORK_STATE lets the download refuse a metered
+      network unless mobile data was explicitly allowed.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!--
       allowBackup="false": the privacy policy promises saved Ardaas stay on the
       device, which is true on iOS (no CloudKit). Android's default would copy
       them to the user's Google Drive. Device-to-device transfer to a new phone
