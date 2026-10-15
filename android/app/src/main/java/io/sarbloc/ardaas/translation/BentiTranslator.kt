@@ -78,9 +78,6 @@ class BentiTranslator(
 
         val clock = LoadClock()
         val generated = greedyDecode(inputIds, clock)
-        // A cancel during the last ORT run (the one that produced </s>) or
-        // the session close is not seen by the loop's per-step check.
-        currentCoroutineContext().ensureActive()
 
         val devanagari = BentiPostprocessor.restorePlaceholders(
             BentiPostprocessor.decodeToText(generated, idToPiece),
@@ -89,7 +86,7 @@ class BentiTranslator(
         val gurmukhi = BentiPostprocessor.indicDetokenize(
             BentiPostprocessor.transliterateDevanagariToGurmukhi(devanagari),
         )
-        return BentiTranslation(
+        val translation = BentiTranslation(
             gurmukhi = gurmukhi,
             rawDevanagari = devanagari,
             generatedIds = generated,
@@ -97,6 +94,10 @@ class BentiTranslator(
             sessionLoadMillis = clock.nanos / NANOS_PER_MILLI,
             isGurmukhiPure = BentiPostprocessor.isGurmukhiPure(gurmukhi),
         )
+        // The decode loop checks between steps only: a cancel during the last
+        // ORT run, the session close or the text stages must still not return.
+        currentCoroutineContext().ensureActive()
+        return translation
     }
 
     // Greedy decode (spec section 4)
