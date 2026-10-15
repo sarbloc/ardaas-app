@@ -2,15 +2,21 @@ package io.sarbloc.ardaas.persistence
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Ignore
 import androidx.room.PrimaryKey
+import io.sarbloc.ardaas.composer.ArdaasComposer
+import io.sarbloc.ardaas.composer.BentiLayers
+import io.sarbloc.ardaas.composer.RenderItem
+import io.sarbloc.ardaas.content.ArdaasContent
 import io.sarbloc.ardaas.content.ArdaasLibrary
+import io.sarbloc.ardaas.occasion.OccasionCatalog
+import io.sarbloc.ardaas.occasion.OccasionChoice
+import io.sarbloc.ardaas.occasion.OccasionLayers
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-// Port of the stored properties of Ardaas/Models/SavedArdaas.swift. The
-// computed extensions (bentiEnglish, occasionChoice, bentiLayers,
-// occasionLayers, renderItems) need the composer and occasion types and land
-// with #85.
+// Port of Ardaas/Models/SavedArdaas.swift: the stored properties as the Room
+// entity, and its computed extensions below it.
 
 /**
  * A user-saved Ardaas: a labelled personal benti composed into the canonical
@@ -64,8 +70,11 @@ data class SavedArdaas(
      * "nothing chosen"**, which renders the canonical dots.
      *
      * Together with [occasionCustom] this pair is meant to be written only
-     * through `OccasionChoice` (#85), which keeps it from holding an
-     * impossible combination such as an id with a stale free-text draft.
+     * through [OccasionChoice] — the `occasion` constructor and
+     * [withOccasionChoice] — which keeps it from holding an impossible
+     * combination such as an id with a stale free-text draft. The raw
+     * parameters exist for Room and `copy`, as iOS's stored properties stay
+     * public for SwiftData.
      */
     @ColumnInfo(defaultValue = "")
     val occasionId: String = "",
@@ -83,4 +92,91 @@ data class SavedArdaas(
      */
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-)
+) {
+    /**
+     * A new record whose occasion is written as a consistent pair through the
+     * choice — iOS's `init(…, occasion:)`. [occasion] has no default, so a
+     * call without it can only mean the primary constructor. Ignored by Room,
+     * which reads rows through the primary constructor.
+     */
+    @Ignore
+    constructor(
+        label: String,
+        bentiText: String,
+        occasion: OccasionChoice,
+        createdAt: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS),
+        variantId: String = ArdaasLibrary.DEFAULT_VARIANT_ID,
+        bentiGurmukhi: String = "",
+        bentiTransliteration: String = "",
+    ) : this(
+        label = label,
+        bentiText = bentiText,
+        createdAt = createdAt,
+        variantId = variantId,
+        bentiGurmukhi = bentiGurmukhi,
+        bentiTransliteration = bentiTransliteration,
+        occasionId = occasion.storedId,
+        occasionCustom = occasion.storedCustomText,
+    )
+}
+
+// Computed views of the stored fields. Extensions rather than members so Room
+// never has to decide whether they are columns.
+
+/**
+ * Clarity alias for [SavedArdaas.bentiText]: the user's own words, which
+ * serve as the benti's English/translation layer.
+ */
+val SavedArdaas.bentiEnglish: String get() = bentiText
+
+/**
+ * This record with a new English layer. The entity is immutable, so iOS's
+ * `bentiEnglish` setter becomes a copy.
+ */
+fun SavedArdaas.withBentiEnglish(text: String): SavedArdaas = copy(bentiText = text)
+
+/** The two persisted occasion fields as the one value the pickers and the composer reason about. */
+val SavedArdaas.occasionChoice: OccasionChoice
+    get() = OccasionChoice.fromStored(occasionId = occasionId, occasionCustom = occasionCustom)
+
+/**
+ * This record with a new occasion — iOS's `occasionChoice` setter. Writes
+ * both fields together so the pair stays consistent: in particular it clears
+ * [SavedArdaas.occasionCustom] for any choice that is not free text.
+ */
+fun SavedArdaas.withOccasionChoice(choice: OccasionChoice): SavedArdaas =
+    copy(occasionId = choice.storedId, occasionCustom = choice.storedCustomText)
+
+/** The persisted layers as the value type the composer and Reader use. */
+val SavedArdaas.bentiLayers: BentiLayers
+    get() = BentiLayers(gurmukhi = bentiGurmukhi, transliteration = bentiTransliteration, english = bentiText)
+
+/**
+ * The chosen occasion's words, resolved through the bundled catalog.
+ *
+ * Null — the canonical dots, untouched — for nothing chosen and for an id a
+ * later bundle has retired ([OccasionChoice.layers]). A broken bundle must
+ * cost the reader the substitution, never the Ardaas.
+ *
+ * A **free-text** occasion is stored whole on this record and needs no
+ * catalog, so it survives a catalog that failed to load (a null [catalog]).
+ * Dropping the user's own words because an unrelated bundled file is missing
+ * would be the wrong trade.
+ */
+fun SavedArdaas.occasionLayers(catalog: OccasionCatalog?): OccasionLayers? {
+    val choice = occasionChoice
+    if (catalog == null) {
+        return if (choice is OccasionChoice.Custom) OccasionLayers.fromFreeText(choice.text) else null
+    }
+    return choice.layers(catalog)
+}
+
+/**
+ * Exactly what the Reader draws: this record's benti composed into [content],
+ * with its chosen occasion spliced into the "….." slot.
+ *
+ * The Reader calls nothing else, so this one function is the whole
+ * composition path and the tests that cover it cannot drift from the screen.
+ */
+fun SavedArdaas.renderItems(content: ArdaasContent, catalog: OccasionCatalog?): List<RenderItem> =
+    ArdaasComposer.compose(content = content, benti = bentiLayers, occasion = occasionLayers(catalog))

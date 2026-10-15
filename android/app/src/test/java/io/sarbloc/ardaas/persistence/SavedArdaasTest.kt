@@ -1,7 +1,9 @@
 package io.sarbloc.ardaas.persistence
 
 import androidx.room.Room
+import io.sarbloc.ardaas.composer.BentiLayers
 import io.sarbloc.ardaas.content.ArdaasLibrary
+import io.sarbloc.ardaas.occasion.OccasionChoice
 import java.time.Instant
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
@@ -9,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -19,8 +22,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 
 /**
- * Port of the stored-model cases in ArdaasTests/SavedArdaasTests.swift, plus
- * the storage layer itself: every field round-trips, and the DAO inserts,
+ * Port of ArdaasTests/SavedArdaasTests.swift, plus the storage layer itself: every field round-trips, and the DAO inserts,
  * updates, deletes and lists newest first.
  *
  * Runs on the JVM under Robolectric against a real in-memory SQLite database,
@@ -80,6 +82,7 @@ class SavedArdaasTest {
         val saved = SavedArdaas(label = "Morning", bentiText = "my benti")
         assertEquals("", saved.occasionId)
         assertEquals("", saved.occasionCustom)
+        assertEquals(OccasionChoice.Unset, saved.occasionChoice)
     }
 
     /** The pinned default, not whatever the manifest happens to list first. */
@@ -123,7 +126,96 @@ class SavedArdaasTest {
 
     // endregion
 
+    // region Computed views (iOS: the SavedArdaas extension)
+
+    /** iOS sets the alias in place; the entity is immutable here, so the setter is a copy. */
+    @Test
+    fun bentiEnglishAliasesTheStoredText() {
+        val saved = SavedArdaas(label = "Morning", bentiText = "my benti")
+        assertEquals("my benti", saved.bentiEnglish)
+        val edited = saved.withBentiEnglish("edited benti")
+        assertEquals("edited benti", edited.bentiText)
+    }
+
+    @Test
+    fun bentiLayersExposesAllThreeLayers() {
+        val saved = SavedArdaas(
+            label = "Morning",
+            bentiText = "my benti",
+            bentiGurmukhi = "ਮੇਰੀ ਬੇਨਤੀ",
+            bentiTransliteration = "merī bentī",
+        )
+        assertEquals(
+            BentiLayers(gurmukhi = "ਮੇਰੀ ਬੇਨਤੀ", transliteration = "merī bentī", english = "my benti"),
+            saved.bentiLayers,
+        )
+    }
+
+    /** An untranslated record still yields a composable benti — only the English layer is populated, and it is not empty. */
+    @Test
+    fun untranslatedRecordYieldsEnglishOnlyLayers() {
+        val saved = SavedArdaas(label = "Morning", bentiText = "  my benti  ")
+        assertEquals(BentiLayers(english = "my benti"), saved.bentiLayers)
+        assertFalse(saved.bentiLayers.isEmpty)
+    }
+
+    @Test
+    fun blankRecordYieldsEmptyLayers() {
+        val saved = SavedArdaas(label = "Morning", bentiText = " \n ")
+        assertTrue(saved.bentiLayers.isEmpty)
+    }
+
+    /**
+     * The choice is the only way in, so the two columns can never hold an
+     * impossible pair — an id with a stale free-text draft beside it, or free
+     * text with no sentinel id to reach it by.
+     */
+    @Test
+    fun theInitialiserStoresTheChoiceAsAConsistentPair() {
+        val picked = SavedArdaas(label = "Morning", bentiText = "b", occasion = OccasionChoice.Catalog("japji-sahib"))
+        assertEquals("japji-sahib", picked.occasionId)
+        assertEquals("", picked.occasionCustom)
+        assertEquals(OccasionChoice.Catalog("japji-sahib"), picked.occasionChoice)
+
+        val typed = SavedArdaas(label = "Morning", bentiText = "b", occasion = OccasionChoice.Custom("my niece's birth"))
+        assertEquals(OccasionChoice.CUSTOM_ID, typed.occasionId)
+        assertEquals("my niece's birth", typed.occasionCustom)
+        assertEquals(OccasionChoice.Custom("my niece's birth"), typed.occasionChoice)
+    }
+
+    /**
+     * Setting the choice keeps the pair consistent — switching from free text
+     * to a catalog entry must not leave the old typed words behind.
+     */
+    @Test
+    fun settingTheChoiceClearsTheOtherField() {
+        var saved = SavedArdaas(label = "Morning", bentiText = "b")
+        saved = saved.withOccasionChoice(OccasionChoice.Custom("my niece's birth"))
+        assertEquals(OccasionChoice.CUSTOM_ID, saved.occasionId)
+        assertEquals("my niece's birth", saved.occasionCustom)
+
+        saved = saved.withOccasionChoice(OccasionChoice.Catalog("japji-sahib"))
+        assertEquals("japji-sahib", saved.occasionId)
+        assertEquals("", saved.occasionCustom)
+
+        saved = saved.withOccasionChoice(OccasionChoice.Unset)
+        assertEquals("", saved.occasionId)
+        assertEquals("", saved.occasionCustom)
+    }
+
+    // endregion
+
     // region Round-trip (iOS: testAllThreeLayersPersist, testOccasionFieldsPersist)
+
+    @Test
+    fun occasionFieldsPersist() = runBlocking {
+        val fetched = insertAndFetch(
+            SavedArdaas(label = "Akhand Paath", bentiText = "my benti", occasion = OccasionChoice.Custom("ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ")),
+        )
+        assertEquals(OccasionChoice.CUSTOM_ID, fetched.occasionId)
+        assertEquals("ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ", fetched.occasionCustom)
+        assertEquals(OccasionChoice.Custom("ਅੰਮ੍ਰਿਤ ਸੰਚਾਰ"), fetched.occasionChoice)
+    }
 
     /** Every stored field survives the store, each set to a value distinct from its default. */
     @Test

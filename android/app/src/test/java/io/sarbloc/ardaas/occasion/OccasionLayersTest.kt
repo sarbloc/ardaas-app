@@ -8,8 +8,8 @@ import org.junit.Test
 
 /**
  * Port of the "Layers" section of ArdaasTests/OccasionChoiceTests.swift — the
- * tests that cover only the plain data type. The rest of that file needs
- * OccasionChoice, OccasionCatalog and the transliterator, and lands with #85.
+ * tests that cover only the plain data type. The rest of that file is in
+ * [OccasionChoiceTest].
  */
 class OccasionLayersTest {
 
