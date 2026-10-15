@@ -86,10 +86,13 @@ android {
         versionName = "1.0"
 
         ndk {
-            // ONNX Runtime ships ~20 MB of native code per ABI. 64-bit ARM is
-            // every phone that can hold the translation peak; x86_64 is the
-            // emulator. 32-bit-only devices can no longer install the app.
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // ONNX Runtime ships ~20 MB of native code per ABI; Play's per-ABI
+            // splits mean each phone downloads only its own. armeabi-v7a keeps
+            // 32-bit phones (old devices, Android Go) able to install and read;
+            // translation there still has to pass MemoryGuard, which refuses
+            // low-RAM devices. x86_64 is the emulator and Chromebooks; 32-bit x86 is
+            // emulator-only and dropped.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
