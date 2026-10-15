@@ -106,10 +106,18 @@ android {
     }
 }
 
+// The transliteration parity fixture (#84) is shared with the iOS test suite:
+// both engines assert the same file, so they cannot drift apart.
+val transliterationParityFixture: File =
+    rootDir.parentFile.resolve("ArdaasTests/Fixtures/transliteration-parity.json")
+
 tasks.withType<Test>().configureEach {
     systemProperty("ardaas.sharedContentDir", sharedContentDir.absolutePath)
     // Re-run the parity test whenever the scripture changes.
     inputs.dir(sharedContentDir).withPathSensitivity(PathSensitivity.RELATIVE)
+    systemProperty("ardaas.transliterationParityFixture", transliterationParityFixture.absolutePath)
+    // …and the transliteration parity test whenever its fixture does.
+    inputs.file(transliterationParityFixture).withPathSensitivity(PathSensitivity.NONE)
 }
 
 dependencies {

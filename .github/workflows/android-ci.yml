@@ -10,6 +10,9 @@ on:
       # Android packages the scripture straight from the iOS resources (#82),
       # so a correction there must rebuild and re-test Android too.
       - 'Ardaas/Resources/**'
+      # The transliteration parity fixture is shared with the iOS tests
+      # (#84): a change to it must re-run the Kotlin engine against it too.
+      - 'ArdaasTests/Fixtures/transliteration-parity.json'
       - '.github/workflows/android-ci.yml'
 
 concurrency:
