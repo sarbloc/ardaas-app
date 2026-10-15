@@ -6,4 +6,5 @@ plugins {
     // compiler plugin — which must be the same Kotlin version exactly.
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
 }
