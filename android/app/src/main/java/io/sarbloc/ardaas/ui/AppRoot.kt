@@ -1,6 +1,19 @@
 package io.sarbloc.ardaas.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import io.sarbloc.ardaas.R
+import io.sarbloc.ardaas.ui.components.BackTopAppBar
+import io.sarbloc.ardaas.ui.components.ContentUnavailable
+import io.sarbloc.ardaas.ui.reader.ReaderScreen
+import kotlinx.coroutines.launch
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -40,6 +53,7 @@ fun AppRoot(container: AppContainer) {
         savedArdaas = savedArdaas,
         version = version,
         onDelete = container::delete,
+        onUpdate = container::update,
     )
 }
 
@@ -56,6 +70,7 @@ fun AppNavHost(
     savedArdaas: LoadState<List<SavedArdaas>>,
     version: String,
     onDelete: suspend (SavedArdaas) -> Boolean,
+    onUpdate: suspend (SavedArdaas) -> Boolean,
 ) {
     val backStack = rememberSaveable(saver = BackStack.Saver) { BackStack() }
     val screenState = rememberSaveableStateHolder()
@@ -87,6 +102,8 @@ fun AppNavHost(
                     Destination.Compose -> ComposePlaceholderScreen(onBack = goBack)
                     is Destination.Reader -> ReaderDestination(
                         savedArdaas = savedArdaas.map { all -> all.firstOrNull { it.id == destination.savedArdaasId } },
+                        bundledContent = bundledContent,
+                        onUpdate = onUpdate,
                         // Leave only if this Reader is still the top screen —
                         // never pop whatever replaced it mid-transition.
                         onRecordGone = { if (backStack.current == destination) goBack() },
@@ -100,28 +117,66 @@ fun AppNavHost(
 
 /**
  * The Reader route. [savedArdaas] is the live record (null once it no longer
- * exists); the bundled library and occasion list are in [AppNavHost]'s
- * `bundledContent`, for the real Reader to take alongside it.
+ * exists), so a write through [onUpdate] comes straight back as the new
+ * record. Waits for both bundles: the occasion list loads alongside the
+ * scripture, and rendering before it lands would flash the `…..` dots where
+ * a chosen occasion belongs. A failed occasion list is no catalog at all —
+ * the Reader carries on — but failed scripture is iOS's "Ardaas Text
+ * Unavailable".
  */
 @Composable
 private fun ReaderDestination(
     savedArdaas: LoadState<SavedArdaas?>,
+    bundledContent: BundledContent,
+    onUpdate: suspend (SavedArdaas) -> Boolean,
     onRecordGone: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     when (savedArdaas) {
         LoadState.Loading -> Unit
         is LoadState.Loaded -> {
             val record = savedArdaas.value
-            if (record != null) {
-                ReaderPlaceholderScreen(savedArdaas = record, onBack = onBack)
-            } else {
+            if (record == null) {
                 // A back stack restored after the record was deleted: there
                 // is nothing to read, so go back to the list.
                 LaunchedEffect(Unit) { onRecordGone() }
+                return
+            }
+            val library = bundledContent.library
+            val catalog = bundledContent.occasionCatalog
+            when {
+                library is LoadState.Failed -> ReaderTextUnavailable(record.label, library.error, onBack)
+                library is LoadState.Loaded && catalog !is LoadState.Loading -> ReaderScreen(
+                    savedArdaas = record,
+                    library = library.value,
+                    occasionCatalog = catalog.valueOrNull,
+                    onBack = onBack,
+                    onVariantChange = { variantId ->
+                        scope.launch { onUpdate(record.copy(variantId = variantId)) }
+                    },
+                )
+                else -> Unit
             }
         }
         // The list could not load; Home shows why.
         is LoadState.Failed -> LaunchedEffect(Unit) { onRecordGone() }
+    }
+}
+
+/** iOS's `ContentUnavailableView("Ardaas Text Unavailable", …)`. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReaderTextUnavailable(title: String, error: Throwable, onBack: () -> Unit) {
+    Scaffold(
+        containerColor = Color.Transparent,
+        topBar = { BackTopAppBar(title, onBack) },
+    ) { innerPadding ->
+        ContentUnavailable(
+            icon = painterResource(R.drawable.ic_warning),
+            title = stringResource(R.string.reader_text_unavailable),
+            description = error.message ?: error.toString(),
+            modifier = Modifier.padding(innerPadding),
+        )
     }
 }

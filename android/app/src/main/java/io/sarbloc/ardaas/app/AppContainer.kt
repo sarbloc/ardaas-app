@@ -85,6 +85,21 @@ class AppContainer(context: Context, scope: CoroutineScope) {
         false
     }
 
+    /**
+     * Writes [saved] over its stored row. Returns false — after logging why —
+     * if the database refused; the Reader keeps showing the stored record,
+     * which is still the truth.
+     */
+    suspend fun update(saved: SavedArdaas): Boolean = try {
+        savedArdaasDao.update(saved)
+        true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.e(TAG, "Updating saved Ardaas ${saved.id} failed", e)
+        false
+    }
+
     private companion object {
         const val TAG = "Ardaas"
         const val STOP_TIMEOUT_MILLIS = 5_000L

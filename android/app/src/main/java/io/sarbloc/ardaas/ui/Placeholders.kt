@@ -15,17 +15,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.sarbloc.ardaas.R
-import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.ui.components.BackTopAppBar
 
 // Stand-ins so navigation is complete end to end before the real screens
 // land. Each is replaced wholesale, at its one call site in AppRoot.
-
-/** Stand-in for the Reader screen: the record's label as its title. */
-@Composable
-fun ReaderPlaceholderScreen(savedArdaas: SavedArdaas, onBack: () -> Unit) {
-    PlaceholderScreen(title = savedArdaas.label, body = stringResource(R.string.reader_placeholder_body), onBack = onBack)
-}
 
 /** Stand-in for the Compose screen (#89). */
 @Composable
