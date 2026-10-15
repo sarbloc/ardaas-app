@@ -119,6 +119,13 @@ room {
 val transliterationParityFixture: File =
     rootDir.parentFile.resolve("ArdaasTests/Fixtures/transliteration-parity.json")
 
+// The translation tokenizer's parity fixture (#115) and the tokenizer it was
+// generated against are shared the same way: one copy, asserted by both suites.
+val tokenizerParityFixture: File =
+    rootDir.parentFile.resolve("ArdaasTests/Fixtures/tokenizer_parity.json")
+val tokenizerSourceFixture: File =
+    rootDir.parentFile.resolve("ArdaasTests/Fixtures/tokenizer_src.json")
+
 tasks.withType<Test>().configureEach {
     // Robolectric's Android 16 (SDK 36) runtime reaches into FileDescriptor
     // internals while setting up the app; on JDK 17+ that needs this opened,
@@ -131,6 +138,11 @@ tasks.withType<Test>().configureEach {
     systemProperty("ardaas.transliterationParityFixture", transliterationParityFixture.absolutePath)
     // …and the transliteration parity test whenever its fixture does.
     inputs.file(transliterationParityFixture).withPathSensitivity(PathSensitivity.NONE)
+    // …and the tokenizer parity tests whenever either tokenizer fixture does.
+    systemProperty("ardaas.tokenizerParityFixture", tokenizerParityFixture.absolutePath)
+    inputs.file(tokenizerParityFixture).withPathSensitivity(PathSensitivity.NONE)
+    systemProperty("ardaas.tokenizerSourceFixture", tokenizerSourceFixture.absolutePath)
+    inputs.file(tokenizerSourceFixture).withPathSensitivity(PathSensitivity.NONE)
 }
 
 dependencies {
