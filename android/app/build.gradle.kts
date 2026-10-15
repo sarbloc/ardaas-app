@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
 }
 
 // ---------------------------------------------------------------------------
@@ -106,12 +108,23 @@ android {
     }
 }
 
+// Room writes each schema version as JSON here; the files are committed so
+// every future migration is a reviewable diff (#86).
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
 // The transliteration parity fixture (#84) is shared with the iOS test suite:
 // both engines assert the same file, so they cannot drift apart.
 val transliterationParityFixture: File =
     rootDir.parentFile.resolve("ArdaasTests/Fixtures/transliteration-parity.json")
 
 tasks.withType<Test>().configureEach {
+    // Robolectric's Android 16 (SDK 36) runtime reaches into FileDescriptor
+    // internals while setting up the app; on JDK 17+ that needs this opened,
+    // or every Robolectric test fails before it starts. Tests then run on the
+    // targetSdk framework rather than an older pinned one.
+    jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
     systemProperty("ardaas.sharedContentDir", sharedContentDir.absolutePath)
     // Re-run the parity test whenever the scripture changes.
     inputs.dir(sharedContentDir).withPathSensitivity(PathSensitivity.RELATIVE)
@@ -127,7 +140,10 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.room.runtime)
+    ksp(libs.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
 }
