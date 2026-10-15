@@ -114,14 +114,17 @@ class TranslationEngine(
      * [release] (after setting the flag) and every translation (after
      * unlocking) call this, so a request is never stranded: either its own
      * tryLock wins, or the holder it lost to sees the flag on the way out, or
-     * the next translation to take the lock drops on the way in.
+     * the next translation to take the lock drops on the way in. Loops
+     * because this function is itself a lock holder: a release() that lost
+     * its tryLock to us is picked up after our unlock.
      */
     private fun honourPendingRelease() {
-        if (!releaseRequested.get() || !mutex.tryLock()) return
-        try {
-            dropIfReleaseRequested()
-        } finally {
-            mutex.unlock()
+        while (releaseRequested.get() && mutex.tryLock()) {
+            try {
+                dropIfReleaseRequested()
+            } finally {
+                mutex.unlock()
+            }
         }
     }
 
