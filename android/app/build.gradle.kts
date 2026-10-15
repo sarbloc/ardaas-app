@@ -136,8 +136,8 @@ val tokenizerSourceFixture: File =
 // The real-model translation test (#118) is opt-in: point ARDAAS_MODEL_DIR at
 // a directory holding the pinned catalog files (the three .onnx graphs plus
 // tokenizer_src.json and dict.TGT.json). CI has no 359 MB model, so it skips.
-val translationGoldenFixture: File =
-    rootDir.parentFile.resolve("ArdaasTests/Fixtures/translation_golden.json")
+// Its goldens are an Android test resource, not a shared ArdaasTests fixture,
+// so adding or regenerating them never triggers the macOS CI build.
 val modelDirectory: Provider<String> = providers.environmentVariable("ARDAAS_MODEL_DIR").orElse("")
 
 tasks.withType<Test>().configureEach {
@@ -157,10 +157,8 @@ tasks.withType<Test>().configureEach {
     inputs.file(tokenizerParityFixture).withPathSensitivity(PathSensitivity.NONE)
     systemProperty("ardaas.tokenizerSourceFixture", tokenizerSourceFixture.absolutePath)
     inputs.file(tokenizerSourceFixture).withPathSensitivity(PathSensitivity.NONE)
-    // …and the end-to-end translation test whenever its goldens or the model
-    // directory it is pointed at change.
-    systemProperty("ardaas.translationGoldenFixture", translationGoldenFixture.absolutePath)
-    inputs.file(translationGoldenFixture).withPathSensitivity(PathSensitivity.NONE)
+    // …and the end-to-end translation test whenever the model directory it is
+    // pointed at changes (its goldens are a test resource, already an input).
     inputs.property("ardaas.modelDir", modelDirectory)
     systemProperty("ardaas.modelDir", modelDirectory.get())
     // The files' contents too, so swapping a model in place re-runs the test
