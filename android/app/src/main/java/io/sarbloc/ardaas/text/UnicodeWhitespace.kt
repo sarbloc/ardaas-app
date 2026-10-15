@@ -21,8 +21,8 @@ package io.sarbloc.ardaas.text
 internal fun Char.isSwiftWhitespace(): Boolean =
     this in '\u0009'..'\u000D' ||
         this == '\u0085' ||
-        this == ' ' ||
-        this == ' ' ||
+        this == '\u2028' ||
+        this == '\u2029' ||
         Character.getType(this) == Character.SPACE_SEPARATOR.toInt()
 
 /** Swift's `trimmingCharacters(in: .whitespacesAndNewlines)`. */
