@@ -20,9 +20,10 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
+        val container = (application as ArdaasApplication).container
         setContent {
             ArdaasTheme {
-                AppRoot()
+                AppRoot(container)
             }
         }
     }
