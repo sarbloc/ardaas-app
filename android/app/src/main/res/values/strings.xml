@@ -26,6 +26,6 @@
     <string name="sources_version">Version</string>
 
     <!-- Placeholders until the Reader and Compose screens land -->
-    <string name="reader_placeholder_body">Reader</string>
+    <string name="reader_text_unavailable">Ardaas Text Unavailable</string>
     <string name="compose_placeholder_body">Composing an Ardaas is coming soon.</string>
 </resources>
