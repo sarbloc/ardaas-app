@@ -1,0 +1,84 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "774095bec9bb04b772d3d843633ded32",
+    "entities": [
+      {
+        "tableName": "saved_ardaas",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`label` TEXT NOT NULL, `bentiText` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `variantId` TEXT NOT NULL DEFAULT 'sgpc', `bentiGurmukhi` TEXT NOT NULL DEFAULT '', `bentiTransliteration` TEXT NOT NULL DEFAULT '', `occasionId` TEXT NOT NULL DEFAULT '', `occasionCustom` TEXT NOT NULL DEFAULT '', `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "label",
+            "columnName": "label",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bentiText",
+            "columnName": "bentiText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAt",
+            "columnName": "createdAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "variantId",
+            "columnName": "variantId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'sgpc'"
+          },
+          {
+            "fieldPath": "bentiGurmukhi",
+            "columnName": "bentiGurmukhi",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "bentiTransliteration",
+            "columnName": "bentiTransliteration",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "occasionId",
+            "columnName": "occasionId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "occasionCustom",
+            "columnName": "occasionCustom",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '774095bec9bb04b772d3d843633ded32')"
+    ]
+  }
+}
