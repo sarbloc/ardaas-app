@@ -3,11 +3,13 @@ package io.sarbloc.ardaas.composer
 import io.sarbloc.ardaas.content.ArdaasContent
 import io.sarbloc.ardaas.content.ArdaasSegment
 import io.sarbloc.ardaas.content.BundledAssets
+import io.sarbloc.ardaas.content.LayerKind
 import io.sarbloc.ardaas.content.OccasionPlaceholder
 import io.sarbloc.ardaas.content.OccasionSlot
 import io.sarbloc.ardaas.content.fixtureContent
 import io.sarbloc.ardaas.content.fixtureSegment
 import io.sarbloc.ardaas.content.fixtureSlot
+import io.sarbloc.ardaas.occasion.OccasionChoice
 import io.sarbloc.ardaas.occasion.OccasionLayers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,9 +26,6 @@ private const val MARKER = "….."
  * Composition-time substitution of a chosen occasion into the "….." slot.
  * Pure logic, so it is tested against both hand-built fixtures (for the
  * rules) and the real bundled variants (for the sentences readers see).
- *
- * Deferred to #85, which ports OccasionCatalog and OccasionChoice:
- * `testEveryBundledOccasionSubstitutesIntoEveryVariant`.
  */
 class OccasionSubstitutionTest {
     private val japji = OccasionLayers(
@@ -282,6 +281,35 @@ class OccasionSubstitutionTest {
             english.endsWith("the prayer of the recitation of Japji Sahib is laid at your lotus feet,"),
         )
         assertFalse(english.contains("mention here"))
+    }
+
+    /**
+     * Every bundled entry has to read into every bundled variant, in every
+     * layer that variant declares a placeholder for: the genitive still closes
+     * with `ਦੀ ਅਰਦਾਸ`, and no dots are left behind.
+     */
+    @Test
+    fun everyBundledOccasionSubstitutesIntoEveryVariant() {
+        val catalog = BundledAssets.occasionCatalog()
+        for (variant in library.variants) {
+            val slot = requireNotNull(variant.content.occasionSlot) { "${variant.id} declares no occasion slot" }
+            for (occasion in catalog.occasions) {
+                val layers = OccasionChoice.Catalog(occasion.id).layers(catalog)
+                val segment = slotSegment(variant.content, layers, id = slot.inSegmentId)
+                assertTrue(
+                    "${occasion.id} does not read into ${variant.id}: ${segment.gurmukhi}",
+                    segment.gurmukhi.contains("${occasion.gurmukhi} ਦੀ ਅਰਦਾਸ"),
+                )
+                for (layer in LayerKind.entries) {
+                    if (slot.placeholder[layer] == null) continue
+                    val text = segment.text(layer) ?: continue
+                    assertFalse(
+                        "${occasion.id} left dots in ${variant.id}'s $layer layer: $text",
+                        text.contains("…"),
+                    )
+                }
+            }
+        }
     }
 
     // endregion

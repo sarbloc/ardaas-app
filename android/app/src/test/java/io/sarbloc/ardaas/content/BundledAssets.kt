@@ -1,5 +1,6 @@
 package io.sarbloc.ardaas.content
 
+import io.sarbloc.ardaas.occasion.OccasionCatalog
 import java.io.File
 import java.io.InputStream
 import java.util.Properties
@@ -22,4 +23,10 @@ object BundledAssets {
     fun open(name: String): InputStream? = dir.resolve(name).takeIf { it.isFile }?.inputStream()
 
     fun library(): ArdaasLibrary = ArdaasLibrary.load(::open)
+
+    fun occasionCatalog(): OccasionCatalog = OccasionCatalog.load(::open)
+
+    /** One bundled variant's content, failing the test if the id is unknown. */
+    fun content(variantId: String): ArdaasContent =
+        requireNotNull(library().variant(variantId)) { "no bundled variant '$variantId'" }.content
 }

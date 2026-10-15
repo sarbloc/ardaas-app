@@ -1,12 +1,13 @@
 package io.sarbloc.ardaas.occasion
 
 import io.sarbloc.ardaas.content.LayerKind
+import io.sarbloc.ardaas.text.BentiScript
+import io.sarbloc.ardaas.text.BentiScriptDetector
 import io.sarbloc.ardaas.text.trimmingWhitespaceAndNewlines
+import io.sarbloc.ardaas.transliteration.GurmukhiTransliterator
 
-// Port of the OccasionLayers struct in Ardaas/Models/OccasionChoice.swift.
-// Only the plain data type lives here for now: the free-text initialiser
-// (which needs the transliterator) and OccasionChoice/OccasionCatalog land
-// with #85.
+// Port of the OccasionLayers struct and its free-text initialiser in
+// Ardaas/Models/OccasionChoice.swift.
 
 /**
  * The three display layers of a chosen occasion, ready to be spliced into
@@ -49,4 +50,46 @@ class OccasionLayers(
 
     override fun toString(): String =
         "OccasionLayers(gurmukhi=$gurmukhi, transliteration=$transliteration, english=$english)"
+
+    companion object {
+        /**
+         * A free-text occasion, typed by the user rather than picked from the
+         * bundled list.
+         *
+         * ## The one-script rule
+         *
+         * Free text arrives in exactly one script, and it is not machine
+         * translated here. So:
+         *
+         * * **Gurmukhi in** ([BentiScriptDetector] says [BentiScript.GURMUKHI])
+         *   → it *is* the Gurmukhi layer, and the Roman layer is derived from
+         *   it with [GurmukhiTransliterator] — the same deterministic, offline
+         *   path that generated the bundled catalog's Roman layer, so a typed
+         *   occasion and a picked one romanize in one voice. English is left
+         *   empty.
+         * * **Anything else** ([BentiScript.LATIN], or
+         *   [BentiScript.UNDETERMINED] — digits and punctuation only) → the
+         *   English layer, verbatim. Roman-script Punjabi lands here too: the
+         *   detector counts scripts, not languages.
+         *
+         * The layers left empty keep their dots (see `ArdaasComposer`), so a
+         * typed occasion never blanks the slot in the layers it cannot speak
+         * to. On a variant with no English layer at all, Latin free text has
+         * nowhere to appear — see [OccasionChoice.willNotAppear] (#72).
+         *
+         * Returns null for text that is empty or whitespace-only — there is
+         * nothing to say, which is "nothing chosen".
+         */
+        fun fromFreeText(text: String): OccasionLayers? {
+            val trimmed = text.trimmingWhitespaceAndNewlines()
+            if (trimmed.isEmpty()) return null
+            return when (BentiScriptDetector.detect(trimmed)) {
+                BentiScript.GURMUKHI -> OccasionLayers(
+                    gurmukhi = trimmed,
+                    transliteration = GurmukhiTransliterator.transliterate(trimmed),
+                )
+                BentiScript.LATIN, BentiScript.UNDETERMINED -> OccasionLayers(english = trimmed)
+            }
+        }
+    }
 }
