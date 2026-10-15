@@ -32,7 +32,10 @@ import io.sarbloc.ardaas.app.AppContainer
 import io.sarbloc.ardaas.app.BundledContent
 import io.sarbloc.ardaas.app.LoadState
 import io.sarbloc.ardaas.app.map
+import io.sarbloc.ardaas.occasion.OccasionDraft
 import io.sarbloc.ardaas.persistence.SavedArdaas
+import io.sarbloc.ardaas.ui.compose.ComposeScreen
+import io.sarbloc.ardaas.ui.compose.OccasionDraftSaver
 import io.sarbloc.ardaas.ui.home.HomeScreen
 import io.sarbloc.ardaas.ui.navigation.BackStack
 import io.sarbloc.ardaas.persistence.occasionChoice
@@ -59,6 +62,7 @@ fun AppRoot(container: AppContainer) {
         version = version,
         onDelete = container::delete,
         onUpdate = container::update,
+        onInsert = container::insert,
     )
 }
 
@@ -76,6 +80,7 @@ fun AppNavHost(
     version: String,
     onDelete: suspend (SavedArdaas) -> Boolean,
     onUpdate: suspend (SavedArdaas) -> Boolean,
+    onInsert: suspend (SavedArdaas) -> Boolean,
 ) {
     val backStack = rememberSaveable(saver = BackStack.Saver) { BackStack() }
     val screenState = rememberSaveableStateHolder()
@@ -104,7 +109,23 @@ fun AppNavHost(
                         version = version,
                         onBack = goBack,
                     )
-                    Destination.Compose -> ComposePlaceholderScreen(onBack = goBack)
+                    Destination.Compose -> {
+                        // Hoisted here, not inside the screen, so the occasion
+                        // picker (#90) can write its choice back.
+                        var occasion by rememberSaveable(stateSaver = OccasionDraftSaver) { mutableStateOf(OccasionDraft()) }
+                        ComposeScreen(
+                            library = bundledContent.library.valueOrNull,
+                            occasionCatalog = bundledContent.occasionCatalog.valueOrNull,
+                            occasion = occasion,
+                            onOccasionChange = { occasion = it },
+                            onEditOccasion = null,
+                            onSave = onInsert,
+                            // As iOS dismisses the sheet: back to Home, where
+                            // the new record leads the list. Only while this
+                            // screen is still on top.
+                            onClose = { if (backStack.current == destination) goBack() },
+                        )
+                    }
                     is Destination.Reader -> ReaderDestination(
                         savedArdaas = savedArdaas.map { all -> all.firstOrNull { it.id == destination.savedArdaasId } },
                         bundledContent = bundledContent,
