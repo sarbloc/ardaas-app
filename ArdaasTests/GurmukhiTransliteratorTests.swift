@@ -488,4 +488,38 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             )
         }
     }
+
+    // MARK: - Shared parity fixture
+
+    private struct ParityFixture: Decodable {
+        struct Case: Decodable {
+            let rule: String
+            let gurmukhi: String
+            let expected: String
+        }
+        let cases: [Case]
+    }
+
+    /// The Android port of this engine asserts the same file
+    /// (`Fixtures/transliteration-parity.json`, #84), so a rule that drifts
+    /// between the platforms fails a build instead of romanizing the same
+    /// benti two ways. Never edit an expected value to make one side pass.
+    func testSharedParityFixture() throws {
+        let url = try XCTUnwrap(
+            Bundle(for: Self.self).url(forResource: "transliteration-parity", withExtension: "json"),
+            "transliteration-parity.json missing from test bundle"
+        )
+        let fixture = try JSONDecoder().decode(ParityFixture.self, from: Data(contentsOf: url))
+        XCTAssertGreaterThanOrEqual(fixture.cases.count, 600)
+        for testCase in fixture.cases {
+            let output = GurmukhiTransliterator.transliterate(testCase.gurmukhi)
+            // Scalar for scalar, not String ==: Swift compares Strings by
+            // canonical equivalence, Kotlin by code unit, and the fixture
+            // pins the exact text on both.
+            XCTAssertTrue(
+                output.unicodeScalars.elementsEqual(testCase.expected.unicodeScalars),
+                "[\(testCase.rule)] \(testCase.gurmukhi) → \(output), expected \(testCase.expected)"
+            )
+        }
+    }
 }
