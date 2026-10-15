@@ -1,5 +1,6 @@
 package io.sarbloc.ardaas.transliteration
 
+import io.sarbloc.ardaas.text.isSwiftWhitespace
 import java.text.BreakIterator
 import java.text.Normalizer
 import java.util.Locale
@@ -680,6 +681,10 @@ object GurmukhiTransliterator {
      * against the Unicode White_Space property. Checking the last UTF-16 unit
      * would disagree on e.g. a space followed by a combining mark, which Swift
      * treats as one whitespace Character.
+     *
+     * The cluster's first unit stands in for its first scalar: every
+     * whitespace scalar is in the BMP, so a leading surrogate (a non-BMP
+     * scalar) is correctly never whitespace.
      */
     private fun lastCharacterIsWhitespace(text: CharSequence): Boolean {
         val string = text.toString()
@@ -687,19 +692,7 @@ object GurmukhiTransliterator {
         clusters.setText(string)
         val start = clusters.preceding(string.length)
         if (start == BreakIterator.DONE) return false
-        return isUnicodeWhiteSpace(string.codePointAt(start))
-    }
-
-    /**
-     * The Unicode White_Space property, which Swift's `isWhitespace` uses.
-     * Not Kotlin's `Char.isWhitespace()`: that also accepts U+001C…U+001F and
-     * rejects U+0085.
-     */
-    private fun isUnicodeWhiteSpace(scalar: Int): Boolean = when (scalar) {
-        in 0x0009..0x000D, 0x0020, 0x0085, 0x00A0, 0x1680,
-        in 0x2000..0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000,
-        -> true
-        else -> false
+        return string[start].isSwiftWhitespace()
     }
 
     /**
