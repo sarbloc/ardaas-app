@@ -60,6 +60,7 @@ fun AppRoot(container: AppContainer) {
         onDelete = container::delete,
         onUpdate = container::update,
         onInsert = container::insertOnce,
+        onRejoinInsert = container::rejoinInsert,
     )
 }
 
@@ -78,6 +79,7 @@ fun AppNavHost(
     onDelete: suspend (SavedArdaas) -> Boolean,
     onUpdate: suspend (SavedArdaas) -> Boolean,
     onInsert: suspend (saveKey: String, record: SavedArdaas) -> Boolean,
+    onRejoinInsert: suspend (saveKey: String) -> Boolean?,
 ) {
     val backStack = rememberSaveable(saver = BackStack.Saver) { BackStack() }
     val screenState = rememberSaveableStateHolder()
@@ -117,6 +119,7 @@ fun AppNavHost(
                             onOccasionChange = { occasion = it },
                             onEditOccasion = null,
                             onSave = onInsert,
+                            onRejoinSave = onRejoinInsert,
                             // As iOS dismisses the sheet: back to Home, where
                             // the new record leads the list. Only while this
                             // screen is still on top.
