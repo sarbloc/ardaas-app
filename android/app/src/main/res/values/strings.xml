@@ -1,4 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Ardaas</string>
+
+    <!-- Shared -->
+    <string name="navigate_back">Back</string>
+    <string name="compose_ardaas">Compose Ardaas</string>
+    <string name="about_and_sources">About &amp; Sources</string>
+
+    <!-- Home (port of HomeView.swift) -->
+    <string name="home_title">Ardaas</string>
+    <string name="home_empty_title">No saved Ardaas yet</string>
+    <string name="home_empty_description">Compose your first Ardaas with a personal benti.</string>
+    <string name="home_delete">Delete</string>
+    <string name="home_open">Read</string>
+    <string name="home_load_failed_title">Saved Ardaas Unavailable</string>
+
+    <!-- About & Sources (port of SourcesView.swift) -->
+    <string name="sources_variant_header">Ardaas — %1$s</string>
+    <string name="sources_texts_header">Texts</string>
+    <string name="sources_load_failed">Could not load bundled texts: %1$s</string>
+    <string name="sources_accuracy_header">Accuracy</string>
+    <string name="sources_accuracy_body">The Gurmukhi text is cross-checked against independent sources and proof-read before every change. If you spot an error, please report it — scripture accuracy is treated as a defect of the highest severity.</string>
+    <string name="sources_support_header">Support</string>
+    <string name="sources_support_link">Help &amp; support</string>
+    <string name="sources_version">Version</string>
+
+    <!-- Placeholders until the Reader and Compose screens land -->
+    <string name="reader_placeholder_body">Reader</string>
+    <string name="compose_placeholder_body">Composing an Ardaas is coming soon.</string>
 </resources>
