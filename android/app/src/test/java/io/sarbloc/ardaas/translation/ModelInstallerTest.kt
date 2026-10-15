@@ -161,6 +161,46 @@ class ModelInstallerTest {
         assertEquals(listOf("dict.TGT.json"), fetcher.requests.takeLast(1).map { it.name })
     }
 
+    /**
+     * Killed after the cache manifest landed but before the load-back check
+     * finished: the cache was never proved loadable, so it must not read as
+     * Ready, and the next install must finish the check without re-fetching.
+     */
+    @Test
+    fun anInterruptedRetirementIsNotReadyUntilVerified() = runBlocking {
+        val installer = makeInstaller()
+        installer.install(false) {}
+        val cache = ModelOptimizer(root, model.catalog, RecordingLogger())
+        // Recreate the kill: originals back on disk, one of them parked.
+        for (name in model.catalog.graphNames) File(root, name).writeBytes(model.payload(name))
+        cache.retiredDirectory.mkdirs()
+        val parked = model.catalog.graphNames[0]
+        assertTrue(File(root, parked).renameTo(File(cache.retiredDirectory, parked)))
+        val verifiedBefore = optimizer.verifiedGraphs.size
+        val fetchedBefore = fetcher.requestCount
+
+        assertEquals(ModelState.NotDownloaded, installer.currentState())
+
+        installer.install(false) {}
+        assertEquals(ModelState.Ready, installer.currentState())
+        assertEquals(verifiedBefore + model.catalog.graphNames.size, optimizer.verifiedGraphs.size)
+        assertEquals("finishing the check must not re-download", fetchedBefore, fetcher.requestCount)
+        for (name in model.catalog.graphNames) assertFalse(exists(name))
+    }
+
+    @Test
+    fun anInterruptedRetirementThatFailsVerificationIsNeverReady() = runBlocking {
+        val installer = makeInstaller()
+        installer.install(false) {}
+        for (name in model.catalog.graphNames) File(root, name).writeBytes(model.payload(name))
+        optimizer.verifyError = TranslationError.SessionFailure("cannot load external data")
+
+        assertEquals(ModelState.NotDownloaded, installer.currentState())
+        assertTrue(installer.installOrThrow() is TranslationError.OptimizationFailed)
+        assertEquals(ModelState.NotDownloaded, installer.currentState())
+        for (name in model.catalog.graphNames) assertTrue("the originals are kept for a rebuild", exists(name))
+    }
+
     // Hash verification
 
     @Test

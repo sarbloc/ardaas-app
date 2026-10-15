@@ -71,7 +71,12 @@ class ModelInstaller(
         // directory behind, so never claim it here.
         if (!optimizer.isAvailable) return ModelState.NotDownloaded
         val vocabularyPresent = catalog.vocabulary.all(::isInstalled)
-        return if (vocabularyPresent && cache.isCacheValid()) ModelState.Ready else ModelState.NotDownloaded
+        // Retirement must have finished too: that is the step that proves the
+        // cache loads on its own (see ModelOptimizer.isRetirementComplete).
+        // An interrupted one reads as NotDownloaded; the next install resumes
+        // it without re-downloading anything.
+        val ready = vocabularyPresent && cache.isCacheValid() && cache.isRetirementComplete()
+        return if (ready) ModelState.Ready else ModelState.NotDownloaded
     }
 
     /**

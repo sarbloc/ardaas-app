@@ -250,6 +250,18 @@ class ModelOptimizer(
     // Disk hygiene
 
     /**
+     * True once [retireSourceGraphs] has finished: no original graph is left
+     * beside the cache and none is parked. A valid manifest alone is not
+     * enough for Ready — it lands before the load-back check, so a kill in
+     * between would otherwise advertise a cache that was never proved
+     * loadable. The originals' presence is the durable "not yet verified"
+     * marker: a failed check drops the cache, so they only coexist with a
+     * valid one when verification never completed.
+     */
+    fun isRetirementComplete(): Boolean =
+        !retiredDirectory.exists() && catalog.graphNames.none { File(modelDirectory, it).exists() }
+
+    /**
      * Deletes the original `.onnx` downloads once the optimized cache has been
      * proved to load without them.
      *
