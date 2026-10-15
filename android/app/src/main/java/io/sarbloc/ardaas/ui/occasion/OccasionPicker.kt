@@ -5,23 +5,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -30,7 +25,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -196,6 +190,8 @@ private fun OccasionPicker(
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             containerColor = Color.Transparent,
+            // Transparent has no content colour of its own: name the theme's.
+            contentColor = MaterialTheme.colorScheme.onSurface,
             topBar = {
                 TopAppBar(
                     title = { Text(OccasionCopy.TITLE) },
@@ -214,15 +210,13 @@ private fun OccasionPicker(
                     scrollBehavior = scrollBehavior,
                 )
             },
-            bottomBar = {
-                PreviewBar(draft = draft, catalog = catalog, ardaasContent = ardaasContent)
-            },
         ) { innerPadding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
                     .consumeWindowInsets(innerPadding)
+                    .imePadding()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 12.dp)
                     .selectableGroup(),
@@ -268,6 +262,8 @@ private fun OccasionPicker(
                         )
                     }
                 }
+
+                if (ardaasContent != null) PreviewSection(draft, catalog, ardaasContent)
             }
         }
     }
@@ -332,29 +328,21 @@ private fun CustomOccasionField(
 }
 
 /**
- * The slot sentence quoted back, pinned under the list so it stays in view
- * whichever row is tapped, and lifted above the keyboard while free text is
- * typed. With nothing to show it is just the bottom inset, so the list still
- * clears the navigation bar and the keyboard.
+ * The slot sentence quoted back with the choice spliced in, and the #72
+ * warning — below the picker, as iOS places them. In the scrolling list
+ * rather than pinned: the full English sentence runs to several lines, and
+ * pinned above the keyboard it would leave no room for the field being typed
+ * in on a small phone.
  */
 @Composable
-private fun PreviewBar(draft: OccasionDraft, catalog: OccasionCatalog, ardaasContent: ArdaasContent?) {
-    val insets = WindowInsets.navigationBars.union(WindowInsets.ime)
-    val preview = remember(draft, catalog, ardaasContent) { ardaasContent?.let { draft.preview(it, catalog) } }
-    val willNotAppear = remember(draft, catalog, ardaasContent) {
-        ardaasContent != null && draft.willNotAppear(ardaasContent, catalog)
-    }
-    if (preview == null && !willNotAppear) {
-        Spacer(Modifier.fillMaxWidth().windowInsetsBottomHeight(insets))
-        return
-    }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+private fun PreviewSection(draft: OccasionDraft, catalog: OccasionCatalog, ardaasContent: ArdaasContent) {
+    val preview = remember(draft, catalog, ardaasContent) { draft.preview(ardaasContent, catalog) }
+    val willNotAppear = remember(draft, catalog, ardaasContent) { draft.willNotAppear(ardaasContent, catalog) }
+    if (preview == null && !willNotAppear) return
+    GroupedSection(header = null) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(insets)
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (preview != null) PreviewText(preview)
             // A choice the text cannot render (#72): said plainly here rather
@@ -372,7 +360,7 @@ private fun PreviewText(preview: OccasionPreview) {
             style = MaterialTheme.typography.labelMedium,
             color = ArdaasColors.Mist,
         )
-        Text(preview.text, style = previewStyle(preview.layer))
+        SelectionContainer { Text(preview.text, style = previewStyle(preview.layer)) }
     }
 }
 
