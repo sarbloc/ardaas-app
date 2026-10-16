@@ -123,6 +123,46 @@ class FakeModelFileFetcher(payloads: Map<String, ByteArray>) : ModelFileFetching
 }
 
 /**
+ * Stands in for the ONNX engine behind [TranslationEngine]. Each "decode step"
+ * checks cancellation exactly as [BentiTranslator] does and then runs
+ * [onStep] — blocking, like an ORT run — so a test can hold a translation in
+ * flight or cancel it mid-decode.
+ */
+class FakeTranslator(
+    private val steps: Int = 1,
+    private val onStep: (Int) -> Unit = {},
+) : BentiTranslating {
+    private val running = java.util.concurrent.atomic.AtomicInteger()
+    private val mostRunning = java.util.concurrent.atomic.AtomicInteger()
+    private val finished = java.util.concurrent.atomic.AtomicInteger()
+
+    /** Highest number of translations ever inside this translator at once. */
+    val maxConcurrent: Int get() = mostRunning.get()
+    val completedCount: Int get() = finished.get()
+
+    override suspend fun translate(english: String): BentiTranslation {
+        mostRunning.accumulateAndGet(running.incrementAndGet(), ::maxOf)
+        try {
+            for (step in 0 until steps) {
+                currentCoroutineContext().ensureActive()
+                onStep(step)
+            }
+            finished.incrementAndGet()
+            return BentiTranslation(
+                gurmukhi = "ਅਰਦਾਸ $english",
+                rawDevanagari = "अरदास",
+                generatedIds = listOf(4L),
+                latencyMillis = 0,
+                sessionLoadMillis = 0,
+                isGurmukhiPure = false,
+            )
+        } finally {
+            running.decrementAndGet()
+        }
+    }
+}
+
+/**
  * Stands in for the ONNX Runtime graph rewrite: writes a stub optimized graph
  * plus the external-initializer side-car the real pass produces, so the cache
  * manifest, the validation and the source-graph retirement are all exercised

@@ -84,6 +84,16 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        ndk {
+            // ONNX Runtime ships ~20 MB of native code per ABI; Play's per-ABI
+            // splits mean each phone downloads only its own. armeabi-v7a keeps
+            // 32-bit phones (old devices, Android Go) able to install and read;
+            // translation there still has to pass MemoryGuard, which refuses
+            // low-RAM devices. x86_64 is the emulator and Chromebooks; 32-bit x86 is
+            // emulator-only and dropped.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+        }
     }
 
     buildTypes {
@@ -126,6 +136,13 @@ val tokenizerParityFixture: File =
 val tokenizerSourceFixture: File =
     rootDir.parentFile.resolve("ArdaasTests/Fixtures/tokenizer_src.json")
 
+// The real-model translation test (#118) is opt-in: point ARDAAS_MODEL_DIR at
+// a directory holding the pinned catalog files (the three .onnx graphs plus
+// tokenizer_src.json and dict.TGT.json). CI has no 359 MB model, so it skips.
+// Its goldens are an Android test resource, not a shared ArdaasTests fixture,
+// so adding or regenerating them never triggers the macOS CI build.
+val modelDirectory: Provider<String> = providers.environmentVariable("ARDAAS_MODEL_DIR").orElse("")
+
 tasks.withType<Test>().configureEach {
     // Robolectric's Android 16 (SDK 36) runtime reaches into FileDescriptor
     // internals while setting up the app; on JDK 17+ that needs this opened,
@@ -143,6 +160,31 @@ tasks.withType<Test>().configureEach {
     inputs.file(tokenizerParityFixture).withPathSensitivity(PathSensitivity.NONE)
     systemProperty("ardaas.tokenizerSourceFixture", tokenizerSourceFixture.absolutePath)
     inputs.file(tokenizerSourceFixture).withPathSensitivity(PathSensitivity.NONE)
+    // …and the end-to-end translation test whenever the model directory it is
+    // pointed at changes (its goldens are a test resource, already an input).
+    inputs.property("ardaas.modelDir", modelDirectory)
+    systemProperty("ardaas.modelDir", modelDirectory.get())
+    // The files' contents too, so swapping a model in place re-runs the test
+    // rather than reusing a pass recorded against the old artifacts.
+    modelDirectory.get().takeIf { it.isNotEmpty() }?.let { path ->
+        inputs.files(fileTree(path) { include("*.onnx", "*.json") })
+            .withPropertyName("ardaas.modelFiles")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+    }
+}
+
+// Host tests run ONNX Runtime from the desktop JVM artifact. The Android AAR's
+// classes.jar carries the same `ai.onnxruntime` classes but only Android .so
+// files, so it is substituted out of every unit-test classpath rather than
+// left to shadow (or be shadowed by) the JVM jar depending on classpath order.
+configurations.matching {
+    it.name.endsWith("UnitTestCompileClasspath") || it.name.endsWith("UnitTestRuntimeClasspath")
+}.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        substitute(module(libs.onnxruntime.android.get().module.toString()))
+            .using(module(libs.onnxruntime.jvm.get().toString()))
+            .because("unit tests run on the host JVM, which needs the desktop native libraries")
+    }
 }
 
 dependencies {
@@ -152,10 +194,12 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.onnxruntime.android)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)
+    testImplementation(libs.onnxruntime.jvm)
 }

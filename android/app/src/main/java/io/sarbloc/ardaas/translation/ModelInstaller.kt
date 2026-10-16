@@ -331,11 +331,9 @@ class ModelInstaller(
         /**
          * The production wiring: the pinned catalog under `noBackupFilesDir`,
          * the HTTP fetcher behind the metered-network gate, and StatFs for
-         * free space. [optimizer] stays [UnavailableGraphOptimizer] until the
-         * engine (#118) supplies the ORT one, so until then install refuses up
-         * front with [TranslationError.EngineUnavailable].
+         * free space, and the ONNX Runtime graph rewrite.
          */
-        fun create(context: Context, optimizer: GraphOptimizing = UnavailableGraphOptimizer): ModelInstaller {
+        fun create(context: Context, optimizer: GraphOptimizing = OnnxGraphOptimizer): ModelInstaller {
             val log = TranslationLogger.Android
             val catalog = ModelCatalog.PRODUCTION
             val volume = context.noBackupFilesDir

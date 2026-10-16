@@ -14,9 +14,8 @@ import kotlinx.serialization.json.Json
  * checks that the result can be loaded back on its own — port of
  * `GraphOptimizing` in `Ardaas/Translation/ModelOptimizer.swift`.
  *
- * An interface for two reasons: the ONNX Runtime implementation lands with the
- * engine (#118) and this build carries no ORT at all, and the cache/disk-
- * hygiene logic has to be testable without 352 MB of real graphs.
+ * An interface so the cache/disk-hygiene logic is testable without 352 MB of
+ * real graphs. The ONNX Runtime implementation is [OnnxGraphOptimizer].
  *
  * Both calls are blocking; [ModelInstaller] runs them on an IO dispatcher.
  */
@@ -41,7 +40,10 @@ interface GraphOptimizing {
     fun verifyLoadable(graph: File)
 }
 
-/** Used while the app carries no ONNX Runtime (today: always, until #118). */
+/**
+ * Stands in for an engine-less build: install refuses up front and nothing
+ * reads as Ready. Exercised by tests; the app wires [OnnxGraphOptimizer].
+ */
 object UnavailableGraphOptimizer : GraphOptimizing {
     override val isAvailable: Boolean get() = false
 
@@ -361,8 +363,8 @@ class ModelOptimizer(
          * A constant rather than something the live [GraphOptimizing]
          * reports: a build without ORT must still be able to read (and account
          * for, and delete) a cache an ORT build left behind. Mirrors iOS's
-         * `ortPackageVersion`; the engine (#118) must keep it equal to the
-         * `onnxruntime-android` version it pins in the version catalog.
+         * `ortPackageVersion`. Must equal the `onnxruntime` version pinned in
+         * gradle/libs.versions.toml; OnnxGraphOptimizerTest enforces it.
          */
         const val ORT_PACKAGE_VERSION = "1.24.2"
 
