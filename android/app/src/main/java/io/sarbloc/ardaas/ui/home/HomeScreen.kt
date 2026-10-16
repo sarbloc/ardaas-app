@@ -65,6 +65,9 @@ import kotlinx.coroutines.launch
  * to compose a new one, and the info button for About & Sources.
  *
  * [onDelete] returns false when the delete failed, and the row slides back.
+ * [diagnosticsAction] is the debug-only Benti Lab entry (iOS: "On-device
+ * translation diagnostics (#42) — debug builds only"); release supplies
+ * nothing.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +77,7 @@ fun HomeScreen(
     onCompose: () -> Unit,
     onShowSources: () -> Unit,
     onDelete: suspend (SavedArdaas) -> Boolean,
+    diagnosticsAction: @Composable () -> Unit = {},
 ) {
     // iOS's large navigation title, collapsing as the list scrolls.
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -89,6 +93,7 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    diagnosticsAction()
                     IconButton(onClick = onCompose) {
                         Icon(painterResource(R.drawable.ic_add), contentDescription = stringResource(R.string.compose_ardaas))
                     }

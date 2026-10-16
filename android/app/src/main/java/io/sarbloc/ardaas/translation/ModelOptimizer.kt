@@ -94,7 +94,7 @@ class ModelOptimizer(
 
     // Locations
 
-    val optimizedDirectory: File get() = File(modelDirectory, "Optimized")
+    val optimizedDirectory: File get() = optimizedDirectory(modelDirectory)
 
     /** Where a new cache is assembled before being moved into place. */
     val scratchDirectory: File get() = File(modelDirectory, "Optimized.building")
@@ -377,6 +377,13 @@ class ModelOptimizer(
          * the .onnx and back on the heap.
          */
         fun externalDataName(graph: String): String = "$graph.data"
+
+        /**
+         * Where the optimized graphs live under an install [modelDirectory] —
+         * static so the translation service can point the engine at the cache
+         * without building an optimizer it would never use.
+         */
+        fun optimizedDirectory(modelDirectory: File): File = File(modelDirectory, "Optimized")
 
         internal val json = Json { ignoreUnknownKeys = true }
 

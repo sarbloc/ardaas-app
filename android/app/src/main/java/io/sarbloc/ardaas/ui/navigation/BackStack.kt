@@ -26,6 +26,16 @@ sealed interface Destination {
     }
 
     /**
+     * Debug-only on-device translation diagnostics (#119). Only the route
+     * lives in main; what it shows comes from the build type's
+     * [io.sarbloc.ardaas.ui.diagnostics.DiagnosticsHook], which in release
+     * shows nothing and leaves.
+     */
+    data object Diagnostics : Destination {
+        override val key = "diagnostics"
+    }
+
+    /**
      * Reading one saved Ardaas. Carries only the record's id, never the
      * record: the screen observes the live row, so an edit made while
      * reading (variant, occasion) is what it draws, and a restored back
@@ -43,6 +53,7 @@ sealed interface Destination {
             Home.key -> Home
             Sources.key -> Sources
             Compose.key -> Compose
+            Diagnostics.key -> Diagnostics
             else -> key.removePrefix(READER_PREFIX)
                 .takeIf { key.startsWith(READER_PREFIX) }
                 ?.toLongOrNull()
