@@ -15,8 +15,8 @@ data class LabRun(
     val engineMillis: Long,
     /** Of which spent creating the three ORT sessions. */
     val sessionLoadMillis: Long,
-    /** Highest VmRSS sampled while this translation ran. */
-    val sampledPeakRssBytes: Long?,
+    /** Peak RssAnon, peak total RSS and RssFile at that peak, sampled while this translation ran. */
+    val sampled: SampledPeak,
     /** Memory straight after it finished. */
     val after: MemorySnapshot,
 )
@@ -27,8 +27,11 @@ data class BenchmarkSummary(
     val meanMillis: Double,
     val medianMillis: Double,
     val maxMillis: Long,
-    /** Highest RSS sampled across the batch. */
-    val sampledPeakRssBytes: Long?,
+    /**
+     * Highest RssAnon and highest total RSS sampled across the batch, with
+     * the RssFile of the run whose total RSS peaked highest.
+     */
+    val sampled: SampledPeak,
     /** VmHWM when the batch ended: the process's lifetime peak, so an upper bound. */
     val processPeakRssBytes: Long?,
 ) {
@@ -37,12 +40,17 @@ data class BenchmarkSummary(
         fun of(runs: List<LabRun>): BenchmarkSummary? {
             if (runs.isEmpty()) return null
             val latencies = runs.map { it.wallMillis }.sorted()
+            val highestRss = runs.filter { it.sampled.peakRssBytes != null }.maxByOrNull { it.sampled.peakRssBytes ?: 0 }
             return BenchmarkSummary(
                 count = runs.size,
                 meanMillis = latencies.average(),
                 medianMillis = median(latencies),
                 maxMillis = latencies.last(),
-                sampledPeakRssBytes = runs.mapNotNull { it.sampledPeakRssBytes }.maxOrNull(),
+                sampled = SampledPeak(
+                    peakRssBytes = highestRss?.sampled?.peakRssBytes,
+                    peakRssAnonBytes = runs.mapNotNull { it.sampled.peakRssAnonBytes }.maxOrNull(),
+                    rssFileAtPeakBytes = highestRss?.sampled?.rssFileAtPeakBytes,
+                ),
                 processPeakRssBytes = runs.last().after.peakRssBytes,
             )
         }
@@ -96,16 +104,26 @@ object LabReport {
             "lowMemory=${device.isLowMemory ?: "unknown"} · lowRamDevice=${device.isLowRamDevice ?: "unknown"}"
 
     fun memoryLine(memory: MemorySnapshot): String =
-        "RSS ${mib(memory.rssBytes)} · VmHWM ${mib(memory.peakRssBytes)} · native heap ${mib(memory.nativeHeapBytes)}"
+        "RSS ${mib(memory.rssBytes)} (anon ${mib(memory.rssAnonBytes)} · file ${mib(memory.rssFileBytes)} · " +
+            "shmem ${mib(memory.rssShmemBytes)}) · VmHWM ${mib(memory.peakRssBytes)} · " +
+            "native heap ${mib(memory.nativeHeapBytes)}"
+
+    /**
+     * Anonymous first: it is the figure comparable with MEMORY.md and iOS's
+     * `phys_footprint`. Total RSS includes the clean, reclaimable mapped
+     * weights, which RssFile-at-peak accounts for.
+     */
+    fun sampledLine(peak: SampledPeak): String =
+        "peak RssAnon ${mib(peak.peakRssAnonBytes)} · peak RSS ${mib(peak.peakRssBytes)} " +
+            "(RssFile ${mib(peak.rssFileAtPeakBytes)} at peak)"
 
     fun benchmarkLine(summary: BenchmarkSummary): String =
         "Benchmark (${summary.count} runs): mean ${millis(summary.meanMillis)} · median ${millis(summary.medianMillis)} · " +
-            "max ${summary.maxMillis} ms · peak RSS sampled ${mib(summary.sampledPeakRssBytes)} · " +
-            "VmHWM ${mib(summary.processPeakRssBytes)}"
+            "max ${summary.maxMillis} ms · ${sampledLine(summary.sampled)} · VmHWM ${mib(summary.processPeakRssBytes)}"
 
     fun runLine(run: LabRun): String =
         "pure=${run.isGurmukhiPure} · wall ${run.wallMillis} ms (engine ${run.engineMillis}, sessions ${run.sessionLoadMillis}) · " +
-            "peak RSS sampled ${mib(run.sampledPeakRssBytes)} · ${memoryLine(run.after)}"
+            "${sampledLine(run.sampled)} · after: ${memoryLine(run.after)}"
 
     fun describe(state: ModelState): String = when (state) {
         ModelState.NotDownloaded -> "not downloaded"

@@ -131,7 +131,7 @@ class BentiLabModel(
 
     private suspend fun measure(english: String): LabRun {
         val start = System.nanoTime()
-        val (translation, sampledPeak) = ProcessMemory.sampledPeakRss { service.translate(english) }
+        val (translation, sampled) = ProcessMemory.sampledPeak { service.translate(english) }
         val wallMillis = (System.nanoTime() - start) / NANOS_PER_MILLI
         return LabRun(
             english = english,
@@ -140,7 +140,7 @@ class BentiLabModel(
             wallMillis = wallMillis,
             engineMillis = translation.latencyMillis,
             sessionLoadMillis = translation.sessionLoadMillis,
-            sampledPeakRssBytes = sampledPeak,
+            sampled = sampled,
             after = ProcessMemory.snapshot(),
         )
     }
