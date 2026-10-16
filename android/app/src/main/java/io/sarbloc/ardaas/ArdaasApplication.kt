@@ -12,7 +12,19 @@ import kotlinx.coroutines.SupervisorJob
  * never shows UI (a Robolectric test, say) opens nothing.
  */
 class ArdaasApplication : Application() {
-    val container: AppContainer by lazy {
+    private val containerHolder = lazy {
         AppContainer(this, CoroutineScope(SupervisorJob() + Dispatchers.Default))
+    }
+
+    val container: AppContainer by containerHolder
+
+    /**
+     * Android's counterpart of iOS's memory warning, which the iOS service
+     * observes itself. Here the app is what receives it, so it forwards —
+     * without building the container just to say there is nothing to free.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (containerHolder.isInitialized()) container.onTrimMemory(level)
     }
 }

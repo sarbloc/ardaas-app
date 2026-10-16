@@ -5,6 +5,10 @@ import android.util.Log
 import io.sarbloc.ardaas.persistence.ArdaasDatabase
 import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.persistence.SavedArdaasDao
+import io.sarbloc.ardaas.translation.ActivityManagerMemoryProbe
+import io.sarbloc.ardaas.translation.BentiTranslationService
+import io.sarbloc.ardaas.translation.ModelInstaller
+import io.sarbloc.ardaas.translation.TranslationEngine
 import java.io.FileNotFoundException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +35,30 @@ class AppContainer(context: Context, scope: CoroutineScope) {
     private val database: ArdaasDatabase by lazy { ArdaasDatabase.create(appContext) }
 
     val savedArdaasDao: SavedArdaasDao get() = database.savedArdaasDao()
+
+    private val translationServiceHolder = lazy {
+        BentiTranslationService(
+            installer = ModelInstaller.create(appContext),
+            engine = TranslationEngine(ActivityManagerMemoryProbe(appContext)),
+        )
+    }
+
+    /**
+     * On-device translation (#119). One per process, built on first touch:
+     * an install must survive the screen that started it, and a second
+     * instance would race the first over the same model files. Constructing
+     * it reads a little disk and downloads nothing.
+     */
+    val translationService: BentiTranslationService by translationServiceHolder
+
+    /**
+     * Memory pressure, from `Application.onTrimMemory`. Reaches the engine
+     * only if translation has been used this process — trimming must never
+     * be what builds the service.
+     */
+    fun onTrimMemory(level: Int) {
+        if (translationServiceHolder.isInitialized()) translationService.onTrimMemory(level)
+    }
 
     /**
      * The bundled library and occasion list, loaded once on the IO
