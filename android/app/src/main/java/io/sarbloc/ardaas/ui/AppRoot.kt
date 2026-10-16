@@ -34,7 +34,10 @@ import io.sarbloc.ardaas.app.LoadState
 import io.sarbloc.ardaas.app.map
 import io.sarbloc.ardaas.occasion.OccasionDraft
 import io.sarbloc.ardaas.persistence.SavedArdaas
+import io.sarbloc.ardaas.translation.BentiTranslationService
 import io.sarbloc.ardaas.ui.compose.ComposeScreen
+import io.sarbloc.ardaas.ui.diagnostics.BuildDiagnostics
+import io.sarbloc.ardaas.ui.diagnostics.DiagnosticsHook
 import io.sarbloc.ardaas.ui.compose.OccasionDraftSaver
 import io.sarbloc.ardaas.ui.home.HomeScreen
 import io.sarbloc.ardaas.ui.navigation.BackStack
@@ -63,6 +66,7 @@ fun AppRoot(container: AppContainer) {
         onDelete = container::delete,
         onUpdate = container::update,
         onInsert = container::insert,
+        translationService = { container.translationService },
     )
 }
 
@@ -81,6 +85,8 @@ fun AppNavHost(
     onDelete: suspend (SavedArdaas) -> Boolean,
     onUpdate: suspend (SavedArdaas) -> Boolean,
     onInsert: suspend (SavedArdaas) -> Boolean,
+    translationService: () -> BentiTranslationService,
+    diagnostics: DiagnosticsHook = BuildDiagnostics,
 ) {
     val backStack = rememberSaveable(saver = BackStack.Saver) { BackStack() }
     val screenState = rememberSaveableStateHolder()
@@ -103,6 +109,13 @@ fun AppNavHost(
                         onCompose = { backStack.push(Destination.Compose) },
                         onShowSources = { backStack.push(Destination.Sources) },
                         onDelete = onDelete,
+                        diagnosticsAction = {
+                            diagnostics.HomeAction(onOpen = { backStack.push(Destination.Diagnostics) })
+                        },
+                    )
+                    Destination.Diagnostics -> diagnostics.Screen(
+                        translationService = translationService,
+                        onBack = { if (backStack.current == destination) goBack() },
                     )
                     Destination.Sources -> SourcesScreen(
                         library = bundledContent.library,
