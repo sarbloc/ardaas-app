@@ -48,10 +48,64 @@
     <string name="compose_occasion_preview_unfilled">Where it goes</string>
     <string name="compose_benti_header">Benti</string>
     <string name="compose_benti_placeholder">Your benti, in English</string>
-    <string name="compose_gurmukhi_header">Gurmukhi</string>
-    <string name="compose_gurmukhi_placeholder">Your benti, in Gurmukhi (optional)</string>
-    <string name="compose_gurmukhi_typed_in_benti">Your benti is written in Gurmukhi, so it\'s saved as the Gurmukhi text.</string>
-    <string name="compose_transliteration_note">Transliteration generated from your Gurmukhi. Saved alongside it so you can read the Ardaas in either script.</string>
+    <string name="compose_transliteration_header">Transliteration</string>
+    <string name="compose_transliteration_note">Generated from your Gurmukhi. Saved alongside it so you can read the Ardaas in either script.</string>
     <string name="compose_keyboard_tip_title">Type in Gurmukhi</string>
     <string name="compose_keyboard_tip_body">Add the Punjabi keyboard to Gboard: Gboard → Settings → Languages → Add keyboard → Punjabi. Then switch to it with the globe key.</string>
+
+    <!-- Compose: translation (port of ComposeView.swift, #44 / #120) -->
+    <string name="translation_section_header">Gurmukhi</string>
+    <string name="translation_translate">Translate to Gurmukhi</string>
+    <string name="translation_translate_again">Translate again</string>
+    <string name="translation_translating">Translating…</string>
+    <string name="translation_first_download_note">Translation runs on this phone. The first time, it downloads a %1$s model — you\'ll see exactly what before anything starts.</string>
+    <string name="translation_on_device_note">Runs on this phone. Your benti is not uploaded anywhere.</string>
+    <string name="translation_downloading">Downloading the translation model — %1$d%%</string>
+    <string name="translation_keep_open_awaiting">Keep this screen open — leaving cancels the download, and Save waits until your translation is done. Cancel below to save your English benti on its own.</string>
+    <string name="translation_keep_open">Keep this screen open. If you leave, whatever finished is kept and it picks up from there next time.</string>
+    <string name="translation_cancel_download">Cancel download</string>
+    <string name="translation_preparing">Preparing the model — one time only.</string>
+    <string name="translation_stop_waiting">Don\'t wait — save without translating</string>
+    <string name="translation_try_again">Try again</string>
+    <string name="translation_draft_header">Gurmukhi draft</string>
+    <string name="translation_draft_editor">Gurmukhi benti</string>
+    <string name="translation_draft_transliteration">Transliteration</string>
+    <string name="translation_machine_title">Machine translation — check before saving</string>
+    <string name="translation_machine_body">This was translated on your phone by a small model, not by a person. Read it, edit the Gurmukhi if anything is off — the transliteration updates as you do — then save.</string>
+    <string name="translation_purity_caution">Some of this isn\'t in Gurmukhi script — a number, a name, or a word the model left untranslated. Check those parts before saving.</string>
+    <string name="translation_stale_note">You\'ve changed the English since this was translated. Translate again to update the Gurmukhi.</string>
+    <string name="translation_remove">Remove Gurmukhi</string>
+
+    <!-- Compose: saving a stale translation -->
+    <string name="translation_stale_title">The Gurmukhi no longer matches your English</string>
+    <string name="translation_stale_message">You edited the English after translating it, so the two layers say different things. Translate again to update the Gurmukhi — or save them as they are.</string>
+    <string name="translation_stale_save_both">Save both anyway</string>
+    <string name="translation_stale_save_english">Save the English only</string>
+    <string name="translation_stale_keep_editing">Keep editing</string>
+
+    <!-- Compose: translation failures (ComposeView.message(for:)) -->
+    <string name="translation_error_cellular">The download needs Wi-Fi, or your permission to use mobile data.</string>
+    <string name="translation_error_disk">Not enough free space on this phone to install the translation model.</string>
+    <string name="translation_error_memory">Not enough free memory to translate right now. Close a few apps and try again.</string>
+    <string name="translation_error_too_long">This benti is too long to translate in one go. Try a shorter one.</string>
+    <string name="translation_error_cancelled">Cancelled.</string>
+    <string name="translation_error_not_ready">Translation isn\'t ready yet.</string>
+    <string name="translation_error_empty">The translation came back empty. Try rewording your benti.</string>
+
+    <!-- Download consent (port of TranslationConsentView.swift) -->
+    <string name="consent_title">Translate on this phone</string>
+    <string name="consent_not_now">Not now</string>
+    <string name="consent_intro">Ardaas can translate your benti into Gurmukhi on this phone. To do that it downloads a translation model once.</string>
+    <string name="consent_sizes_header">What gets downloaded</string>
+    <string name="consent_size_download">Download</string>
+    <string name="consent_size_download_value">%1$s once</string>
+    <string name="consent_size_peak">Free space while installing</string>
+    <string name="consent_size_installed">Kept on your phone after</string>
+    <string name="consent_privacy_header">Privacy</string>
+    <string name="consent_privacy_body">Everything happens on this phone. Your benti is never uploaded, and translating keeps working with no signal at all.</string>
+    <string name="consent_network_header">Network</string>
+    <string name="consent_network_body">Wi-Fi is used by default. Turn on mobile data below to download without it — that spends about %1$s of your data plan.</string>
+    <string name="consent_cellular_toggle">Download over mobile data</string>
+    <string name="consent_keep_open">Keep this screen open while it downloads. If you leave, whatever finished is kept and the download picks up from there next time.</string>
+    <string name="consent_download">Download %1$s</string>
 </resources>

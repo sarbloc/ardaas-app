@@ -39,6 +39,7 @@ import io.sarbloc.ardaas.ui.compose.ComposeScreen
 import io.sarbloc.ardaas.ui.diagnostics.BuildDiagnostics
 import io.sarbloc.ardaas.ui.diagnostics.DiagnosticsHook
 import io.sarbloc.ardaas.ui.compose.OccasionDraftSaver
+import io.sarbloc.ardaas.ui.compose.rememberComposeTranslationSession
 import io.sarbloc.ardaas.ui.home.HomeScreen
 import io.sarbloc.ardaas.ui.navigation.BackStack
 import io.sarbloc.ardaas.persistence.occasionChoice
@@ -128,12 +129,18 @@ fun AppNavHost(
                         var occasion by rememberSaveable(stateSaver = OccasionDraftSaver) { mutableStateOf(OccasionDraft()) }
                         var editingOccasion by rememberSaveable { mutableStateOf(false) }
                         val occasionCatalog = bundledContent.occasionCatalog.valueOrNull
+                        // Retained, not remembered: a configuration change
+                        // keeps a download or translation running, and the
+                        // session ends — cancelling both — only when this
+                        // destination leaves composition for good.
+                        val translation = rememberComposeTranslationSession(translationService)
                         ComposeScreen(
                             library = bundledContent.library.valueOrNull,
                             occasionCatalog = occasionCatalog,
                             occasion = occasion,
                             onOccasionChange = { occasion = it },
                             onEditOccasion = occasionCatalog?.let { { editingOccasion = true } },
+                            translation = translation,
                             onSave = onInsert,
                             // As iOS dismisses the sheet: back to Home, where
                             // the new record leads the list. Only while this

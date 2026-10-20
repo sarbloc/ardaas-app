@@ -238,6 +238,39 @@ class BentiTranslationService(
         }
     }
 
+    /**
+     * Preloads the translator's tokenizer and dictionary so the first
+     * [translate] skips the cold load — see [TranslationEngine.warmUp], which
+     * opens no ORT session. Compose calls it when it opens on a ready model.
+     *
+     * Best effort: a no-op (false) unless the model is [ModelState.Ready] and
+     * no delete is running, and a load failure is logged and reported as
+     * false rather than thrown — the translation that follows hits the same
+     * failure and surfaces it properly. Counts as a translation in flight, so
+     * a delete waits for it rather than removing the files it is reading.
+     *
+     * @return true when this call loaded the translator.
+     * @throws CancellationException when the caller is cancelled.
+     */
+    suspend fun warmUp(): Boolean {
+        synchronized(lock) {
+            if (!mutableState.value.isReady || isDeleting) return false
+            inFlightTranslations.update { it + 1 }
+        }
+        try {
+            return engine.warmUp(
+                catalog = installer.catalog,
+                graphDirectory = ModelOptimizer.optimizedDirectory(installer.directory),
+                vocabularyDirectory = installer.directory,
+            )
+        } catch (e: TranslationError) {
+            log.warn("Translation warm-up failed; the first translation will load instead", e)
+            return false
+        } finally {
+            inFlightTranslations.update { it - 1 }
+        }
+    }
+
     /** Drops the resident translator. Exposed for the lab; production gets it via [onTrimMemory]. */
     fun releaseEngine() = engine.release()
 
