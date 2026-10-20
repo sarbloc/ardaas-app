@@ -301,6 +301,78 @@ class ComposeTranslationSessionTest {
         assertFalse(session.isTranslating)
     }
 
+    /** The install finished a frame before the tap: the queued translation has already started. */
+    private suspend fun queuedTranslationRunning(gate: GatedTranslator): ComposeTranslationSession {
+        val session = session(makeService(gate.translator))
+        session.start()
+        session.updateDraft(english)
+        session.download(allowingCellular = false)
+        eventually("the queued translation") { gate.entered.count == 0L }
+        return session
+    }
+
+    @Test
+    fun stopWaitingAbandonsAQueuedTranslationThatAlreadyStarted() = test {
+        val gate = GatedTranslator()
+        val session = queuedTranslationRunning(gate)
+
+        session.stopWaiting()
+        assertFalse(session.isTranslating)
+        assertFalse("Save no longer waits", session.currentStatus().isAwaitingTranslation)
+
+        gate.release.countDown()
+        delay(200)
+        assertEquals(0, gate.translator.completedCount)
+        assertNull("nothing lands later", session.pendingResult)
+        assertFalse(session.isTranslating)
+    }
+
+    @Test
+    fun cancelDownloadAbandonsAQueuedTranslationThatAlreadyStarted() = test {
+        val gate = GatedTranslator()
+        val session = queuedTranslationRunning(gate)
+
+        session.cancelDownload()
+        assertFalse(session.currentStatus().isAwaitingTranslation)
+
+        gate.release.countDown()
+        delay(200)
+        assertEquals(0, gate.translator.completedCount)
+        assertNull(session.pendingResult)
+    }
+
+    @Test
+    fun aTappedTranslationIsNotAbandonedByStopWaiting() = test {
+        val gate = GatedTranslator()
+        val session = session(readyService(gate.translator))
+        session.start()
+
+        session.translate(english)
+        session.stopWaiting()
+        gate.release.countDown()
+
+        eventually("the result") { session.pendingResult != null }
+    }
+
+    @Test
+    fun anInstallThisVisitNoLongerOwnsIsNotCancelledOnLeaving() = test {
+        fetcher.delayMillis = 300
+        val service = makeService()
+        val session = session(service)
+        session.start()
+        session.download(allowingCellular = false)
+
+        // Cancelled elsewhere, and the session sees it end…
+        service.cancelDownload()
+        delay(50)
+        // …then another caller starts a fresh install.
+        fetcher.delayMillis = 50
+        service.download()
+        session.end()
+
+        eventually("the other install") { service.state.value == ModelState.Ready }
+    }
+
     @Test
     fun aFailedInstallDropsTheQueuedTranslation() = test {
         fetcher.corrupt("tokenizer_src.json")

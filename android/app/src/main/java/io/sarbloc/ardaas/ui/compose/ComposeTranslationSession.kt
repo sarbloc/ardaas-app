@@ -98,8 +98,23 @@ class ComposeTranslationSession(
      */
     private var latestDraft = BentiDraft()
 
-    /** This visit started an install, so leaving cancels it — as iOS's screen-owned service does. */
-    private var startedInstall = false
+    /**
+     * The install running now is the one this visit started, so leaving
+     * cancels it — as iOS's screen-owned service does. Cleared the moment
+     * that install ends however it ends, so a later install started elsewhere
+     * on the shared service (the debug lab) is never this visit's to cancel.
+     */
+    private var ownsInstall = false
+
+    /**
+     * The translation running (or just finished) was started by the queued
+     * request rather than a tap — so "Cancel download" or "Don't wait",
+     * tapped on a frame that still shows the install, abandon it too.
+     */
+    private var isQueuedTranslation = false
+
+    /** Bumped per translation, so a cancelled run's cleanup cannot touch the run that replaced it. */
+    private var translationRun = 0
 
     private var isStarted = false
     private var isEnded = false
@@ -140,13 +155,17 @@ class ComposeTranslationSession(
      * text is not translatable, or before the model is ready — the button is
      * disabled then anyway, and a double tap must not start a second run.
      */
-    fun translate(draft: BentiDraft) {
+    fun translate(draft: BentiDraft) = translate(draft, queued = false)
+
+    private fun translate(draft: BentiDraft, queued: Boolean) {
         latestDraft = draft
         if (isEnded || isTranslating || !draft.isTranslatable || !service.state.value.isReady) return
         val source = draft.translationSource
         if (source.isEmpty()) return
         isTranslating = true
+        isQueuedTranslation = queued
         failure = null
+        val run = ++translationRun
         translationJob?.cancel()
         translationJob = scope.launch {
             try {
@@ -157,13 +176,14 @@ class ComposeTranslationSession(
                     pendingResult = CompletedTranslation(gurmukhi = gurmukhi, source = source)
                 }
             } catch (e: CancellationException) {
-                // Leaving the screen: drop the result nobody is looking at.
+                // Leaving the screen, or the request was abandoned: drop the
+                // result nobody is asking for any more.
                 throw e
             } catch (e: Exception) {
                 log.warn("Translating the benti failed", e)
                 failure = TranslateFailure.Failed(TranslationError.wrap(e))
             } finally {
-                isTranslating = false
+                if (run == translationRun) isTranslating = false
             }
         }
     }
@@ -185,7 +205,7 @@ class ComposeTranslationSession(
         service.download(allowingCellular)
         // Only an install this call actually started is this visit's to
         // cancel — not one already running (from the debug lab, say).
-        if (wasIdle && service.state.value.isWorking) startedInstall = true
+        if (wasIdle && service.state.value.isWorking) ownsInstall = true
         // Already ready (installed elsewhere meanwhile): no state change is
         // coming to trigger the queued translation, so run it now.
         onModelState(service.state.value)
@@ -193,7 +213,8 @@ class ComposeTranslationSession(
 
     /** "Cancel download": stops the install and the translation queued behind it. */
     fun cancelDownload() {
-        translateWhenReady = false
+        abandonQueuedRequest()
+        ownsInstall = false
         service.cancelDownload()
     }
 
@@ -203,7 +224,24 @@ class ComposeTranslationSession(
      * interrupted.
      */
     fun stopWaiting() {
+        abandonQueuedRequest()
+    }
+
+    /**
+     * Drops the translate-when-ready request — and, if the install finished
+     * a frame before the tap landed and the request already fired, the
+     * translation it started and any result not yet applied: the user just
+     * said not to wait for it, so it must neither hold Save nor land later.
+     */
+    private fun abandonQueuedRequest() {
         translateWhenReady = false
+        if (!isQueuedTranslation) return
+        isQueuedTranslation = false
+        translationRun++
+        translationJob?.cancel()
+        translationJob = null
+        isTranslating = false
+        pendingResult = null
     }
 
     /** Clears the inline failure, as "Remove Gurmukhi" does on iOS. */
@@ -232,7 +270,7 @@ class ComposeTranslationSession(
         if (isEnded) return
         isEnded = true
         translateWhenReady = false
-        if (startedInstall) service.cancelDownload()
+        if (ownsInstall) service.cancelDownload()
         scope.cancel()
     }
 
@@ -260,10 +298,14 @@ class ComposeTranslationSession(
      * the request too: nothing is coming, so nothing should fire later.
      */
     private fun onModelState(state: ModelState) {
+        // Whatever install this visit owned is over. (State conflation could
+        // only hide an end followed at once by a new install from another
+        // thread; no UI path does that.)
+        if (!state.isWorking) ownsInstall = false
         when {
             state.isReady && translateWhenReady -> {
                 translateWhenReady = false
-                translate(latestDraft)
+                translate(latestDraft, queued = true)
             }
             state.isReady -> warmUp()
             !state.isWorking -> translateWhenReady = false
