@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resource shrinker keep list (not packaged). The library list (#139) is the
+  generated res/raw/aboutlibraries.json; it is referenced from code, but keep
+  it explicitly so an empty licences screen can never be a shrinker decision.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/aboutlibraries" />

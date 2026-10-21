@@ -87,7 +87,7 @@ import Foundation
 ///   ending in ਹਿ is read /-ɛh/, not /-əhi/, so the schwa becomes `e` and the
 ///   ਹ closes the syllable: `ਪਹਿ` → `Peh`, `ਮਹਿ` → `Meh`, `ਕਹਿ` → `Keh`.
 ///   Two things narrow it. It is **word-final only** — mid-word ਹਿ takes the
-///   ordinary rules, so `ਸਹਿਤ` → `Sahit` and `ਪਹਿਲਾ` → `Pahilaa` — and the
+///   ordinary rules, so `ਸਹਿਤ` → `Sahit` and `ਕਹਿਣਾ` → `Kahinaa` — and the
 ///   trigger is specifically the inherent schwa, so a written vowel before ਹ
 ///   is unaffected and `ਸਾਹਿਬ` stays `Saahib`, `ਬੋਹਿਥ` stays `Bohith`.
 ///   (`ਵਾਹਿਗੁਰੂ` → `Waheguru` shows the same `e` after a long vowel, but that
@@ -99,8 +99,8 @@ import Foundation
 /// Restricting the first rule to word-final position is what keeps the tatsama
 /// borrowings that hold their /əhi/ intact: `ਸਹਿਤ` reads `Sahit`. The words
 /// that *are* reduced mid-word are lexical, not predictable from the spelling,
-/// so they go in the lexicon: `ਰਹਿਤ` → `Rehat`, `ਰਹਿਰਾਸ` → `Reharaas`,
-/// `ਸਹਿਜ` → `Sehaj`.
+/// so they go in the lexicon: `ਰਹਿਤ` → `Rehat`, `ਰਹਿਰਾਸ` → `Rehraas`,
+/// `ਸਹਿਜ` → `Sehaj`, `ਪਹਿਲਾ` → `Pehlaa`.
 ///
 /// ### Schwa deletion
 ///
@@ -349,7 +349,7 @@ enum GurmukhiTransliterator {
     ///
     /// - **Word-final.** Only a word that *ends* in ਹਿ coalesces: `ਪਹਿ` → `Peh`,
     ///   `ਮਹਿ` → `Meh`. Mid-word ਹਿ is left to the ordinary rules, so `ਸਹਿਤ` →
-    ///   `Sahit` and `ਪਹਿਲਾ` → `Pahilaa`.
+    ///   `Sahit` and `ਕਹਿਣਾ` → `Kahinaa`.
     /// - **An inherent schwa.** A written vowel before ਹ keeps its own syllable,
     ///   so `ਸਾਹਿਬ` stays `Saahib` and `ਬੋਹਿਥ` stays `Bohith`.
     private static func coalesceSchwaBeforeHaha(_ units: inout [Unit]) {
@@ -537,12 +537,13 @@ enum GurmukhiTransliterator {
         // Lexicalized spellings specified by Sarbloc. The ਹ rule is word-final
         // only, so the rules give "Rahit" — right for the tatsama ਸਹਿਤ →
         // "Sahit", wrong for these words, which are read /rɛhət/, /rɛhraas/,
-        // /sɛhəj/. Which mid-word ਹਿ reduces is lexical, not predictable from
-        // the spelling (ਰਹਿਤ is spelled exactly like ਸਹਿਤ), so the table is
-        // the only place these can live.
+        // /sɛhəj/, /pɛhlaa/. Which mid-word ਹਿ reduces is lexical, not
+        // predictable from the spelling (ਰਹਿਤ is spelled exactly like ਸਹਿਤ),
+        // so the table is the only place these can live.
         "ਰਹਿਤ": "Rehat",         // rules: Rahit
-        "ਰਹਿਰਾਸ": "Reharaas",    // rules: Rahiraas
+        "ਰਹਿਰਾਸ": "Rehraas",     // rules: Rahiraas
         "ਸਹਿਜ": "Sehaj",         // rules: Sahij
+        "ਪਹਿਲਾ": "Pehlaa",       // rules: Pahilaa
         // Two adjacent deletable schwas: only the rightmost goes and the left
         // is then blocked, so the rules strand the wrong one (same shape as
         // ਗੁਰਦਵਾਰਿਆਂ → "Guradvaariyaa(n)").

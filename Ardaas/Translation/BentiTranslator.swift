@@ -101,6 +101,9 @@ final class BentiTranslator: BentiTranslating {
 
         let generated = try greedyDecode(
             inputIds: inputIds, stages: &stages, clock: clock, sampler: sampler)
+        // The decode loop checks between steps only: a cancel that landed
+        // during the last ORT run must still not return a translation.
+        try Task.checkCancellation()
 
         var text = BentiPostprocessor.decodeToText(ids: generated, idToPiece: idToPiece)
         text = BentiPostprocessor.restorePlaceholders(text, placeholders: pre.placeholders)
@@ -161,6 +164,15 @@ final class BentiTranslator: BentiTranslating {
     }
 
     // MARK: - Greedy decode loop (spec section 4)
+    //
+    // Cancellation (#52): every stage boundary and every decode step checks
+    // `Task.checkCancellation()`, so a caller that abandons the translation
+    // (Compose cancels its task on dismiss) stops within one ORT run instead
+    // of decoding to completion with the engine held. An ORT `run` already in
+    // flight cannot be interrupted, so that one finishes first. Nothing here
+    // keeps per-translation state on `self` — sessions and tensors are locals
+    // released on the way out — so a cancelled translation leaves the
+    // translator exactly as reusable as a completed one.
 
     private func greedyDecode(
         inputIds: [Int64], stages: inout [MemoryStage], clock: LoadClock,
@@ -171,16 +183,19 @@ final class BentiTranslator: BentiTranslating {
         let maskValue = try Self.int64Tensor(mask, shape: [1, sourceLength])
 
         // Stage 1: encoder. Its output is the only thing that outlives it.
+        try Task.checkCancellation()
         let encoderHidden = try runEncoder(
             inputIds: inputIds, maskValue: maskValue, clock: clock)
         record("Encoder", into: &stages, sampler: sampler)
 
         // Stage 2: decoder without past, one step. decoder_start_token_id == </s>.
+        try Task.checkCancellation()
         let (firstId, past) = try runFirstDecodeStep(
             encoderHidden: encoderHidden, maskValue: maskValue, clock: clock)
         record("Decode step 1", into: &stages, sampler: sampler)
 
         // Stage 3: decoder with past for the remaining steps.
+        try Task.checkCancellation()
         let generated = try runDecodeLoop(
             firstId: firstId, past: past, maskValue: maskValue, clock: clock)
         record("Decode loop", into: &stages, sampler: sampler)
@@ -262,6 +277,9 @@ final class BentiTranslator: BentiTranslating {
         }
 
         while nextId != Self.eos && generated.count < Self.maxNewTokens {
+            // Between steps: a cancelled caller gets the cancellation, never a
+            // partial translation.
+            try Task.checkCancellation()
             try autoreleasepool {
                 var feed = past
                 feed["input_ids"] = try Self.int64Tensor([nextId], shape: [1, 1])
