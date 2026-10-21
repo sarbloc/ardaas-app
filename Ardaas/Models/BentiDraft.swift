@@ -27,10 +27,26 @@ struct BentiDraft: Equatable {
     /// edited since — see `isStale`.
     var translatedFrom: String?
 
-    init(typed: String = "", gurmukhi: String = "", translatedFrom: String? = nil) {
+    /// The Gurmukhi draft section is open on screen. Set when a translation
+    /// lands and cleared only by `clearTranslation()` ("Remove Gurmukhi") —
+    /// deliberately *not* derived from `gurmukhi` being non-empty, so emptying
+    /// the editor mid-edit leaves the editor where it is instead of removing
+    /// it from under the user (#131). Editor state only: it never reaches
+    /// `layers`, so what gets saved is unchanged.
+    var isDraftOpen: Bool
+
+    /// `isDraftOpen` defaults to whether `gurmukhi` holds anything, so a draft
+    /// built with Gurmukhi already in it opens its section.
+    init(
+        typed: String = "",
+        gurmukhi: String = "",
+        translatedFrom: String? = nil,
+        isDraftOpen: Bool? = nil
+    ) {
         self.typed = typed
         self.gurmukhi = gurmukhi
         self.translatedFrom = translatedFrom
+        self.isDraftOpen = isDraftOpen ?? !gurmukhi.trimmed.isEmpty
     }
 
     // MARK: - Derived
@@ -89,10 +105,19 @@ struct BentiDraft: Equatable {
         return !current.isEmpty && current != translatedFrom
     }
 
-    /// A translation draft is on screen: only meaningful while the typed text
-    /// is not itself Gurmukhi.
+    /// The translation draft holds Gurmukhi that counts: only meaningful
+    /// while the typed text is not itself Gurmukhi. Drives staleness — an
+    /// empty draft saves English only, so it has nothing to disagree with.
     var hasTranslationDraft: Bool {
         !isTypedInGurmukhi && !gurmukhi.trimmed.isEmpty
+    }
+
+    /// The Gurmukhi draft section is on screen: it is open, and the typed text
+    /// is not itself Gurmukhi (a draft from earlier English stays hidden while
+    /// it is ignored, and comes back if the English does). Stays true while
+    /// the editor is empty — see `isDraftOpen`.
+    var showsTranslationDraft: Bool {
+        !isTypedInGurmukhi && isDraftOpen
     }
 
     /// Text the translator can be given. `.undetermined` (digits, punctuation,
@@ -109,12 +134,15 @@ struct BentiDraft: Equatable {
     mutating func applyTranslation(_ translated: String, of source: String) {
         gurmukhi = translated.trimmed
         translatedFrom = source.trimmed
+        isDraftOpen = true
     }
 
-    /// Drops the translation draft, returning to English-only.
+    /// Drops the translation draft, returning to English-only, and closes its
+    /// section.
     mutating func clearTranslation() {
         gurmukhi = ""
         translatedFrom = nil
+        isDraftOpen = false
     }
 }
 

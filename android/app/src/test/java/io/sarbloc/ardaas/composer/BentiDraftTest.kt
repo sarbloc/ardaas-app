@@ -203,6 +203,75 @@ class BentiDraftTest {
 
     // endregion
 
+    // region The draft section (#131)
+
+    /**
+     * Emptying the Gurmukhi editor keeps its section open — the user is in
+     * the middle of editing it — while saving exactly what it did before:
+     * English only, and nothing stale to warn about.
+     */
+    @Test
+    fun emptyingTheGurmukhiKeepsTheDraftSectionOpen() {
+        val draft = translated("Bless the sangat.", "ਸਿੰਘ").copy(gurmukhi = "  ")
+        assertTrue(draft.isDraftOpen)
+        assertTrue(draft.showsTranslationDraft)
+        assertFalse(draft.hasTranslationDraft)
+        assertEquals(BentiLayers(english = "Bless the sangat."), draft.layers)
+        assertFalse(draft.copy(typed = "Bless the whole sangat.").isStale)
+    }
+
+    /** Typing back into the emptied editor carries on as an ordinary draft. */
+    @Test
+    fun retypingIntoAnEmptiedDraftRestoresItsLayers() {
+        val draft = translated("Bless the sangat.", "ਸਿੰਘ").copy(gurmukhi = "").copy(gurmukhi = "ਅਰਦਾਸ")
+        assertTrue(draft.showsTranslationDraft)
+        assertEquals(BentiLayers(gurmukhi = "ਅਰਦਾਸ", transliteration = "Ardaas", english = "Bless the sangat."), draft.layers)
+    }
+
+    @Test
+    fun removeGurmukhiClosesTheSection() {
+        val draft = translated("Bless the sangat.", "ਸਿੰਘ").copy(gurmukhi = "").clearTranslation()
+        assertFalse(draft.isDraftOpen)
+        assertFalse(draft.showsTranslationDraft)
+    }
+
+    @Test
+    fun translatingAgainRefillsAnEmptiedDraft() {
+        val emptied = translated("Bless the sangat.", "ਸਿੰਘ").copy(gurmukhi = "", typed = "Bless us all.")
+        val draft = emptied.applyTranslation("ਅਰਦਾਸ", emptied.translationSource)
+        assertTrue(draft.showsTranslationDraft)
+        assertEquals("ਅਰਦਾਸ", draft.gurmukhi)
+        assertEquals("Bless us all.", draft.translatedFrom)
+        assertFalse(draft.isStale)
+    }
+
+    /** No translation, no section — the editor only appears once one lands. */
+    @Test
+    fun anUntranslatedDraftHasNoSection() {
+        assertFalse(BentiDraft().showsTranslationDraft)
+        assertFalse(BentiDraft(typed = "Bless the sangat.").showsTranslationDraft)
+    }
+
+    /** Rewriting the benti in Gurmukhi hides even an emptied draft; English brings it back. */
+    @Test
+    fun gurmukhiInputHidesAnOpenDraftUntilTheEnglishReturns() {
+        var draft = translated("Bless the sangat.", "ਸਿੰਘ").copy(gurmukhi = "")
+        draft = draft.copy(typed = "ਸਿੰਘ")
+        assertFalse(draft.showsTranslationDraft)
+        assertTrue(draft.isDraftOpen)
+        draft = draft.copy(typed = "Bless the sangat.")
+        assertTrue(draft.showsTranslationDraft)
+    }
+
+    /** A draft built with Gurmukhi already in it opens its section; blank Gurmukhi does not. */
+    @Test
+    fun theSectionDefaultsFromTheGurmukhi() {
+        assertTrue(BentiDraft(typed = "Bless us.", gurmukhi = "ਅਰਦਾਸ").showsTranslationDraft)
+        assertFalse(BentiDraft(typed = "Bless us.", gurmukhi = " \n").isDraftOpen)
+    }
+
+    // endregion
+
     // region Nothing to translate
 
     /**

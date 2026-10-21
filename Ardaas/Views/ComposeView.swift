@@ -182,8 +182,10 @@ struct ComposeView: View {
                 if showsTranslationSection {
                     translateSection
                     // False whenever the typed text is Gurmukhi, so a draft
-                    // from earlier English stays hidden while it is ignored.
-                    if draft.hasTranslationDraft {
+                    // from earlier English stays hidden while it is ignored —
+                    // but not when the user empties the editor (#131): only
+                    // Remove Gurmukhi closes it.
+                    if draft.showsTranslationDraft {
                         gurmukhiDraftSection
                     }
                 }
@@ -405,7 +407,7 @@ struct ComposeView: View {
                 }
             } else {
                 Label(
-                    draft.hasTranslationDraft ? "Translate again" : "Translate to Gurmukhi",
+                    draft.showsTranslationDraft ? "Translate again" : "Translate to Gurmukhi",
                     systemImage: "character.book.closed")
             }
         }
