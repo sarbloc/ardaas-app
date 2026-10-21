@@ -222,13 +222,18 @@ struct ComposeView: View {
                 }
                 if showsTranslationSection {
                     translateSection
-                    // False whenever the typed text is Gurmukhi, so a draft
-                    // from earlier English stays hidden while it is ignored —
-                    // but not when the user empties the editor (#131): only
-                    // Remove Gurmukhi closes it.
-                    if draft.showsTranslationDraft {
-                        gurmukhiDraftSection
-                    }
+                }
+                // False whenever the typed text is Gurmukhi, so a draft from
+                // earlier English stays hidden while it is ignored — but not
+                // when the user empties the editor (#131): only Remove
+                // Gurmukhi closes it.
+                //
+                // Not gated on the engine like the Translate action: with an
+                // engine the two conditions coincide, and without one the
+                // only open draft is a saved translation reopened for editing
+                // (#154), which must stay visible, editable and removable.
+                if draft.showsTranslationDraft {
+                    gurmukhiDraftSection
                 }
 
                 Section {
