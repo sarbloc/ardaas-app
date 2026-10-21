@@ -41,9 +41,6 @@ struct ReaderView: View {
             .navigationTitle(savedArdaas.label)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    editButton
-                }
                 // Its own control, ahead of the gear: what the prayer is for
                 // is content, not a display preference, and burying it in a
                 // menu of layer toggles and text size would say otherwise.
@@ -351,12 +348,13 @@ struct ReaderView: View {
     }
 
     /// Reopens this Ardaas in Compose to change any of what it was saved
-    /// with (#154).
+    /// with (#154). Lives at the top of `displayMenu` rather than in the
+    /// toolbar, which already holds Occasion and the gear.
     private var editButton: some View {
         Button {
             isEditingArdaas = true
         } label: {
-            Label("Edit", systemImage: "square.and.pencil")
+            Label("Edit", systemImage: "pencil")
         }
     }
 
@@ -374,6 +372,9 @@ struct ReaderView: View {
 
     private var displayMenu: some View {
         Menu {
+            Section {
+                editButton
+            }
             if case .success(let library) = loadResult, library.variants.count > 1 {
                 Section("Ardaas") {
                     Picker("Ardaas", selection: $savedArdaas.variantId) {
