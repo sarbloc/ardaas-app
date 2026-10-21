@@ -192,10 +192,22 @@ android {
 
     buildTypes {
         release {
-            // R8 stays off for the first closed-test build: ONNX Runtime
-            // reaches its Java classes from JNI and by reflection, and a
-            // shrinker mistake there would only show up on a device.
-            isMinifyEnabled = false
+            // R8 shrinks, optimizes and obfuscates; the mapping file is
+            // embedded in the AAB so Play can deobfuscate crash reports.
+            // ONNX Runtime reaches its Java classes from JNI by name and ships
+            // no consumer rules, so proguard-rules.pro keeps them — a
+            // shrinker mistake there only shows up on a device, so a change to
+            // the rules (or an ORT upgrade) needs translation exercised on a
+            // minified release build, not just a debug one.
+            isMinifyEnabled = true
+            // Drops resources nothing references. Nothing is looked up by
+            // name (no getIdentifier); the bundled JSON lives in assets/,
+            // which resource shrinking does not touch.
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             // The default for release; stated so it cannot drift.
             isDebuggable = false
             // Unset without the upload key: the release build stays unsigned.
