@@ -50,22 +50,39 @@ final class ModelInstaller: @unchecked Sendable {
 
     // MARK: - Inspection
 
+    /// Name → SHA-256 of every artifact that passed the hash gate.
+    ///
+    /// Readiness goes by size (re-hashing ~677 MB per launch is not an
+    /// option), and size alone cannot tell a superseded artifact from the
+    /// current one when an app update re-pins a file at the same length. The
+    /// ledger can: a file only counts as installed when the hash it was
+    /// verified against is the one the catalog pins now.
+    static let ledgerName = "verified.json"
+
+    private var ledgerURL: URL { directory.appendingPathComponent(Self.ledgerName) }
+
     /// Cheap, synchronous readiness check, safe to call on every appearance.
     ///
-    /// Files are matched by exact expected size rather than by hash: the
-    /// artifacts are hash-verified once, at download time, before being moved
-    /// into place, and re-hashing ~677 MB on every launch would cost seconds
-    /// for no new information.
+    /// Files are matched by exact expected size plus the hash they were
+    /// verified against at download time (the ledger), rather than by
+    /// re-hashing ~677 MB on every launch.
     func currentState() -> ModelState {
         // `.ready` is a promise that translate() can run. Without the engine
         // linked it never can, even if a previous ONNX-enabled build left a
         // complete model directory behind, so never claim ready here.
         guard optimizer.isAvailable else { return .notDownloaded }
-        let vocabularyPresent = catalog.vocabulary.allSatisfy(fileMatchesCatalog)
-        if vocabularyPresent && ModelOptimizer.isCacheValid(in: directory, catalog: catalog) {
-            return .ready
+        let verified = readLedger()
+        let vocabularyPresent = catalog.vocabulary.allSatisfy {
+            isInstalled($0, verified: verified)
         }
-        return .notDownloaded
+        // Retirement must have finished too: that is the step that proves the
+        // cache loads on its own (see ModelOptimizer.isRetirementComplete).
+        // An interrupted one reads as .notDownloaded; the next install resumes
+        // it without re-downloading anything.
+        let ready = vocabularyPresent
+            && ModelOptimizer.isCacheValid(in: directory, catalog: catalog)
+            && ModelOptimizer.isRetirementComplete(in: directory, catalog: catalog)
+        return ready ? .ready : .notDownloaded
     }
 
     /// Everything this install occupies: whatever catalog files are still on
@@ -97,15 +114,17 @@ final class ModelInstaller: @unchecked Sendable {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         ModelOptimizer.excludeFromBackup(directory)
 
+        let verified = readLedger()
+
         // A valid cache means the graphs have already done their job, so a
         // repair (e.g. a deleted vocabulary file) must not re-fetch 352 MB.
         let cacheIsValid = ModelOptimizer.isCacheValid(in: directory, catalog: catalog)
         let wanted = cacheIsValid ? catalog.vocabulary : catalog.files
-        let outstanding = wanted.filter { !fileMatchesCatalog($0) }
+        let outstanding = wanted.filter { !isInstalled($0, verified: verified) }
 
         let totalBytes = max(wanted.reduce(Int64(0)) { $0 + $1.bytes }, 1)
         var completedBytes = wanted.reduce(Int64(0)) {
-            $0 + (fileMatchesCatalog($1) ? $1.bytes : 0)
+            $0 + (isInstalled($1, verified: verified) ? $1.bytes : 0)
         }
         onPhase(.downloading(progress: Double(completedBytes) / Double(totalBytes)))
 
@@ -212,6 +231,10 @@ final class ModelInstaller: @unchecked Sendable {
 
         let destination = directory.appendingPathComponent(file.name)
         do {
+            // Forget any earlier verification of this name before its bytes
+            // change, so no kill below can leave a record that describes bytes
+            // which are no longer on disk.
+            try forgetVerified(file.name)
             try? fileManager.removeItem(at: destination)
             try fileManager.moveItem(at: temporaryURL, to: destination)
         } catch {
@@ -219,6 +242,51 @@ final class ModelInstaller: @unchecked Sendable {
             throw TranslationError.wrap(error)
         }
         ModelOptimizer.excludeFromBackup(destination)
+        do {
+            // After the move: a kill in between leaves an unrecorded file,
+            // which is re-fetched — never a recorded file that is not there.
+            try recordVerified(file)
+        } catch {
+            throw TranslationError.wrap(error)
+        }
+    }
+
+    // MARK: - Ledger
+
+    /// The verification ledger, or empty when there is none or it cannot be
+    /// read. Empty fails closed: every artifact reads as not installed and is
+    /// re-fetched, never trusted on size alone.
+    private func readLedger() -> [String: String] {
+        guard fileManager.fileExists(atPath: ledgerURL.path) else { return [:] }
+        do {
+            let data = try Data(contentsOf: ledgerURL)
+            return try JSONDecoder().decode([String: String].self, from: data)
+        } catch {
+            print(
+                "BentiModel: unreadable verification ledger; "
+                    + "every artifact will be re-fetched: \(error)")
+            return [:]
+        }
+    }
+
+    /// Atomic read-modify-write. Only ever called from the single running
+    /// install (the service never runs two), so there is no lost update.
+    private func writeLedger(_ ledger: [String: String]) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        try encoder.encode(ledger).write(to: ledgerURL, options: .atomic)
+    }
+
+    private func recordVerified(_ file: ModelCatalog.File) throws {
+        var ledger = readLedger()
+        ledger[file.name] = file.sha256
+        try writeLedger(ledger)
+    }
+
+    private func forgetVerified(_ name: String) throws {
+        var ledger = readLedger()
+        guard ledger.removeValue(forKey: name) != nil else { return }
+        try writeLedger(ledger)
     }
 
     /// Streaming SHA-256 in 1 MiB chunks — the graphs are far too large to load
@@ -270,8 +338,12 @@ final class ModelInstaller: @unchecked Sendable {
 
     // MARK: - Helpers
 
-    private func fileMatchesCatalog(_ file: ModelCatalog.File) -> Bool {
-        ModelOptimizer.fileSize(directory.appendingPathComponent(file.name)) == file.bytes
+    /// On disk at the pinned size AND recorded as verified against the pinned
+    /// hash. Size alone would keep a superseded artifact re-pinned at the same
+    /// byte count.
+    private func isInstalled(_ file: ModelCatalog.File, verified: [String: String]) -> Bool {
+        verified[file.name] == file.sha256
+            && ModelOptimizer.fileSize(directory.appendingPathComponent(file.name)) == file.bytes
     }
 
     private func takeResumeData(for name: String) -> Data? {
