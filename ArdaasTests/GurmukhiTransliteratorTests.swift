@@ -284,11 +284,11 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਰਹਿਤ", "Rehat"),
             // The cost of the narrowing, pinned so it can't change silently: a
             // word whose mid-word ਹਿ *is* reduced by readers comes out
-            // unreduced until it is lexicalized. ਰਹਿਰਾਸ and ਸਹਿਜ were
-            // lexicalized in #69 because they reach bundled content; this one
-            // is not in the canonical text or the slot list, so it only
-            // reaches a user-authored benti and stays on the rules.
-            ("ਪਹਿਲਾ", "Pahilaa"),
+            // unreduced until it is lexicalized (read /kɛhnaa/). ਰਹਿਰਾਸ and
+            // ਸਹਿਜ were lexicalized in #69 because they reach bundled content,
+            // ਪਹਿਲਾ in #48; this one is not in the lexicon, so it stays on the
+            // rules.
+            ("ਕਹਿਣਾ", "Kahinaa"),
         ])
     }
 
@@ -313,14 +313,16 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਰਹਿਤ", "Rehat"),  // rules alone: "Rahit"
             // The three words #69 lexicalized, all of them reaching bundled
             // content through occasions.json. Spellings are Sarbloc's.
-            ("ਰਹਿਰਾਸ", "Reharaas"),   // rules alone: "Rahiraas" (mid-word ਹਿ)
+            ("ਰਹਿਰਾਸ", "Rehraas"),    // rules alone: "Rahiraas" (mid-word ਹਿ)
             ("ਸਹਿਜ", "Sehaj"),        // rules alone: "Sahij" (mid-word ਹਿ)
             ("ਸੁਖਮਨੀ", "Sukhmani"),   // rules alone: "Sukhamni" (adjacent schwas)
+            // Lexicalized in #48 for user-authored bentis. Spelling is Sarbloc's.
+            ("ਪਹਿਲਾ", "Pehlaa"),      // rules alone: "Pahilaa" (mid-word ਹਿ)
         ])
         // In the phrases they actually ship in, so the entry is pinned where
         // the bundled Roman layer reads it, not just in isolation.
         expect([
-            ("ਰਹਿਰਾਸ ਸਾਹਿਬ ਦੇ ਪਾਠ", "Reharaas Saahib De Paath"),
+            ("ਰਹਿਰਾਸ ਸਾਹਿਬ ਦੇ ਪਾਠ", "Rehraas Saahib De Paath"),
             ("ਸ੍ਰੀ ਸਹਿਜ ਪਾਠ ਦੇ ਭੋਗ", "Sri Sehaj Paath De Bhog"),
             ("ਸੁਖਮਨੀ ਸਾਹਿਬ ਦੇ ਪਾਠ", "Sukhmani Saahib De Paath"),
         ])
