@@ -53,8 +53,9 @@ private const val TAG = "Ardaas"
 
 /**
  * About & Sources: the sources behind each bundled text — read from the
- * bundle itself, never hardcoded — the accuracy policy, a link to the support
- * page, and the app version. Port of `SourcesView.swift`; a bundle that
+ * bundle itself, never hardcoded — the accuracy policy, credits for the
+ * translation model and runtime, a link to the support page, and the app
+ * version. Port of `SourcesView.swift`; a bundle that
  * failed to load shows the failure rather than an empty page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,6 +122,15 @@ fun SourcesScreen(
             item {
                 GroupedSection(stringResource(R.string.sources_accuracy_header)) {
                     ProseRow(stringResource(R.string.sources_accuracy_body))
+                }
+            }
+            item {
+                GroupedSection(stringResource(R.string.sources_translation_header)) {
+                    ProseRow(stringResource(R.string.sources_credit_indictrans2))
+                    SectionDivider()
+                    ProseRow(stringResource(R.string.sources_credit_onnx_export))
+                    SectionDivider()
+                    ProseRow(stringResource(R.string.sources_credit_onnx_runtime))
                 }
             }
             item {
