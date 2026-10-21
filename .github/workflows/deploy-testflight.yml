@@ -117,7 +117,9 @@ jobs:
           set -euo pipefail
           APP="build/Ardaas.xcarchive/Products/Applications/Ardaas.app"
           SIGNATURE=$(codesign -dvv "${APP}" 2>&1 || true)
-          echo "${SIGNATURE}"
+          # Authority lines name the certificate holder; this log is public,
+          # so print only the certificate type.
+          sed -E 's/^(Authority=[^:]*):.*/\1: (redacted)/' <<<"${SIGNATURE}"
           if grep -q '^Authority=' <<<"${SIGNATURE}"; then
             echo "::error::The archive was signed with a certificate. It must be unsigned so that no development certificate is created (#57)."
             exit 1
