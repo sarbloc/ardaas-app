@@ -133,10 +133,11 @@ data class TranslationStatus(
 
     /**
      * The editable Gurmukhi draft shows under the section once a translation
-     * exists — false whenever the typed text is Gurmukhi, so a draft from
+     * has landed, until Remove Gurmukhi — emptying the editor does not hide it
+     * (#131). False whenever the typed text is Gurmukhi, so a draft from
      * earlier English stays hidden while it is ignored.
      */
-    fun showsDraft(benti: BentiDraft): Boolean = showsSection(benti) && benti.hasTranslationDraft
+    fun showsDraft(benti: BentiDraft): Boolean = showsSection(benti) && benti.showsTranslationDraft
 
     /** iOS's `translateSection` switch. */
     fun section(benti: BentiDraft): TranslateSection = when (val state = model) {
@@ -158,7 +159,7 @@ data class TranslationStatus(
     private fun button(benti: BentiDraft, opensConsent: Boolean) = TranslateButton(
         label = when {
             isTranslating -> TranslateButton.Label.TRANSLATING
-            benti.hasTranslationDraft -> TranslateButton.Label.TRANSLATE_AGAIN
+            benti.showsTranslationDraft -> TranslateButton.Label.TRANSLATE_AGAIN
             else -> TranslateButton.Label.TRANSLATE
         },
         isEnabled = benti.isTranslatable && !isTranslating,

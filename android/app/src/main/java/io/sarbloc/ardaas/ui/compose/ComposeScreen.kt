@@ -126,7 +126,8 @@ fun ComposeScreen(
     modifier: Modifier = Modifier,
 ) {
     var label by rememberSaveable { mutableStateOf("") }
-    // One saveable value, translatedFrom included, so staleness survives a
+    // One saveable value, translatedFrom and isDraftOpen included, so
+    // staleness and an emptied-but-open Gurmukhi editor survive a
     // configuration change and process death along with the text.
     var benti by rememberSaveable(stateSaver = BentiDraftSaver) { mutableStateOf(BentiDraft()) }
     var variantId by rememberSaveable { mutableStateOf(ArdaasLibrary.DEFAULT_VARIANT_ID) }

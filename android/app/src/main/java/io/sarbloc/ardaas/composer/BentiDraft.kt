@@ -44,6 +44,17 @@ data class BentiDraft(
      * edited since — see [isStale].
      */
     val translatedFrom: String? = null,
+    /**
+     * The Gurmukhi draft section is open on screen. Set when a translation
+     * lands and cleared only by [clearTranslation] ("Remove Gurmukhi") —
+     * deliberately *not* derived from [gurmukhi] being non-empty, so emptying
+     * the editor mid-edit leaves the editor where it is instead of removing it
+     * from under the user (#131). Editor state only: it never reaches
+     * [layers], so what gets saved is unchanged. Defaults to whether
+     * [gurmukhi] holds anything, so a draft built with Gurmukhi already in it
+     * opens its section.
+     */
+    val isDraftOpen: Boolean = gurmukhi.trimmingWhitespaceAndNewlines().isNotEmpty(),
 ) {
     val script: BentiScript get() = BentiScriptDetector.detect(typed)
 
@@ -107,11 +118,21 @@ data class BentiDraft(
         }
 
     /**
-     * A translation draft is on screen: only meaningful while the typed text
-     * is not itself Gurmukhi.
+     * The translation draft holds Gurmukhi that counts: only meaningful while
+     * the typed text is not itself Gurmukhi. Drives staleness — an empty
+     * draft saves English only, so it has nothing to disagree with.
      */
     val hasTranslationDraft: Boolean
         get() = !isTypedInGurmukhi && gurmukhi.trimmingWhitespaceAndNewlines().isNotEmpty()
+
+    /**
+     * The Gurmukhi draft section is on screen: it is open, and the typed text
+     * is not itself Gurmukhi (a draft from earlier English stays hidden while
+     * it is ignored, and comes back if the English does). Stays true while
+     * the editor is empty — see [isDraftOpen].
+     */
+    val showsTranslationDraft: Boolean
+        get() = !isTypedInGurmukhi && isDraftOpen
 
     /**
      * Text the translator can be given. [BentiScript.UNDETERMINED] (digits,
@@ -127,8 +148,9 @@ data class BentiDraft(
     fun applyTranslation(translated: String, source: String): BentiDraft = copy(
         gurmukhi = translated.trimmingWhitespaceAndNewlines(),
         translatedFrom = source.trimmingWhitespaceAndNewlines(),
+        isDraftOpen = true,
     )
 
-    /** Drops the translation draft, returning to English-only. */
-    fun clearTranslation(): BentiDraft = copy(gurmukhi = "", translatedFrom = null)
+    /** Drops the translation draft, returning to English-only, and closes its section. */
+    fun clearTranslation(): BentiDraft = copy(gurmukhi = "", translatedFrom = null, isDraftOpen = false)
 }

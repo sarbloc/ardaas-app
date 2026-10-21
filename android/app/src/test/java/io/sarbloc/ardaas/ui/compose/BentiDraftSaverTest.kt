@@ -40,4 +40,26 @@ class BentiDraftSaverTest {
         assertEquals(null, restored.translatedFrom)
         assertFalse(restored.isStale)
     }
+
+    /** #131: an emptied Gurmukhi editor is still on screen after a rotation or process death. */
+    @Test
+    fun anEmptiedDraftStaysOpenAfterRestore() {
+        val emptied = BentiDraft(typed = "Bless us").applyTranslation("ਸਾਨੂੰ ਬਖ਼ਸ਼ੋ", "Bless us").copy(gurmukhi = "")
+        val restored = roundTrip(emptied)
+        assertEquals(emptied, restored)
+        assertTrue(restored.showsTranslationDraft)
+    }
+
+    @Test
+    fun aRemovedDraftStaysClosedAfterRestore() {
+        val removed = BentiDraft(typed = "Bless us").applyTranslation("ਸਾਨੂੰ ਬਖ਼ਸ਼ੋ", "Bless us").clearTranslation()
+        assertFalse(roundTrip(removed).showsTranslationDraft)
+    }
+
+    /** State saved before the flag existed restores it from the Gurmukhi, as the old derivation did. */
+    @Test
+    fun aListWithoutTheFlagDerivesItFromTheGurmukhi() {
+        assertTrue(requireNotNull(BentiDraftSaver.restore(listOf("Bless us", "ਅਰਦਾਸ", "Bless us"))).isDraftOpen)
+        assertFalse(requireNotNull(BentiDraftSaver.restore(listOf("Bless us", "", null))).isDraftOpen)
+    }
 }
