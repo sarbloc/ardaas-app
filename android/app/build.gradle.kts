@@ -1,9 +1,14 @@
+import java.io.InputStream
+import java.util.regex.Pattern
+import java.util.zip.ZipInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
+    alias(libs.plugins.aboutLibraries.android)
 }
 
 // ---------------------------------------------------------------------------
@@ -72,11 +77,14 @@ val verifySharedContent = tasks.register<VerifySharedContent>("verifySharedConte
 // ---------------------------------------------------------------------------
 val sharedLicencesDir: File = rootDir.parentFile.resolve("Ardaas/Licences")
 
-// Must match OpenSourceLicence.all.
+// Must match OpenSourceLicence.all (each licence and its third-party notices).
 val sharedLicenceFiles = setOf(
     "licence-indictrans2.txt",
     "licence-indictrans2-onnx-int8.txt",
     "licence-onnxruntime.txt",
+    // ONNX Runtime's ThirdPartyNotices.txt at the pinned tag (#139): the
+    // components its native binaries statically include.
+    "licence-onnxruntime-third-party-notices.txt",
 )
 
 val verifySharedLicences = tasks.register<VerifySharedContent>("verifySharedLicences") {
@@ -86,6 +94,131 @@ val verifySharedLicences = tasks.register<VerifySharedContent>("verifySharedLice
 }
 
 tasks.named("preBuild") { dependsOn(verifySharedContent, verifySharedLicences) }
+
+// ---------------------------------------------------------------------------
+// Library notices (#139)
+//
+// The AboutLibraries plugin walks each variant's dependency graph at build
+// time and writes every library, its version and its licence text to
+// res/raw/aboutlibraries.json, which the Open-source licences screen lists.
+// Nothing is maintained by hand, so a dependency bump updates the list.
+//
+// It fails the build (prepareLibraryDefinitions<Variant>, part of every
+// assemble and unit-test run) when a library declares no licence, or one not
+// in allowedLicenses. Only Apache-2.0 is allowed, deliberately: its text is
+// the same for every project, so the generic copy in aboutlibraries/licenses/
+// is the real notice. MIT, BSD and friends carry a per-project copyright line
+// that a generic text lacks, so a library under one of those needs its
+// verbatim notice added to Ardaas/Licences/ (and OpenSourceLicence.all),
+// then an exclusion here, like ONNX Runtime's.
+//
+// Offline mode: licence texts come from aboutlibraries/licenses/, never
+// spdx.org, so the build is reproducible and cannot quietly ship an empty
+// text when the network blips. LibraryNoticesTest checks every listed
+// library carries a non-empty licence text.
+//
+// Apache-2.0 §4(d) NOTICE files: the plugin reads POM metadata only and never
+// sees them, so verifyDependencyNotices below opens every artifact the
+// release build packages and fails on a NOTICE not yet reproduced in the
+// app. None ships one today.
+// ---------------------------------------------------------------------------
+aboutLibraries {
+    offlineMode = true
+    collect {
+        configPath = file("aboutlibraries")
+        // BOMs pin versions and ship no code.
+        includePlatform = false
+    }
+    export {
+        // Only name, version, website and licences are shown.
+        excludeFields.addAll("description", "developers", "organization", "scm", "funding")
+    }
+    license {
+        strictMode = com.mikepenz.aboutlibraries.plugin.StrictMode.FAIL
+        allowedLicenses.addAll("Apache-2.0")
+    }
+    library {
+        requireLicense = true
+        // Shown with its own MIT notice and ThirdPartyNotices.txt from
+        // Ardaas/Licences/ (OpenSourceLicence.all), not the generic MIT text.
+        exclusionPatterns.add(Pattern.compile("com\\.microsoft\\.onnxruntime:onnxruntime-android"))
+    }
+}
+
+/**
+ * Fails when a packaged dependency (AAR or JAR, including an AAR's nested
+ * jars) carries a NOTICE file not in [reproduced]. Apache-2.0 §4(d) requires
+ * its contents to be reproduced, AGP drops NOTICE files from the APK, and the
+ * generated library list has no slot for them — so one appearing needs a
+ * decision, not silence.
+ */
+abstract class VerifyDependencyNotices : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val artifacts: ConfigurableFileCollection
+
+    /** `artifact-file-name!entry` of each NOTICE already reproduced in the app. */
+    @get:Input
+    abstract val reproduced: SetProperty<String>
+
+    @get:OutputFile
+    abstract val stamp: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val found = artifacts.files.sortedBy { it.name }.flatMap { file ->
+            noticesIn(file).map { "${file.name}!$it" }
+        }
+        val unhandled = found - reproduced.get()
+        if (unhandled.isNotEmpty()) {
+            throw GradleException(
+                "Dependencies ship NOTICE files, which Apache-2.0 §4(d) requires the app to reproduce:\n" +
+                    unhandled.joinToString("\n") { "  $it" } + "\n" +
+                    "Add each verbatim to Ardaas/Licences/ and OpenSourceLicence.all (both platforms), " +
+                    "then list it in reproducedDependencyNotices in android/app/build.gradle.kts.",
+            )
+        }
+        stamp.get().asFile.writeText("${artifacts.files.size} artifacts checked; NOTICE files: $found\n")
+    }
+
+    private fun noticesIn(file: File): List<String> = when {
+        file.isDirectory -> file.walkTopDown()
+            .filter { it.isFile && isNotice(it.path) }
+            .map { it.relativeTo(file).path }
+            .toList()
+        file.extension == "jar" || file.extension == "aar" -> file.inputStream().use { noticesIn(it) }
+        else -> emptyList()
+    }
+
+    /** NOTICE entries in the zip read from [stream], descending into nested jars. */
+    private fun noticesIn(stream: InputStream): List<String> {
+        val found = mutableListOf<String>()
+        val zip = ZipInputStream(stream)
+        while (true) {
+            val entry = zip.nextEntry ?: break
+            when {
+                isNotice(entry.name) -> found += entry.name
+                entry.name.endsWith(".jar") -> noticesIn(zip.readBytes().inputStream()).mapTo(found) { "${entry.name}!$it" }
+            }
+        }
+        return found
+    }
+
+    private fun isNotice(path: String) = Regex("(?i)notice([._-].*)?").matches(path.substringAfterLast('/'))
+}
+
+// Keyed by artifact file name, version included, so an upgrade asks again:
+// a new version's NOTICE may say something new.
+val reproducedDependencyNotices = emptySet<String>()
+
+val verifyDependencyNotices = tasks.register<VerifyDependencyNotices>("verifyDependencyNotices") {
+    // What the release APK/AAB packages. Debug-only tooling never ships.
+    artifacts.from(configurations.named("releaseRuntimeClasspath").map { it.incoming.artifacts.artifactFiles })
+    reproduced.set(reproducedDependencyNotices)
+    stamp.set(layout.buildDirectory.file("verifyDependencyNotices/ok.txt"))
+}
+
+tasks.named("preBuild") { dependsOn(verifyDependencyNotices) }
 
 // ---------------------------------------------------------------------------
 // Versioning (#92)
@@ -227,7 +360,8 @@ android {
             isMinifyEnabled = true
             // Drops resources nothing references. Nothing is looked up by
             // name (no getIdentifier); the bundled JSON lives in assets/,
-            // which resource shrinking does not touch.
+            // which resource shrinking does not touch, except the generated
+            // library list (R.raw.aboutlibraries), which res/raw/keep.xml keeps.
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

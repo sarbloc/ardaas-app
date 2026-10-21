@@ -10,6 +10,9 @@ on:
       # Android packages the scripture straight from the iOS resources (#82),
       # so a correction there must rebuild and re-test Android too.
       - 'Ardaas/Resources/**'
+      # …and the licence notices the same way (#132, #139): a changed,
+      # added or removed file must re-run verifySharedLicences and the tests.
+      - 'Ardaas/Licences/**'
       # The transliteration parity fixture is shared with the iOS tests
       # (#84): a change to it must re-run the Kotlin engine against it too.
       - 'ArdaasTests/Fixtures/transliteration-parity.json'

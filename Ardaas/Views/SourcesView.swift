@@ -43,17 +43,17 @@ struct SourcesView: View {
             ForEach(library.variants) { variant in
                 Section("Ardaas — \(variant.displayName)") {
                     ForEach(variant.content.sources, id: \.self) { source in
-                        // Only real web links render as Link — iOS 17's
-                        // lenient URL(string:) would otherwise turn prose
-                        // source descriptions into broken links.
-                        if let url = URL(string: source),
-                           url.scheme == "https" || url.scheme == "http" {
+                        // Only a string that is wholly a web address renders
+                        // as a Link, labelled with its host; prose is shown
+                        // as written (see SourceEntry).
+                        switch SourceEntry(source) {
+                        case .link(let url, let host):
                             Link(destination: url) {
-                                Text(displayName(for: source))
+                                Text(host)
                                     .foregroundStyle(Color.accentColor)
                             }
-                        } else {
-                            Text(source)
+                        case .prose(let text):
+                            Text(text)
                                 .font(.footnote)
                                 .foregroundStyle(Theme.mist)
                         }
@@ -113,11 +113,6 @@ struct SourcesView: View {
                 .foregroundStyle(Theme.parchment)
         }
         .listRowBackground(Theme.raisedFill)
-    }
-
-    /// Hostname as a readable label, e.g. "discoversikhism.com".
-    private func displayName(for source: String) -> String {
-        URL(string: source)?.host() ?? source
     }
 
     private static var versionString: String {
