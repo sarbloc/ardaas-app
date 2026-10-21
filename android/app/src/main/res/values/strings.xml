@@ -21,6 +21,11 @@
     <string name="sources_load_failed">Could not load bundled texts: %1$s</string>
     <string name="sources_accuracy_header">Accuracy</string>
     <string name="sources_accuracy_body">The Gurmukhi text is cross-checked against independent sources and proof-read before every change. If you spot an error, please report it — scripture accuracy is treated as a defect of the highest severity.</string>
+    <!-- Credits for on-device benti translation (#121). Licences checked at the pinned revision. -->
+    <string name="sources_translation_header">Translation</string>
+    <string name="sources_credit_indictrans2">IndicTrans2 (en–indic, distilled 200M) by AI4Bharat — the model that translates a benti into Gurmukhi. MIT licence.</string>
+    <string name="sources_credit_onnx_export">Int8 ONNX export of IndicTrans2 by naklitechie on Hugging Face. MIT licence.</string>
+    <string name="sources_credit_onnx_runtime">ONNX Runtime by Microsoft — runs the model on your phone. MIT licence.</string>
     <string name="sources_support_header">Support</string>
     <string name="sources_support_link">Help &amp; support</string>
     <string name="sources_version">Version</string>
