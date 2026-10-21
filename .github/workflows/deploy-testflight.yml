@@ -5,8 +5,7 @@ on:
     branches: [main]
     # Only deploy when something the iOS app actually ships has changed.
     # Without this, an Android-only merge costs ~150 billed macOS minutes,
-    # consumes a build number, and mints another Development certificate —
-    # which is what wedged the deploy twice already (#57).
+    # and consumes a build number.
     #
     # Ardaas/Resources/** is inside Ardaas/**, so a scripture correction still
     # deploys, as it must.
@@ -79,10 +78,24 @@ jobs:
       # re-running after a SUCCESSFUL upload fails on "duplicate build"
       # (correct — that build is already up), and workflow_dispatch should
       # only be run from the main tip.
-      - name: Archive (build number = commit count)
-        env:
-          API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
-          API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+      #
+      # The archive is deliberately UNSIGNED and never talks to the developer
+      # account; -exportArchive below does all the signing (#57). Signing the
+      # archive under automatic signing always uses an *Apple Development*
+      # identity, and a fresh runner has none in its keychain, so
+      # -allowProvisioningUpdates minted a new development certificate on every
+      # run until the account hit Apple's cap ("Choose a certificate to revoke").
+      # Pinning the archive to Release (#63) or to CODE_SIGN_IDENTITY=Apple
+      # Distribution (#62) did not change that. The export re-signs for App
+      # Store distribution with Apple's cloud-managed distribution certificate,
+      # which it already did before this change and which creates nothing.
+      #
+      # This relies on the app having no entitlements file / capabilities: an
+      # unsigned archive carries no entitlements, so the export signs with the
+      # baseline ones from the App Store profile. Adding a capability (push,
+      # app groups, iCloud…) means ad-hoc signing the archived app with its
+      # .entitlements file before export, or the capability is silently lost.
+      - name: Archive, unsigned (build number = commit count)
         run: |
           set -o pipefail
           BUILD_NUMBER=$(git rev-list --count HEAD)
@@ -94,10 +107,21 @@ jobs:
             -archivePath build/Ardaas.xcarchive \
             -configuration Release \
             CURRENT_PROJECT_VERSION="${BUILD_NUMBER}" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "${PWD}/private_keys/AuthKey_${API_KEY_ID}.p8" \
-            -authenticationKeyID "${API_KEY_ID}" \
-            -authenticationKeyIssuerID "${API_ISSUER_ID}"
+            CODE_SIGNING_ALLOWED=NO
+
+      # Fail fast if anything signed the archive with a certificate — that is
+      # the path that minted a development certificate per run (#57). The
+      # linker's ad-hoc signature is expected and carries no Authority.
+      - name: Assert the archive carries no certificate signature
+        run: |
+          set -euo pipefail
+          APP="build/Ardaas.xcarchive/Products/Applications/Ardaas.app"
+          SIGNATURE=$(codesign -dvv "${APP}" 2>&1 || true)
+          echo "${SIGNATURE}"
+          if grep -q '^Authority=' <<<"${SIGNATURE}"; then
+            echo "::error::The archive was signed with a certificate. It must be unsigned so that no development certificate is created (#57)."
+            exit 1
+          fi
 
       # ONNX Runtime ships a STATIC archive inside a framework wrapper (its
       # binary is an `ar` archive, not a dylib), so its code is linked into the
@@ -149,7 +173,23 @@ jobs:
             -allowProvisioningUpdates \
             -authenticationKeyPath "${PWD}/private_keys/AuthKey_${API_KEY_ID}.p8" \
             -authenticationKeyID "${API_KEY_ID}" \
-            -authenticationKeyIssuerID "${API_ISSUER_ID}"
+            -authenticationKeyIssuerID "${API_ISSUER_ID}" \
+            2>&1 | tee build/export.log
+
+      # Diagnostic only: which identities the export signed with, from the
+      # distribution logs xcodebuild leaves behind. Expect "Apple Distribution"
+      # and no "Apple Development" — the evidence that #57 stays fixed.
+      - name: Signing summary
+        if: always()
+        continue-on-error: true
+        run: |
+          LOGS=$(sed -n 's/.*Created bundle at path "\(.*\.xcdistributionlogs\)".*/\1/p' build/export.log 2>/dev/null | tail -n 1)
+          if [ -z "${LOGS}" ] || [ ! -d "${LOGS}" ]; then
+            echo "No distribution logs found."
+            exit 0
+          fi
+          grep -rhoiE '(Apple|iPhone) (Distribution|Development)[^"<,]*|[A-Za-z ]*certificate[A-Za-z ]*' "${LOGS}" \
+            | sed 's/^ *//' | sort | uniq -c | sort -rn | head -n 40
 
       - name: Clean up API key
         if: always()
