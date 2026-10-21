@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup on Android 11 and below (API 26-30). Android 12+ reads
+  data_extraction_rules.xml instead; keep the two in step (BackupRulesTest).
+
+  An allowlist: only saved Ardaas (Room, ardaas.db, with its journal/WAL) and
+  the Reader's display preferences. The translation model lives in
+  noBackupFilesDir and caches are never backed up.
+-->
+<full-backup-content>
+    <include domain="database" path="ardaas.db" />
+    <include domain="sharedpref" path="reader.xml" />
+</full-backup-content>
