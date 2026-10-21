@@ -95,6 +95,40 @@ extension SavedArdaas {
         )
     }
 
+    /// Everything Compose edits on this record, as the value it saves — how
+    /// an edit reopens the record (`ComposeForm(fields:)`).
+    var fields: SavedArdaasFields {
+        SavedArdaasFields(
+            label: label,
+            variantId: variantId,
+            benti: bentiLayers,
+            occasion: occasionChoice
+        )
+    }
+
+    /// Writes Compose's fields onto this record in place: the label, the
+    /// variant, all three benti layers and the occasion. `createdAt` is not
+    /// touched, so an edited Ardaas keeps its place in the list.
+    ///
+    /// The only writer of these fields from Compose, for a new record
+    /// (`make(from:)`) as much as an edited one.
+    func apply(_ fields: SavedArdaasFields) {
+        label = fields.label
+        variantId = fields.variantId
+        bentiText = fields.benti.english
+        bentiGurmukhi = fields.benti.gurmukhi
+        bentiTransliteration = fields.benti.transliteration
+        occasionChoice = fields.occasion
+    }
+
+    /// A new record holding `fields`, written through `apply(_:)` so creating
+    /// and editing cannot disagree about what a field means.
+    static func make(from fields: SavedArdaasFields, createdAt: Date = .now) -> SavedArdaas {
+        let record = SavedArdaas(label: fields.label, bentiText: fields.benti.english, createdAt: createdAt)
+        record.apply(fields)
+        return record
+    }
+
     /// The chosen occasion's words, resolved through the bundled catalog.
     ///
     /// Nil — the canonical dots, untouched — for nothing chosen and for an id
