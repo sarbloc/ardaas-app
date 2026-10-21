@@ -199,6 +199,39 @@ final class OccasionSubstitutionTests: XCTestCase {
         XCTAssertEqual(segment.transliteration, "Aap De Hazur Jap Ji Saahib De Paath Di Ardas ||")
     }
 
+    /// Whitespace *after* the placeholder is absorbed too, including the
+    /// non-space kinds Swift counts as whitespace (NBSP, NEXT LINE). Mirrors
+    /// Android's `iosWhitespaceAtASeamIsAbsorbed`. The test above cannot
+    /// catch a broken trailing seam on its own: a single leftover space reads
+    /// the same as the one the splice would have added (#104).
+    func testWhitespaceAfterThePlaceholderIsAbsorbed() throws {
+        let spaced = content(
+            gurmukhi: "ਹਜ਼ੂਰ\u{00A0}\(marker)\u{0085}ਦੀ",
+            transliteration: nil,
+            english: nil,
+            placeholder: OccasionPlaceholder(
+                gurmukhi: marker, transliteration: nil, english: nil
+            )
+        )
+        let segment = try slotSegment(of: spaced, occasion: japji)
+        XCTAssertEqual(segment.gurmukhi, "ਹਜ਼ੂਰ ਜਪੁ ਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ ਦੀ")
+    }
+
+    /// …and before punctuation it is absorbed entirely, so the occasion
+    /// closes up against the mark rather than standing a space (or two) off.
+    func testWhitespaceBetweenThePlaceholderAndPunctuationIsAbsorbed() throws {
+        let spaced = content(
+            gurmukhi: "ਹਜ਼ੂਰ\(marker)  ॥",
+            transliteration: nil,
+            english: nil,
+            placeholder: OccasionPlaceholder(
+                gurmukhi: marker, transliteration: nil, english: nil
+            )
+        )
+        let segment = try slotSegment(of: spaced, occasion: japji)
+        XCTAssertEqual(segment.gurmukhi, "ਹਜ਼ੂਰ ਜਪੁ ਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ॥")
+    }
+
     /// No space is added before punctuation: SGPC's English placeholder is
     /// followed by the sentence's full stop.
     func testPunctuationAfterTheSlotIsNotPushedAway() throws {

@@ -246,3 +246,43 @@ final class StubTranslator: BentiTranslating, @unchecked Sendable {
             isGurmukhiPure: true)
     }
 }
+
+/// Stands in for an ORT run that cannot be interrupted: its first translation
+/// blocks until the calling task is cancelled (or a safety timeout passes) and
+/// then returns normally, exactly as a `run` that was already in flight would.
+/// Later translations return at once. Lets the engine's own cancellation
+/// handling (#52) be driven without the real model.
+final class UninterruptibleTranslator: BentiTranslating, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _started = false
+    private var _calls = 0
+
+    /// True once the first (blocking) translation is running.
+    var hasStarted: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _started
+    }
+
+    var callCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return _calls
+    }
+
+    func translate(_ english: String, collectMetrics: Bool) throws -> BentiTranslation {
+        lock.lock()
+        _calls += 1
+        let blocks = _calls == 1
+        _started = true
+        lock.unlock()
+
+        if blocks {
+            let deadline = Date().addingTimeInterval(5)
+            while !Task.isCancelled && Date() < deadline {
+                Thread.sleep(forTimeInterval: 0.005)
+            }
+        }
+        return try StubTranslator().translate(english, collectMetrics: collectMetrics)
+    }
+}
