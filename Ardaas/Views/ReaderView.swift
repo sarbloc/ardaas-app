@@ -27,6 +27,7 @@ struct ReaderView: View {
     @State private var occasionCatalog: OccasionCatalog?
 
     @State private var isEditingOccasion = false
+    @State private var isEditingArdaas = false
 
     private static let fontScaleRange = 0.7...1.6
     private static let fontScaleStep = 0.1
@@ -60,6 +61,11 @@ struct ReaderView: View {
                         content: loadedContent
                     )
                 }
+            }
+            // Compose, reopened on this record (#154): label, variant,
+            // occasion and benti, saved back in place.
+            .sheet(isPresented: $isEditingArdaas) {
+                ComposeView(editing: savedArdaas)
             }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
@@ -341,6 +347,17 @@ struct ReaderView: View {
         occasionCatalog != nil && loadedContent?.occasionSlot != nil
     }
 
+    /// Reopens this Ardaas in Compose to change any of what it was saved
+    /// with (#154). Lives at the top of `displayMenu` rather than in the
+    /// toolbar, which already holds Occasion and the gear.
+    private var editButton: some View {
+        Button {
+            isEditingArdaas = true
+        } label: {
+            Label("Edit", systemImage: "pencil")
+        }
+    }
+
     /// Opens the occasion picker. Kept out of `displayMenu` — that menu is
     /// display preferences (which layers, how big); this changes the words of
     /// the Ardaas itself, and it is the one thing on this screen a reader may
@@ -355,6 +372,9 @@ struct ReaderView: View {
 
     private var displayMenu: some View {
         Menu {
+            Section {
+                editButton
+            }
             if case .success(let library) = loadResult, library.variants.count > 1 {
                 Section("Ardaas") {
                     Picker("Ardaas", selection: $savedArdaas.variantId) {
