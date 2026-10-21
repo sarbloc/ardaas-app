@@ -90,7 +90,7 @@ schwa. Both apply before schwa deletion:
   syllable: ਪਹਿ → `Peh`, ਮਹਿ → `Meh`, ਕਹਿ → `Keh`, ਕਰਹਿ → `Kareh`. Two things
   narrow it:
   - **Word-final only.** Mid-word ਹਿ takes the ordinary rules, so ਸਹਿਤ →
-    `Sahit`, ਮਹਿਮਾ → `Mahimaa`, ਪਹਿਲਾ → `Pahilaa`.
+    `Sahit`, ਮਹਿਮਾ → `Mahimaa`, ਕਹਿਣਾ → `Kahinaa`.
   - **The inherent schwa only.** A written vowel before ਹ keeps its own
     syllable, so ਸਾਹਿਬ stays `Saahib`, ਬੋਹਿਥ stays `Bohith` and ਨਾਹਿ stays
     `Naahi`.
@@ -140,10 +140,11 @@ word. Three rules, per word:
 - Nothing restores the schwa Punjabi keeps before certain sonorant clusters;
   only the conjunct-cluster case is handled.
 - A word whose *mid-word* ਹਿ is reduced by readers comes out unreduced until it
-  is lexicalized: ਪਹਿਲਾ → `Pahilaa`. The words that reach bundled content are
-  lexicalized instead — ਰਹਿਤ → `Rehat`, and ਰਹਿਰਾਸ → `Reharaas`, ਸਹਿਜ → `Sehaj`
-  for `occasions.json` (#69) — so what is left on the rules only reaches a
-  user-authored benti.
+  is lexicalized: ਕਹਿਣਾ → `Kahinaa` (read *kehnaa*). The words that reach
+  bundled content are lexicalized instead — ਰਹਿਤ → `Rehat`, and ਰਹਿਰਾਸ →
+  `Rehraas`, ਸਹਿਜ → `Sehaj` for `occasions.json` (#69) — so what is left on the
+  rules only reaches a user-authored benti. Common benti words are lexicalized
+  as they come up: ਪਹਿਲਾ → `Pehlaa` (#48).
 - A vowel-vowel juncture with no glide is written plain, so ਲਈਂ → `Lai(n)` can
   be misread as the `ai` of ਐ. `La-i(n)` would be no clearer, and the house
   style writes such junctures plain too ("Nau", "Bhagauti").
@@ -154,8 +155,8 @@ A deliberately small table — a dozen or so words, several of them just alterna
 spellings of the same one — covering high-frequency words whose rule output reads
 wrong: ਵਾਹਿਗੁਰੂ → `Waheguru` (rules: *Vaahiguru*), ਖਾਲਸਾ → `Khalsa`
 (*Khaalsaa*), ਸਤਿਗੁਰੂ → `Satguru`, ਫ਼ਤਹਿ/ਫਤਿਹ/ਫਤੇ → `Fateh`, ਨੂੰ → `Noon`,
-ਰਹਿਤ → `Rehat` (*Rahit*), ਰਹਿਰਾਸ → `Reharaas` (*Rahiraas*), ਸਹਿਜ → `Sehaj`
-(*Sahij*), ਸੁਖਮਨੀ → `Sukhmani` (*Sukhamni*).
+ਰਹਿਤ → `Rehat` (*Rahit*), ਰਹਿਰਾਸ → `Rehraas` (*Rahiraas*), ਸਹਿਜ → `Sehaj`
+(*Sahij*), ਪਹਿਲਾ → `Pehlaa` (*Pahilaa*), ਸੁਖਮਨੀ → `Sukhmani` (*Sukhamni*).
 A few words the rules already get right (ਗੁਰੂ, ਜੀ, ਸ੍ਰੀ, ਸਿੰਘ, ਅਰਦਾਸ) are pinned
 there too, so a later rule change can't silently alter them.
 
