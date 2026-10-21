@@ -53,11 +53,10 @@ schemes:
       gatherCoverageData: true
       targets:
         - ArdaasTests
-    # Pin the archive action to Release. Left implicit, the archive resolved to
-    # development signing ("Ardaas is automatically signed for development"),
-    # which is why every CI run minted a fresh development certificate and
-    # eventually hit Apple's certificate limit (#57). Automatic signing picks a
-    # distribution identity for a Release archive, so no development identity
-    # is requested and nothing accrues.
+    # Archive in Release. This does NOT affect signing: automatic signing
+    # always signs an archive with an Apple Development identity, whatever the
+    # configuration (#63 tried this as a fix for #57 and it was a no-op). The
+    # TestFlight workflow archives unsigned and lets -exportArchive sign for
+    # distribution instead — see .github/workflows/deploy-testflight.yml.
     archive:
       config: Release
