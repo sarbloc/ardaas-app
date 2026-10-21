@@ -47,7 +47,8 @@ abstract class VerifySharedContent : DefaultTask() {
                 "Shared Ardaas content in ${dir.path} does not match what Android expects.\n" +
                     "  missing:    ${expected - actual}\n" +
                     "  unexpected: ${actual - expected}\n" +
-                    "Update sharedContentFiles in android/app/build.gradle.kts only once " +
+                    "Update the expected set (sharedContentFiles / sharedLicenceFiles) in " +
+                    "android/app/build.gradle.kts only once " +
                     "Android is meant to ship the change.",
             )
         }
@@ -61,7 +62,30 @@ val verifySharedContent = tasks.register<VerifySharedContent>("verifySharedConte
     stamp.set(layout.buildDirectory.file("verifySharedContent/ok.txt"))
 }
 
-tasks.named("preBuild") { dependsOn(verifySharedContent) }
+// ---------------------------------------------------------------------------
+// Shared licence notices (#132)
+//
+// The verbatim MIT notices for the translation stack live once, beside the
+// scripture in the iOS app (Ardaas/Licences/, NOT Ardaas/Resources/ — these
+// are not scripture and carry no proof-read gate). Packaged and verified the
+// same way: an exact file set, straight from the source directory.
+// ---------------------------------------------------------------------------
+val sharedLicencesDir: File = rootDir.parentFile.resolve("Ardaas/Licences")
+
+// Must match OpenSourceLicence.all.
+val sharedLicenceFiles = setOf(
+    "licence-indictrans2.txt",
+    "licence-indictrans2-onnx-int8.txt",
+    "licence-onnxruntime.txt",
+)
+
+val verifySharedLicences = tasks.register<VerifySharedContent>("verifySharedLicences") {
+    contentDir.set(sharedLicencesDir)
+    expectedFiles.set(sharedLicenceFiles)
+    stamp.set(layout.buildDirectory.file("verifySharedLicences/ok.txt"))
+}
+
+tasks.named("preBuild") { dependsOn(verifySharedContent, verifySharedLicences) }
 
 // ---------------------------------------------------------------------------
 // Versioning (#92)
@@ -148,6 +172,7 @@ val uploadSigning: UploadSigning? = run {
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addStaticSourceDirectory(sharedContentDir.absolutePath)
+        variant.sources.assets?.addStaticSourceDirectory(sharedLicencesDir.absolutePath)
     }
 }
 
@@ -192,10 +217,22 @@ android {
 
     buildTypes {
         release {
-            // R8 stays off for the first closed-test build: ONNX Runtime
-            // reaches its Java classes from JNI and by reflection, and a
-            // shrinker mistake there would only show up on a device.
-            isMinifyEnabled = false
+            // R8 shrinks, optimizes and obfuscates; the mapping file is
+            // embedded in the AAB so Play can deobfuscate crash reports.
+            // ONNX Runtime reaches its Java classes from JNI by name and ships
+            // no consumer rules, so proguard-rules.pro keeps them — a
+            // shrinker mistake there only shows up on a device, so a change to
+            // the rules (or an ORT upgrade) needs translation exercised on a
+            // minified release build, not just a debug one.
+            isMinifyEnabled = true
+            // Drops resources nothing references. Nothing is looked up by
+            // name (no getIdentifier); the bundled JSON lives in assets/,
+            // which resource shrinking does not touch.
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             // The default for release; stated so it cannot drift.
             isDebuggable = false
             // Unset without the upload key: the release build stays unsigned.
@@ -253,6 +290,9 @@ tasks.withType<Test>().configureEach {
     systemProperty("ardaas.sharedContentDir", sharedContentDir.absolutePath)
     // Re-run the parity test whenever the scripture changes.
     inputs.dir(sharedContentDir).withPathSensitivity(PathSensitivity.RELATIVE)
+    // …and the licence test whenever a notice does.
+    systemProperty("ardaas.sharedLicencesDir", sharedLicencesDir.absolutePath)
+    inputs.dir(sharedLicencesDir).withPathSensitivity(PathSensitivity.RELATIVE)
     systemProperty("ardaas.transliterationParityFixture", transliterationParityFixture.absolutePath)
     // …and the transliteration parity test whenever its fixture does.
     inputs.file(transliterationParityFixture).withPathSensitivity(PathSensitivity.NONE)

@@ -51,6 +51,20 @@ class ComposeDraftTest {
         assertFalse(ComposeDraft(label = "Family", benti = BentiDraft(typed = "  ", gurmukhi = "\n")).canSave)
     }
 
+    /**
+     * #131: an emptied-but-open Gurmukhi editor saves exactly what an absent
+     * one does — English only.
+     */
+    @Test
+    fun anEmptiedGurmukhiDraftSavesEnglishOnly() {
+        val benti = BentiDraft(typed = "Bless us.").applyTranslation("ਅਰਦਾਸ", "Bless us.").copy(gurmukhi = "")
+        assertTrue(benti.showsTranslationDraft)
+        val record = requireNotNull(ComposeDraft(label = "Family", benti = benti).toSavedArdaas(createdAt))
+        assertEquals("Bless us.", record.bentiText)
+        assertEquals("", record.bentiGurmukhi)
+        assertEquals("", record.bentiTransliteration)
+    }
+
     /** A Gurmukhi-only benti, from either editor, is worth saving. */
     @Test
     fun gurmukhiAloneCanSave() {

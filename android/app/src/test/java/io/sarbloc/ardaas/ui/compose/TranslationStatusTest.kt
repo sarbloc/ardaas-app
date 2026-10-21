@@ -184,6 +184,21 @@ class TranslationStatusTest {
         assertFalse(status.showsDraft(translated.copy(typed = "ਸਰਬੱਤ ਦਾ ਭਲਾ")))
     }
 
+    /** #131: emptying the Gurmukhi editor leaves it on screen; only Remove Gurmukhi takes it away. */
+    @Test
+    fun anEmptiedDraftStaysOnScreenUntilRemoved() {
+        val status = TranslationStatus(ModelState.Ready)
+        val emptied = translated.copy(gurmukhi = "")
+        assertTrue(status.showsDraft(emptied))
+        val offer = status.section(emptied) as TranslateSection.Offer
+        assertEquals(TranslateButton.Label.TRANSLATE_AGAIN, offer.button.label)
+        assertFalse(TranslationStatus.showsPurityCaution(emptied))
+
+        val removed = emptied.clearTranslation()
+        assertFalse(status.showsDraft(removed))
+        assertEquals(TranslateButton.Label.TRANSLATE, (status.section(removed) as TranslateSection.Offer).button.label)
+    }
+
     // Purity caution
 
     @Test
