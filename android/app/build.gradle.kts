@@ -63,6 +63,84 @@ val verifySharedContent = tasks.register<VerifySharedContent>("verifySharedConte
 
 tasks.named("preBuild") { dependsOn(verifySharedContent) }
 
+// ---------------------------------------------------------------------------
+// Versioning (#92)
+//
+// versionCode is the commit count on main, passed in by the release workflow
+// (-PardaasVersionCode=N), the same number the iOS build uses for
+// CURRENT_PROJECT_VERSION. Local and PR builds default to 1: nothing they
+// produce is ever uploaded, so they never need a real one.
+//
+// versionName lives in gradle.properties (ardaasVersionName) so the release
+// workflow can name the artifact without evaluating Gradle. Keep it in step
+// with MARKETING_VERSION in project.yml — the two apps are one release.
+// ---------------------------------------------------------------------------
+// Play's ceiling for versionCode.
+val maxVersionCode = 2_100_000_000
+
+val ardaasVersionCode: Int = providers.gradleProperty("ardaasVersionCode").orNull.let { raw ->
+    if (raw == null) {
+        1
+    } else {
+        raw.trim().toIntOrNull()?.takeIf { it in 1..maxVersionCode }
+            ?: throw GradleException(
+                "ardaasVersionCode must be an integer in 1..$maxVersionCode, got \"$raw\".",
+            )
+    }
+}
+
+val ardaasVersionName: String = providers.gradleProperty("ardaasVersionName").orNull
+    ?.trim()
+    ?.takeIf { it.isNotEmpty() }
+    ?: throw GradleException("ardaasVersionName is missing from android/gradle.properties.")
+
+// ---------------------------------------------------------------------------
+// Release signing (#92)
+//
+// Play App Signing holds the app-signing key; we sign with the UPLOAD key.
+// The keystore and its credentials arrive only through the environment — the
+// release workflow decodes the keystore to a temp file and sets all three.
+// Nothing about the key is ever committed.
+//
+// None set (local dev, PR CI): release builds assemble UNSIGNED, as before.
+// Some but not all set: a misconfigured release job, so fail now rather than
+// quietly produce an unsigned bundle that Play would reject later.
+//
+// The keystore is PKCS12, where the key password is the store password.
+// ---------------------------------------------------------------------------
+data class UploadSigning(val storeFile: File, val password: String, val keyAlias: String)
+
+val uploadSigning: UploadSigning? = run {
+    // A secret that is not configured reaches the job as an EMPTY variable,
+    // so blank counts as unset.
+    fun env(name: String): String? = providers.environmentVariable(name).orNull?.takeIf { it.isNotBlank() }
+
+    val keystore = env("ARDAAS_UPLOAD_KEYSTORE")
+    val password = env("ARDAAS_UPLOAD_KEYSTORE_PASSWORD")
+    val alias = env("ARDAAS_UPLOAD_KEY_ALIAS")
+    val present = mapOf(
+        "ARDAAS_UPLOAD_KEYSTORE" to (keystore != null),
+        "ARDAAS_UPLOAD_KEYSTORE_PASSWORD" to (password != null),
+        "ARDAAS_UPLOAD_KEY_ALIAS" to (alias != null),
+    )
+    when {
+        present.values.none { it } -> null
+        present.values.all { it } -> {
+            val file = File(keystore!!)
+            if (!file.isFile) {
+                // The path is not secret; the password never appears in a message.
+                throw GradleException("ARDAAS_UPLOAD_KEYSTORE points at $file, which is not a file.")
+            }
+            UploadSigning(file, password!!, alias!!)
+        }
+        else -> throw GradleException(
+            "Release signing is half-configured. Set all of ARDAAS_UPLOAD_KEYSTORE, " +
+                "ARDAAS_UPLOAD_KEYSTORE_PASSWORD and ARDAAS_UPLOAD_KEY_ALIAS, or none.\n" +
+                "  missing: ${present.filterValues { !it }.keys}",
+        )
+    }
+}
+
 androidComponents {
     onVariants { variant ->
         variant.sources.assets?.addStaticSourceDirectory(sharedContentDir.absolutePath)
@@ -82,8 +160,8 @@ android {
         applicationId = "io.sarbloc.ardaas"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = ardaasVersionCode
+        versionName = ardaasVersionName
 
         ndk {
             // ONNX Runtime ships ~20 MB of native code per ABI; Play's per-ABI
@@ -96,9 +174,28 @@ android {
         }
     }
 
+    signingConfigs {
+        uploadSigning?.let { upload ->
+            create("release") {
+                storeFile = upload.storeFile
+                storeType = "pkcs12"
+                storePassword = upload.password
+                keyAlias = upload.keyAlias
+                keyPassword = upload.password
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // R8 stays off for the first closed-test build: ONNX Runtime
+            // reaches its Java classes from JNI and by reflection, and a
+            // shrinker mistake there would only show up on a device.
             isMinifyEnabled = false
+            // The default for release; stated so it cannot drift.
+            isDebuggable = false
+            // Unset without the upload key: the release build stays unsigned.
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 
