@@ -12,7 +12,9 @@
 #
 # Our own code (io.sarbloc.ardaas) uses no reflection, no getIdentifier, and
 # loads its bundled JSON from assets/, which the resource shrinker never
-# touches. Saved instance state is plain strings, never class names.
+# touches — bar the generated library list, R.raw.aboutlibraries, read by id
+# and kept by res/raw/keep.xml. Saved instance state is plain strings, never
+# class names.
 
 # ONNX Runtime (com.microsoft.onnxruntime:onnxruntime-android) ships NO
 # consumer rules (the AAR has no proguard.txt), yet libonnxruntime4j_jni.so

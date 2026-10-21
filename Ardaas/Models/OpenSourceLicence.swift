@@ -15,6 +15,10 @@ struct OpenSourceLicence: Identifiable, Equatable {
     let component: String
     /// Who publishes it and exactly which version is used.
     let source: String
+    /// Bundle resource name (`.txt`) of the notices for third-party code the
+    /// component itself includes (#139), verbatim from the project; nil if
+    /// none.
+    var thirdPartyNoticesResource: String? = nil
 
     var id: String { resource }
 
@@ -36,17 +40,65 @@ struct OpenSourceLicence: Identifiable, Equatable {
         OpenSourceLicence(
             resource: "licence-onnxruntime",
             component: "ONNX Runtime 1.24.2",
-            source: "Microsoft — github.com/microsoft/onnxruntime"
+            source: "Microsoft — github.com/microsoft/onnxruntime",
+            // ThirdPartyNotices.txt at tag v1.24.2: protobuf, abseil, Eigen
+            // and the rest statically linked into its binaries.
+            thirdPartyNoticesResource: "licence-onnxruntime-third-party-notices"
         ),
     ]
 
     /// The licence text exactly as bundled. Throws if the resource is
     /// missing — a build defect, not a runtime state.
     func loadText(from bundle: Bundle = OpenSourceLicence.appBundle) throws -> String {
-        guard let url = bundle.url(forResource: resource, withExtension: "txt") else {
-            throw OpenSourceLicenceError.resourceMissing(resource)
+        try Self.loadResource(resource, from: bundle)
+    }
+
+    /// The component's third-party notices exactly as bundled, or nil if it
+    /// has none. Throws if the resource is missing, as `loadText` does.
+    func loadThirdPartyNotices(from bundle: Bundle = OpenSourceLicence.appBundle) throws -> String? {
+        guard let name = thirdPartyNoticesResource else { return nil }
+        return try Self.loadResource(name, from: bundle)
+    }
+
+    /// The bundled `.txt` resource `name` as UTF-8 text.
+    static func loadResource(_ name: String, from bundle: Bundle) throws -> String {
+        guard let url = bundle.url(forResource: name, withExtension: "txt") else {
+            throw OpenSourceLicenceError.resourceMissing(name)
         }
         return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    /// A third-party notices file split into its components' notices. The
+    /// files separate components with a line of underscores; those lines are
+    /// dropped, and every other line is kept in order. Port of Android's
+    /// `OpenSourceLicence.noticeSections`.
+    static func noticeSections(_ raw: String) -> [String] {
+        let lines = raw.replacingOccurrences(of: "\r\n", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false)
+        var sections: [String] = []
+        var current: [Substring] = []
+        for line in lines {
+            if isNoticeSeparator(line) {
+                appendSection(current, to: &sections)
+                current = []
+            } else {
+                current.append(line)
+            }
+        }
+        appendSection(current, to: &sections)
+        return sections
+    }
+
+    private static func appendSection(_ lines: [Substring], to sections: inout [String]) {
+        let text = lines.joined(separator: "\n").trimmingCharacters(in: .newlines)
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            sections.append(text)
+        }
+    }
+
+    private static func isNoticeSeparator(_ line: Substring) -> Bool {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        return trimmed.count >= 5 && trimmed.allSatisfy { $0 == "_" }
     }
 
     /// `raw` as readable paragraphs for a phone-width screen. The bundled

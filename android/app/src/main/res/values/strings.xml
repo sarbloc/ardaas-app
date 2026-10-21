@@ -30,6 +30,17 @@
     <!-- Open-source licences (#132): full MIT notices for the translation stack. -->
     <string name="licences_title">Open-source licences</string>
     <string name="licences_load_failed">Could not load this licence: %1$s</string>
+    <!-- #139: a component's own third-party notices, and every packaged library. -->
+    <string name="licences_third_party_toggle">Third-party components in %1$s</string>
+    <plurals name="licences_third_party_count">
+        <item quantity="one">%d notice</item>
+        <item quantity="other">%d notices</item>
+    </plurals>
+    <string name="licences_libraries_header">Android libraries</string>
+    <string name="licences_libraries_intro">Libraries built into this app, each with the licence it is used under. Tap one for the full text.</string>
+    <string name="licences_library_detail">%1$s · %2$s</string>
+    <string name="licences_expand">Show licence</string>
+    <string name="licences_collapse">Hide licence</string>
     <string name="sources_support_link">Help &amp; support</string>
     <string name="sources_version">Version</string>
 
