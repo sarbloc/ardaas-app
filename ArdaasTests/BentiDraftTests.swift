@@ -180,6 +180,83 @@ final class BentiDraftTests: XCTestCase {
         XCTAssertEqual(draft.layers.transliteration, "Singh Ardaas ok")
     }
 
+    // MARK: - The draft section (#131)
+
+    /// Emptying the Gurmukhi editor keeps its section open — the user is in
+    /// the middle of editing it — while saving exactly what it did before:
+    /// English only, and nothing stale to warn about.
+    func testEmptyingTheGurmukhiKeepsTheDraftSectionOpen() {
+        var draft = BentiDraft(typed: "Bless the sangat.")
+        draft.applyTranslation("ਸਿੰਘ", of: draft.translationSource)
+        draft.gurmukhi = "  "
+        XCTAssertTrue(draft.isDraftOpen)
+        XCTAssertTrue(draft.showsTranslationDraft)
+        XCTAssertFalse(draft.hasTranslationDraft)
+        XCTAssertEqual(draft.layers, BentiLayers(english: "Bless the sangat."))
+
+        draft.typed = "Bless the whole sangat."
+        XCTAssertFalse(draft.isStale)
+    }
+
+    /// Typing back into the emptied editor carries on as an ordinary draft.
+    func testRetypingIntoAnEmptiedDraftRestoresItsLayers() {
+        var draft = BentiDraft(typed: "Bless the sangat.")
+        draft.applyTranslation("ਸਿੰਘ", of: draft.translationSource)
+        draft.gurmukhi = ""
+        draft.gurmukhi = "ਅਰਦਾਸ"
+        XCTAssertTrue(draft.showsTranslationDraft)
+        XCTAssertEqual(
+            draft.layers,
+            BentiLayers(gurmukhi: "ਅਰਦਾਸ", transliteration: "Ardaas", english: "Bless the sangat."))
+    }
+
+    func testRemoveGurmukhiClosesTheSection() {
+        var draft = BentiDraft(typed: "Bless the sangat.")
+        draft.applyTranslation("ਸਿੰਘ", of: draft.translationSource)
+        draft.gurmukhi = ""
+        draft.clearTranslation()
+        XCTAssertFalse(draft.isDraftOpen)
+        XCTAssertFalse(draft.showsTranslationDraft)
+    }
+
+    func testTranslatingAgainRefillsAnEmptiedDraft() {
+        var draft = BentiDraft(typed: "Bless the sangat.")
+        draft.applyTranslation("ਸਿੰਘ", of: draft.translationSource)
+        draft.gurmukhi = ""
+        draft.typed = "Bless us all."
+        draft.applyTranslation("ਅਰਦਾਸ", of: draft.translationSource)
+        XCTAssertTrue(draft.showsTranslationDraft)
+        XCTAssertEqual(draft.gurmukhi, "ਅਰਦਾਸ")
+        XCTAssertEqual(draft.translatedFrom, "Bless us all.")
+        XCTAssertFalse(draft.isStale)
+    }
+
+    /// No translation, no section — the editor only appears once one lands.
+    func testUntranslatedDraftHasNoSection() {
+        XCTAssertFalse(BentiDraft().showsTranslationDraft)
+        XCTAssertFalse(BentiDraft(typed: "Bless the sangat.").showsTranslationDraft)
+    }
+
+    /// Rewriting the benti in Gurmukhi hides even an emptied draft; English
+    /// brings it back.
+    func testGurmukhiInputHidesAnOpenDraftUntilTheEnglishReturns() {
+        var draft = BentiDraft(typed: "Bless the sangat.")
+        draft.applyTranslation("ਸਿੰਘ", of: draft.translationSource)
+        draft.gurmukhi = ""
+        draft.typed = "ਸਿੰਘ"
+        XCTAssertFalse(draft.showsTranslationDraft)
+        XCTAssertTrue(draft.isDraftOpen)
+        draft.typed = "Bless the sangat."
+        XCTAssertTrue(draft.showsTranslationDraft)
+    }
+
+    /// A draft built with Gurmukhi already in it opens its section; blank
+    /// Gurmukhi does not.
+    func testTheSectionDefaultsFromTheGurmukhi() {
+        XCTAssertTrue(BentiDraft(typed: "Bless us.", gurmukhi: "ਅਰਦਾਸ").showsTranslationDraft)
+        XCTAssertFalse(BentiDraft(typed: "Bless us.", gurmukhi: " \n").isDraftOpen)
+    }
+
     // MARK: - Nothing to translate
 
     /// Digits and punctuation are `.undetermined`: not translatable, and there
