@@ -35,6 +35,7 @@ import io.sarbloc.ardaas.app.map
 import io.sarbloc.ardaas.occasion.OccasionDraft
 import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.translation.BentiTranslationService
+import io.sarbloc.ardaas.ui.compose.ComposeMode
 import io.sarbloc.ardaas.ui.compose.ComposeScreen
 import io.sarbloc.ardaas.ui.diagnostics.BuildDiagnostics
 import io.sarbloc.ardaas.ui.diagnostics.DiagnosticsHook
@@ -126,49 +127,33 @@ fun AppNavHost(
                         onBack = goBack,
                     )
                     Destination.Licences -> LicencesScreen(onBack = goBack)
-                    Destination.Compose -> {
-                        // Hoisted here, not inside the screen, so the occasion
-                        // picker (#90) can write its choice back.
-                        var occasion by rememberSaveable(stateSaver = OccasionDraftSaver) { mutableStateOf(OccasionDraft()) }
-                        var editingOccasion by rememberSaveable { mutableStateOf(false) }
-                        val occasionCatalog = bundledContent.occasionCatalog.valueOrNull
-                        // Retained, not remembered: a configuration change
-                        // keeps a download or translation running, and the
-                        // session ends — cancelling both — only when this
-                        // destination leaves composition for good.
-                        val translation = rememberComposeTranslationSession(translationService)
-                        ComposeScreen(
-                            library = bundledContent.library.valueOrNull,
-                            occasionCatalog = occasionCatalog,
-                            occasion = occasion,
-                            onOccasionChange = { occasion = it },
-                            onEditOccasion = occasionCatalog?.let { { editingOccasion = true } },
-                            translation = translation,
-                            onSave = onInsert,
-                            // As iOS dismisses the sheet: back to Home, where
-                            // the new record leads the list. Only while this
-                            // screen is still on top.
-                            onClose = { if (backStack.current == destination) goBack() },
-                        )
-                        if (editingOccasion && occasionCatalog != null) {
-                            // No ardaasContent: Compose shows its own live
-                            // "Where it goes" preview, for the variant chosen
-                            // on that screen, right under the row.
-                            OccasionPickerDialog(
-                                catalog = occasionCatalog,
-                                choice = occasion.choice,
-                                onDone = { picked ->
-                                    editingOccasion = false
-                                    occasion = OccasionDraft.from(picked, occasionCatalog)
-                                },
-                                onCancel = { editingOccasion = false },
-                            )
-                        }
-                    }
+                    Destination.Compose -> ComposeDestination(
+                        mode = ComposeMode.Create,
+                        bundledContent = bundledContent,
+                        translationService = translationService,
+                        onSave = onInsert,
+                        // As iOS dismisses the sheet: back to Home, where
+                        // the new record leads the list. Only while this
+                        // screen is still on top.
+                        onClose = { if (backStack.current == destination) goBack() },
+                    )
+                    is Destination.Edit -> EditDestination(
+                        savedArdaas = savedArdaas.map { all -> all.firstOrNull { it.id == destination.savedArdaasId } },
+                        bundledContent = bundledContent,
+                        translationService = translationService,
+                        onUpdate = onUpdate,
+                        // Back to the Reader, which observes the live row and
+                        // so shows the saved edit. Only while this screen is
+                        // still on top.
+                        onClose = { if (backStack.current == destination) goBack() },
+                    )
                     is Destination.Reader -> ReaderDestination(
                         savedArdaas = savedArdaas.map { all -> all.firstOrNull { it.id == destination.savedArdaasId } },
                         bundledContent = bundledContent,
                         onUpdate = onUpdate,
+                        onEdit = {
+                            if (backStack.current == destination) backStack.push(Destination.Edit(destination.savedArdaasId))
+                        },
                         // Leave only if this Reader is still the top screen —
                         // never pop whatever replaced it mid-transition.
                         onRecordGone = { if (backStack.current == destination) goBack() },
@@ -177,6 +162,92 @@ fun AppNavHost(
                 }
             }
         }
+    }
+}
+
+/**
+ * The Compose route, creating or editing per [mode]. The occasion is hoisted
+ * here, not inside the screen, so the occasion picker (#90) can write its
+ * choice back; it is seeded from [mode] once, like the screen's own fields.
+ */
+@Composable
+private fun ComposeDestination(
+    mode: ComposeMode,
+    bundledContent: BundledContent,
+    translationService: () -> BentiTranslationService,
+    onSave: suspend (SavedArdaas) -> Boolean,
+    onClose: () -> Unit,
+) {
+    var occasion by rememberSaveable(stateSaver = OccasionDraftSaver) { mutableStateOf(mode.initialDraft.occasion) }
+    var editingOccasion by rememberSaveable { mutableStateOf(false) }
+    val occasionCatalog = bundledContent.occasionCatalog.valueOrNull
+    // Retained, not remembered: a configuration change keeps a download or
+    // translation running, and the session ends — cancelling both — only
+    // when this destination leaves composition for good.
+    val translation = rememberComposeTranslationSession(translationService)
+    ComposeScreen(
+        library = bundledContent.library.valueOrNull,
+        occasionCatalog = occasionCatalog,
+        occasion = occasion,
+        onOccasionChange = { occasion = it },
+        onEditOccasion = occasionCatalog?.let { { editingOccasion = true } },
+        translation = translation,
+        onSave = onSave,
+        onClose = onClose,
+        mode = mode,
+    )
+    if (editingOccasion && occasionCatalog != null) {
+        // No ardaasContent: Compose shows its own live "Where it goes"
+        // preview, for the variant chosen on that screen, right under the
+        // row.
+        OccasionPickerDialog(
+            catalog = occasionCatalog,
+            choice = occasion.choice,
+            onDone = { picked ->
+                editingOccasion = false
+                occasion = OccasionDraft.from(picked, occasionCatalog)
+            },
+            onCancel = { editingOccasion = false },
+        )
+    }
+}
+
+/**
+ * The Edit route (#154): Compose on the live record [savedArdaas], saving
+ * through [onUpdate]. Waits for the record and both bundles, as the Reader
+ * does — the form is seeded once, so it must not be seeded from a half-loaded
+ * state (the occasion resolves against the catalog). A record that no longer
+ * exists, or a list that failed to load, leaves at once.
+ */
+@Composable
+private fun EditDestination(
+    savedArdaas: LoadState<SavedArdaas?>,
+    bundledContent: BundledContent,
+    translationService: () -> BentiTranslationService,
+    onUpdate: suspend (SavedArdaas) -> Boolean,
+    onClose: () -> Unit,
+) {
+    when (savedArdaas) {
+        LoadState.Loading -> Unit
+        is LoadState.Loaded -> {
+            val record = savedArdaas.value
+            if (record == null) {
+                LaunchedEffect(Unit) { onClose() }
+                return
+            }
+            val catalog = bundledContent.occasionCatalog
+            if (bundledContent.library is LoadState.Loading || catalog is LoadState.Loading) return
+            val occasionCatalog = catalog.valueOrNull
+            val mode = remember(record, occasionCatalog) { ComposeMode.Edit(record, occasionCatalog) }
+            ComposeDestination(
+                mode = mode,
+                bundledContent = bundledContent,
+                translationService = translationService,
+                onSave = onUpdate,
+                onClose = onClose,
+            )
+        }
+        is LoadState.Failed -> LaunchedEffect(Unit) { onClose() }
     }
 }
 
@@ -194,6 +265,7 @@ private fun ReaderDestination(
     savedArdaas: LoadState<SavedArdaas?>,
     bundledContent: BundledContent,
     onUpdate: suspend (SavedArdaas) -> Boolean,
+    onEdit: () -> Unit,
     onRecordGone: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -225,6 +297,7 @@ private fun ReaderDestination(
                             scope.launch { onUpdate(record.copy(variantId = variantId)) }
                         },
                         onEditOccasion = { editingOccasion = true },
+                        onEdit = onEdit,
                     )
                     if (editingOccasion && occasionCatalog != null) {
                         OccasionPickerDialog(

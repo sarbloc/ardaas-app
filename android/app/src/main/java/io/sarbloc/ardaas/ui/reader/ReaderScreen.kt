@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -106,6 +107,8 @@ import io.sarbloc.ardaas.ui.ArdaasTheme
  *   picker all agree.
  * @param onEditOccasion opens the occasion picker (#90). Null hides the
  *   Occasion button and leaves the stranded-occasion note informational.
+ * @param onEdit opens Compose on this record (#154). Null hides the Edit
+ *   button.
  */
 @Composable
 fun ReaderScreen(
@@ -116,6 +119,7 @@ fun ReaderScreen(
     onVariantChange: (variantId: String) -> Unit,
     modifier: Modifier = Modifier,
     onEditOccasion: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val preferences = remember { ReaderPreferencesState(ReaderPreferenceStore.from(context.applicationContext)) }
@@ -134,6 +138,7 @@ fun ReaderScreen(
         onBack = onBack,
         onVariantChange = onVariantChange,
         onEditOccasion = onEditOccasion,
+        onEdit = onEdit,
         modifier = modifier,
     )
 }
@@ -158,6 +163,7 @@ private fun ReaderContent(
     onBack: () -> Unit,
     onVariantChange: (String) -> Unit,
     onEditOccasion: (() -> Unit)?,
+    onEdit: (() -> Unit)?,
     modifier: Modifier,
 ) {
     val variant = library.resolvedVariant(savedArdaas.variantId)
@@ -197,6 +203,11 @@ private fun ReaderContent(
                         }
                     },
                     actions = {
+                        if (onEdit != null) {
+                            IconButton(onClick = onEdit) {
+                                Icon(painterResource(R.drawable.ic_edit), contentDescription = stringResource(R.string.reader_edit))
+                            }
+                        }
                         // Its own control, ahead of the cog: what the prayer
                         // is for is content, not a display preference.
                         if (editOccasion != null) {

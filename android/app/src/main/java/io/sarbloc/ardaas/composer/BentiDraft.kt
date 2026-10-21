@@ -153,4 +153,46 @@ data class BentiDraft(
 
     /** Drops the translation draft, returning to English-only, and closes its section. */
     fun clearTranslation(): BentiDraft = copy(gurmukhi = "", translatedFrom = null, isDraftOpen = false)
+
+    companion object {
+        /**
+         * The draft that saves back to [saved] — how Compose reopens a saved
+         * benti for editing (#154). The exact inverse of [layers] for every
+         * shape [layers] produces:
+         *
+         * * **English + Gurmukhi** (translated): the English is [typed], the
+         *   Gurmukhi is the open translation draft, and [translatedFrom] is
+         *   the English, so the pair counts as one translation — not stale on
+         *   open, stale once the English changes.
+         * * **English only** (never translated, or Remove Gurmukhi): the
+         *   English is [typed]; no draft, section closed.
+         * * **Gurmukhi only, in Gurmukhi script** (typed with the Punjabi
+         *   keyboard, or a translation whose English was then deleted): the
+         *   Gurmukhi is [typed] — the benti editor, where it was typed.
+         * * **Gurmukhi only, not in Gurmukhi script** (a translation draft
+         *   edited into something the detector reads as another script, with
+         *   the English deleted): left in the open translation draft under an
+         *   empty benti editor, since [typed] would read it as English.
+         *
+         * The transliteration is never read: it is derived from the Gurmukhi,
+         * so it comes back regenerated — identical unless the transliterator
+         * has changed since the record was saved.
+         *
+         * English in Gurmukhi script is the one shape this cannot reproduce,
+         * and no version of Compose ever saved it: [layers] only writes the
+         * English layer when the typed text is not Gurmukhi.
+         */
+        fun from(saved: BentiLayers): BentiDraft {
+            val english = saved.english
+            val gurmukhi = saved.gurmukhi
+            return when {
+                english.isNotEmpty() && gurmukhi.isNotEmpty() ->
+                    BentiDraft(typed = english, gurmukhi = gurmukhi, translatedFrom = english, isDraftOpen = true)
+                english.isNotEmpty() -> BentiDraft(typed = english)
+                gurmukhi.isEmpty() -> BentiDraft()
+                BentiScriptDetector.detect(gurmukhi) == BentiScript.GURMUKHI -> BentiDraft(typed = gurmukhi)
+                else -> BentiDraft(gurmukhi = gurmukhi, isDraftOpen = true)
+            }
+        }
+    }
 }

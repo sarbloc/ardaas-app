@@ -50,8 +50,19 @@ sealed interface Destination {
         override val key = "$READER_PREFIX$savedArdaasId"
     }
 
+    /**
+     * Compose reopened on one saved Ardaas (#154), pushed from its Reader.
+     * Like [Reader], it carries only the id: the screen seeds its form from
+     * the live row, and the form itself survives a restore through its own
+     * saved state.
+     */
+    data class Edit(val savedArdaasId: Long) : Destination {
+        override val key = "$EDIT_PREFIX$savedArdaasId"
+    }
+
     companion object {
         private const val READER_PREFIX = "reader:"
+        private const val EDIT_PREFIX = "edit:"
 
         /** Inverse of [key]; null for anything unrecognised. */
         fun fromKey(key: String): Destination? = when (key) {
@@ -60,11 +71,11 @@ sealed interface Destination {
             Licences.key -> Licences
             Compose.key -> Compose
             Diagnostics.key -> Diagnostics
-            else -> key.removePrefix(READER_PREFIX)
-                .takeIf { key.startsWith(READER_PREFIX) }
-                ?.toLongOrNull()
-                ?.let(::Reader)
+            else -> idAfter(READER_PREFIX, key)?.let(::Reader) ?: idAfter(EDIT_PREFIX, key)?.let(::Edit)
         }
+
+        private fun idAfter(prefix: String, key: String): Long? =
+            key.removePrefix(prefix).takeIf { key.startsWith(prefix) }?.toLongOrNull()
     }
 }
 

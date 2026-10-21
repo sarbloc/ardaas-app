@@ -46,9 +46,14 @@
 
     <!-- Reader -->
     <string name="reader_text_unavailable">Ardaas Text Unavailable</string>
+    <string name="reader_edit">Edit</string>
 
     <!-- Compose (port of ComposeView.swift) -->
     <string name="compose_title">New Ardaas</string>
+    <string name="compose_edit_title">Edit Ardaas</string>
+    <string name="compose_discard_title">Discard changes?</string>
+    <string name="compose_discard">Discard</string>
+    <string name="compose_keep_editing">Keep editing</string>
     <string name="compose_cancel">Cancel</string>
     <string name="compose_save">Save</string>
     <string name="compose_save_failed">Couldn\'t save this Ardaas. Try again.</string>
