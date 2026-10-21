@@ -12,6 +12,10 @@ import java.io.InputStream
  * files live once, in the iOS app's `Ardaas/Licences/`, and Android packages
  * them as assets straight from there (see `sharedLicencesDir` in
  * build.gradle.kts). Port of `OpenSourceLicence.swift`; keep the two lists in step.
+ *
+ * These are the components whose notices are curated by hand; the Android
+ * libraries the build packages are listed from generated data instead
+ * ([LibraryNotice], #139).
  */
 data class OpenSourceLicence(
     /** Asset file name of the verbatim licence text. */
@@ -20,6 +24,11 @@ data class OpenSourceLicence(
     val component: String,
     /** Who publishes it and exactly which version is used. */
     val source: String,
+    /**
+     * Asset file name of the notices for third-party code the component
+     * itself includes (#139), verbatim from the project; null if none.
+     */
+    val thirdPartyNoticesAssetName: String? = null,
 ) {
     /**
      * The licence text exactly as bundled. Throws if the asset is missing —
@@ -27,10 +36,7 @@ data class OpenSourceLicence(
      *
      * @param open opens a bundled file by name, or returns null when absent.
      */
-    fun loadText(open: (fileName: String) -> InputStream?): String {
-        val stream = open(assetName) ?: throw FileNotFoundException("$assetName is not bundled")
-        return stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-    }
+    fun loadText(open: (fileName: String) -> InputStream?): String = loadAsset(assetName, open)
 
     companion object {
         val all: List<OpenSourceLicence> = listOf(
@@ -48,8 +54,38 @@ data class OpenSourceLicence(
                 assetName = "licence-onnxruntime.txt",
                 component = "ONNX Runtime 1.24.2",
                 source = "Microsoft — github.com/microsoft/onnxruntime",
+                // ThirdPartyNotices.txt at tag v1.24.2: protobuf, abseil,
+                // Eigen and the rest statically linked into its binaries.
+                thirdPartyNoticesAssetName = "licence-onnxruntime-third-party-notices.txt",
             ),
         )
+
+        /** The bundled file [name] as UTF-8 text; throws if it is missing. */
+        fun loadAsset(name: String, open: (fileName: String) -> InputStream?): String {
+            val stream = open(name) ?: throw FileNotFoundException("$name is not bundled")
+            return stream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        }
+
+        /**
+         * A third-party notices file split into its components' notices.
+         * The files separate components with a line of underscores; those
+         * lines are dropped, and every other line is kept in order.
+         */
+        fun noticeSections(raw: String): List<String> {
+            val sections = mutableListOf<String>()
+            val current = StringBuilder()
+            fun endSection() {
+                current.toString().trim('\n', '\r').takeIf { it.isNotBlank() }?.let(sections::add)
+                current.clear()
+            }
+            for (line in raw.lines()) {
+                if (SEPARATOR.matches(line)) endSection() else current.append(line).append('\n')
+            }
+            endSection()
+            return sections
+        }
+
+        private val SEPARATOR = Regex("""\s*_{5,}\s*""")
 
         /**
          * [raw] as readable paragraphs for a phone-width screen. The bundled

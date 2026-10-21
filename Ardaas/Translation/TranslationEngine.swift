@@ -35,6 +35,10 @@ actor TranslationEngine {
         vocabularyDirectory: URL,
         collectMetrics: Bool = false
     ) throws -> BentiTranslation {
+        // A caller cancelled while queued behind another translation must not
+        // start one (#52): the whole point of cancelling is to free the engine.
+        try Task.checkCancellation()
+
         // Pre-flight before anything is allocated. The optimized pipeline peaks
         // at 582 MB; starting it with less headroom than that is asking for a
         // jetsam kill, which the user experiences as the app vanishing.
@@ -44,7 +48,14 @@ actor TranslationEngine {
             catalog: catalog,
             graphDirectory: graphDirectory,
             vocabularyDirectory: vocabularyDirectory)
-        return try translator.translate(english, collectMetrics: collectMetrics)
+        // The translator checks cancellation between its stages and decode
+        // steps and throws `CancellationError`, which reaches the caller as is
+        // (`TranslationError.wrap` maps it to `.cancelled`). It holds no
+        // per-translation state, so the resident translator stays usable.
+        let translation = try translator.translate(english, collectMetrics: collectMetrics)
+        // Never hand a cancelled caller a result, whichever translator ran.
+        try Task.checkCancellation()
+        return translation
     }
 
     /// Drops the resident translator. Called on

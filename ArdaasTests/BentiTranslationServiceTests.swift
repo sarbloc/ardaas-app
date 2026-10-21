@@ -201,6 +201,38 @@ final class BentiTranslationServiceTests: XCTestCase {
         XCTAssertTrue(translator.inputs.isEmpty)
     }
 
+    /// Dismissing Compose cancels its translation (#52). The service must
+    /// stay ready, the cancellation must read as `.cancelled` rather than a
+    /// failure, and the very next translation must work.
+    func testACancelledTranslationLeavesTheServiceReady() async throws {
+        let translator = UninterruptibleTranslator()
+        let service = makeService(
+            engine: TranslationEngine(
+                availableMemory: { nil }, makeTranslator: { _, _, _ in translator }))
+        service.download()
+        try await waitForState(service) { $0 == .ready }
+
+        let task = Task { try await service.translate("Please bless my family.") }
+        var spins = 0
+        while !translator.hasStarted && spins < 400 {
+            try await Task.sleep(for: .milliseconds(5))
+            spins += 1
+        }
+        XCTAssertTrue(translator.hasStarted, "the translation never started")
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled translation must not return a result")
+        } catch {
+            XCTAssertEqual(TranslationError.wrap(error), .cancelled, "got \(error)")
+        }
+        XCTAssertEqual(service.state, .ready)
+
+        let output = try await service.translate("Please bless my family.")
+        XCTAssertEqual(output, "ਸਤਿਗੁਰੂ ਜੀ")
+    }
+
     func testTranslateWithoutTheEngineThrowsEngineUnavailable() async throws {
         let service = makeService(
             engine: TranslationEngine(
@@ -268,6 +300,75 @@ final class TranslationEngineTests: XCTestCase {
         XCTAssertEqual(
             probe.callCount, 0,
             "nothing may be allocated once the pre-flight has refused")
+    }
+
+    /// A caller cancelled before its turn (say, queued behind another
+    /// translation) must not start one at all (#52).
+    func testACancelledCallerNeverStartsATranslation() async {
+        let probe = FactoryProbe()
+        let engine = TranslationEngine(
+            availableMemory: { nil },
+            makeTranslator: { _, _, _ in
+                probe.record()
+                return StubTranslator()
+            })
+        let directory = self.directory
+
+        let task = Task {
+            // Cancelled before it reaches the engine, deterministically.
+            withUnsafeCurrentTask { current in
+                if let current { current.cancel() }
+            }
+            return try await engine.translate(
+                "one", catalog: .production, graphDirectory: directory,
+                vocabularyDirectory: directory)
+        }
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled caller must not get a translation")
+        } catch {
+            XCTAssertTrue(error is CancellationError, "expected CancellationError, got \(error)")
+            XCTAssertEqual(TranslationError.wrap(error), .cancelled)
+        }
+        XCTAssertEqual(probe.callCount, 0, "nothing may be loaded for a cancelled caller")
+    }
+
+    /// Cancelled while the translator is mid-run: the run that cannot be
+    /// interrupted finishes, but its result is dropped, and the engine is free
+    /// and fully usable for the next caller.
+    func testCancellingMidTranslationDropsTheResultAndFreesTheEngine() async throws {
+        let translator = UninterruptibleTranslator()
+        let engine = TranslationEngine(
+            availableMemory: { nil }, makeTranslator: { _, _, _ in translator })
+        let directory = self.directory
+
+        let task = Task {
+            try await engine.translate(
+                "one", catalog: .production, graphDirectory: directory,
+                vocabularyDirectory: directory)
+        }
+        var spins = 0
+        while !translator.hasStarted && spins < 400 {
+            try await Task.sleep(for: .milliseconds(5))
+            spins += 1
+        }
+        XCTAssertTrue(translator.hasStarted, "the translation never started")
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled translation must not return a result")
+        } catch {
+            XCTAssertEqual(TranslationError.wrap(error), .cancelled, "got \(error)")
+        }
+
+        let next = try await engine.translate(
+            "two", catalog: .production, graphDirectory: directory,
+            vocabularyDirectory: directory)
+        XCTAssertEqual(next.gurmukhi, "ਸਤਿਗੁਰੂ ਜੀ")
+        XCTAssertEqual(translator.callCount, 2)
+        let loaded = await engine.isLoaded
+        XCTAssertTrue(loaded, "cancelling must not cost the resident translator")
     }
 
     func testTheTranslatorIsBuiltOnceAndReleasedOnDemand() async throws {
