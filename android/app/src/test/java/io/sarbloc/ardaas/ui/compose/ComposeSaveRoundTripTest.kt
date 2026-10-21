@@ -11,6 +11,7 @@ import io.sarbloc.ardaas.persistence.SavedArdaasDao
 import io.sarbloc.ardaas.persistence.bentiLayers
 import io.sarbloc.ardaas.persistence.occasionChoice
 import java.time.Instant
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -81,6 +82,40 @@ class ComposeSaveRoundTripTest {
         )
         assertEquals(OccasionChoice.Catalog("japji-sahib"), stored.occasionChoice)
         assertEquals(OccasionDraft(selection = OccasionSelection.Catalog("japji-sahib")), OccasionDraft.from(stored.occasionChoice))
+    }
+
+    /**
+     * #154: Save in edit mode rewrites the same row — same id, same
+     * `createdAt` — and adds none.
+     */
+    @Test
+    fun anEditUpdatesTheSameRow() = runBlocking {
+        val (_, stored) = saveAndReload(
+            ComposeDraft(label = "Akhand Paath", benti = BentiDraft(typed = "Bless the sangat.", gurmukhi = "ਸਿੰਘ ਅਰਦਾਸ")),
+        )
+        val other = dao.insert(requireNotNull(ComposeDraft(label = "Other", benti = BentiDraft(typed = "Hi.")).toSavedArdaas()))
+
+        val mode = ComposeMode.Edit(stored, catalog = null)
+        val edited = mode.initialDraft.copy(
+            label = "Morning",
+            benti = mode.initialDraft.benti.copy(typed = "Bless us all."),
+            occasion = OccasionDraft(selection = OccasionSelection.Catalog("japji-sahib")),
+        )
+        val update = requireNotNull(mode.record(edited))
+        assertEquals(1, dao.update(update))
+
+        val all = dao.observeAll().first()
+        assertEquals(2, all.size)
+        val reloaded = requireNotNull(dao.getById(stored.id))
+        assertEquals(update, reloaded)
+        assertEquals(stored.createdAt, reloaded.createdAt)
+        assertEquals("Morning", reloaded.label)
+        assertEquals(
+            BentiLayers(gurmukhi = "ਸਿੰਘ ਅਰਦਾਸ", transliteration = "Singh Ardaas", english = "Bless us all."),
+            reloaded.bentiLayers,
+        )
+        assertEquals(OccasionChoice.Catalog("japji-sahib"), reloaded.occasionChoice)
+        assertEquals("Hi.", requireNotNull(dao.getById(other)).bentiText)
     }
 
     @Test

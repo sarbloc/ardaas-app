@@ -53,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -106,6 +107,8 @@ import io.sarbloc.ardaas.ui.ArdaasTheme
  *   picker all agree.
  * @param onEditOccasion opens the occasion picker (#90). Null hides the
  *   Occasion button and leaves the stranded-occasion note informational.
+ * @param onEdit opens Compose on this record (#154). Null hides the Edit
+ *   button.
  */
 @Composable
 fun ReaderScreen(
@@ -116,6 +119,7 @@ fun ReaderScreen(
     onVariantChange: (variantId: String) -> Unit,
     modifier: Modifier = Modifier,
     onEditOccasion: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val preferences = remember { ReaderPreferencesState(ReaderPreferenceStore.from(context.applicationContext)) }
@@ -134,6 +138,7 @@ fun ReaderScreen(
         onBack = onBack,
         onVariantChange = onVariantChange,
         onEditOccasion = onEditOccasion,
+        onEdit = onEdit,
         modifier = modifier,
     )
 }
@@ -158,6 +163,7 @@ private fun ReaderContent(
     onBack: () -> Unit,
     onVariantChange: (String) -> Unit,
     onEditOccasion: (() -> Unit)?,
+    onEdit: (() -> Unit)?,
     modifier: Modifier,
 ) {
     val variant = library.resolvedVariant(savedArdaas.variantId)
@@ -213,6 +219,7 @@ private fun ReaderContent(
                             onVariantChange = onVariantChange,
                             onGurmukhiChange = { preferences.setLayer(LayerKind.GURMUKHI, it) },
                             onAdjustFontScale = preferences::adjustFontScale,
+                            onEdit = onEdit,
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -422,7 +429,10 @@ private fun LayerPill(
 
 // region Display menu
 
-/** The cog: which Ardaas, the Gurmukhi layer, and text size. */
+/**
+ * The cog: Edit (#154, kept out of the crowded top bar), which Ardaas, the
+ * Gurmukhi layer, and text size. A null [onEdit] hides the Edit item.
+ */
 @Composable
 private fun DisplayMenu(
     library: ArdaasLibrary,
@@ -433,6 +443,7 @@ private fun DisplayMenu(
     onVariantChange: (String) -> Unit,
     onGurmukhiChange: (Boolean) -> Unit,
     onAdjustFontScale: (Double) -> Unit,
+    onEdit: (() -> Unit)?,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Box {
@@ -440,6 +451,17 @@ private fun DisplayMenu(
             Icon(painterResource(R.drawable.ic_settings), contentDescription = "Display Options")
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (onEdit != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.reader_edit)) },
+                    onClick = {
+                        expanded = false
+                        onEdit()
+                    },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                )
+                HorizontalDivider()
+            }
             if (library.variants.size > 1) {
                 MenuSectionHeader("Ardaas")
                 for (variant in library.variants) {

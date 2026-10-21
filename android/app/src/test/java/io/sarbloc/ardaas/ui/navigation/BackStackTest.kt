@@ -71,7 +71,7 @@ class BackStackTest {
 
     @Test
     fun everyDestinationRoundTripsThroughItsKey() {
-        val all = listOf(Destination.Home, Destination.Sources, Destination.Licences, Destination.Compose, Destination.Diagnostics, Destination.Reader(42))
+        val all = listOf(Destination.Home, Destination.Sources, Destination.Licences, Destination.Compose, Destination.Diagnostics, Destination.Reader(42), Destination.Edit(42))
         for (destination in all) {
             assertEquals(destination, Destination.fromKey(destination.key))
         }
@@ -79,7 +79,7 @@ class BackStackTest {
 
     @Test
     fun unrecognisedKeysDecodeToNothing() {
-        for (key in listOf("", "settings", "reader:", "reader:abc", "xreader:1")) {
+        for (key in listOf("", "settings", "reader:", "reader:abc", "xreader:1", "edit:", "edit:abc", "xedit:1")) {
             assertNull(key, Destination.fromKey(key))
         }
     }
@@ -88,12 +88,12 @@ class BackStackTest {
     fun saverRestoresTheStackAndDropsWhatItCannotRead() {
         val stack = BackStack()
         stack.push(Destination.Reader(9))
-        stack.push(Destination.Sources)
+        stack.push(Destination.Edit(9))
 
         val saved = with(BackStack.Saver) { scope.save(stack) }!!
-        assertEquals(listOf("home", "reader:9", "sources"), saved)
+        assertEquals(listOf("home", "reader:9", "edit:9"), saved)
 
-        val restored = BackStack.Saver.restore(arrayListOf("home", "gone", "reader:9", "sources"))!!
+        val restored = BackStack.Saver.restore(arrayListOf("home", "gone", "reader:9", "edit:9"))!!
         assertEquals(stack.entries, restored.entries)
     }
 

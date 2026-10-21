@@ -81,8 +81,8 @@ import kotlinx.coroutines.launch
 /**
  * Compose: enter a label and a personal benti, pick the variant and the
  * occasion, optionally translate the benti to Gurmukhi on the phone, and
- * save it as a new [SavedArdaas]. Create-only, as on iOS — editing an
- * existing record is the Reader's job.
+ * save it — as a new [SavedArdaas], or, opened from the Reader's Edit action
+ * (#154), over the saved record it was filled from. See [ComposeMode].
  *
  * Sections in iOS order: Label, Ardaas (variant), Occasion, Benti; then
  * Transliteration when the benti is typed in Gurmukhi, or the translate
@@ -107,10 +107,17 @@ import kotlinx.coroutines.launch
  *   (see [rememberComposeTranslationSession]) so a configuration change does
  *   not cancel a download or a translation. Null hides translation entirely
  *   (previews).
- * @param onSave inserts the record. False (after the host has logged why)
- *   keeps the screen open with the draft intact.
- * @param onClose leaves the screen: after a successful save, or Cancel. No
- *   confirmation for unsaved input, exactly as iOS's Cancel.
+ * @param mode a new record, or the saved one being edited. In edit mode the
+ *   form opens on the record — seeded once, so a rotation or process death
+ *   keeps the user's edits rather than refilling it — the title reads "Edit
+ *   Ardaas", and Save hands [onSave] the same row rewritten.
+ * @param onSave writes the record [mode] built: an insert when creating, an
+ *   update when editing. False (after the host has logged why) keeps the
+ *   screen open with the draft intact.
+ * @param onClose leaves the screen: after a successful save, or Cancel. When
+ *   creating, no confirmation for unsaved input, exactly as iOS's Cancel.
+ *   When editing, Cancel and system Back ask "Discard changes?" first if
+ *   anything differs from the saved record, and leave at once otherwise.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,18 +131,29 @@ fun ComposeScreen(
     onSave: suspend (record: SavedArdaas) -> Boolean,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    mode: ComposeMode = ComposeMode.Create,
 ) {
-    var label by rememberSaveable { mutableStateOf("") }
+    // Seeded from the mode once, keyed on the record being edited: a
+    // recomposition — or the live record re-emitting after Save — never
+    // refills the form over the user's edits, and restored state wins over
+    // the seed after a rotation or process death.
+    val seedKey = (mode as? ComposeMode.Edit)?.original?.id
+    var label by rememberSaveable(seedKey) { mutableStateOf(mode.initialDraft.label) }
     // One saveable value, translatedFrom and isDraftOpen included, so
     // staleness and an emptied-but-open Gurmukhi editor survive a
     // configuration change and process death along with the text.
-    var benti by rememberSaveable(stateSaver = BentiDraftSaver) { mutableStateOf(BentiDraft()) }
-    var variantId by rememberSaveable { mutableStateOf(ArdaasLibrary.DEFAULT_VARIANT_ID) }
+    var benti by rememberSaveable(seedKey, stateSaver = BentiDraftSaver) { mutableStateOf(mode.initialDraft.benti) }
+    var variantId by rememberSaveable(seedKey) { mutableStateOf(mode.initialDraft.variantId) }
     var isSaving by remember { mutableStateOf(false) }
     var showConsent by rememberSaveable { mutableStateOf(false) }
     var showStaleAlert by rememberSaveable { mutableStateOf(false) }
+    var showDiscardAlert by rememberSaveable { mutableStateOf(false) }
 
     val draft = ComposeDraft(label = label, benti = benti, variantId = variantId, occasion = occasion)
+    val hasUnsavedChanges = mode.hasUnsavedChanges(draft)
+    // Cancel and system Back: straight out, unless editing has changed
+    // something — then the user decides.
+    val onCancel: () -> Unit = { if (hasUnsavedChanges) showDiscardAlert = true else onClose() }
     val content = library?.resolvedVariant(variantId)?.content
     val status = translation?.let { session ->
         val model by session.modelState.collectAsState()
@@ -151,7 +169,7 @@ fun ComposeScreen(
         // Everything is re-read at tap time — `isSaving` and the session are
         // snapshot state — so a second tap, or a translation that started a
         // frame ago, is still refused.
-        val record = toSave.toSavedArdaas()
+        val record = mode.record(toSave)
         val canSave = translation?.currentStatus()?.canSave(toSave) ?: toSave.canSave
         if (!isSaving && record != null && canSave) {
             isSaving = true
@@ -170,9 +188,13 @@ fun ComposeScreen(
     // from the English next to it, and nothing outside this screen can tell
     // that later — so it is never saved without an explicit answer.
     val onSaveTap: () -> Unit = { if (benti.isStale) showStaleAlert = true else saveDraft(draft) }
+    // Editing with changes: Back asks, as Cancel does. Declared before the
+    // saving handler so that one, composed later, wins while a write runs.
+    BackHandler(enabled = hasUnsavedChanges && !isSaving) { showDiscardAlert = true }
     // The write takes milliseconds; Back simply waits for it.
     BackHandler(enabled = isSaving) {}
 
+    val title = if (mode is ComposeMode.Edit) R.string.compose_edit_title else R.string.compose_title
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -180,9 +202,9 @@ fun ComposeScreen(
         snackbarHost = { SnackbarHost(snackbarHostState, modifier = Modifier.imePadding()) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.compose_title)) },
+                title = { Text(stringResource(title)) },
                 navigationIcon = {
-                    IconButton(onClick = onClose, enabled = !isSaving) {
+                    IconButton(onClick = onCancel, enabled = !isSaving) {
                         Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.compose_cancel))
                     }
                 },
@@ -300,6 +322,38 @@ fun ComposeScreen(
             onKeepEditing = { showStaleAlert = false },
         )
     }
+
+    if (showDiscardAlert) {
+        DiscardChangesAlert(
+            onDiscard = {
+                showDiscardAlert = false
+                onClose()
+            },
+            onKeepEditing = { showDiscardAlert = false },
+        )
+    }
+}
+
+/**
+ * Leaving an edit with changes (#154): Discard in the error colour, Keep
+ * editing beside it. Dismissing it (Back, outside tap) is Keep editing.
+ */
+@Composable
+private fun DiscardChangesAlert(onDiscard: () -> Unit, onKeepEditing: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onKeepEditing,
+        title = { Text(stringResource(R.string.compose_discard_title)) },
+        confirmButton = {
+            TextButton(onClick = onDiscard) {
+                Text(stringResource(R.string.compose_discard), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onKeepEditing) {
+                Text(stringResource(R.string.compose_keep_editing))
+            }
+        },
+    )
 }
 
 /**
