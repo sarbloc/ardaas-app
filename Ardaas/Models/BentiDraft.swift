@@ -146,6 +146,50 @@ struct BentiDraft: Equatable {
     }
 }
 
+extension BentiDraft {
+    /// The draft that reproduces a saved benti — how Compose reopens a record
+    /// for editing (#154). The exact inverse of `layers`: for every benti
+    /// Compose can save, `BentiDraft(saved: draft.layers).layers ==
+    /// draft.layers`.
+    ///
+    /// * **English saved** (with or without Gurmukhi) → the English is what
+    ///   was typed and the Gurmukhi is the translation draft. A saved pair
+    ///   counts as one translation (`translatedFrom` is the saved English), so
+    ///   reopening is not stale; only changing the English makes it so. The
+    ///   draft section is open exactly when there is saved Gurmukhi — so a
+    ///   benti saved after Remove Gurmukhi reopens as plain English.
+    /// * **Gurmukhi only, in Gurmukhi script** → it was typed in Gurmukhi (or
+    ///   the English was deleted after translating, which saves the same), so
+    ///   it goes back in the benti editor and the transliteration regenerates.
+    /// * **Gurmukhi only, in any other script** — the user rewrote the
+    ///   translation draft in Latin letters, then deleted the English. Put in
+    ///   the benti editor it would save as English, so it reopens as an open
+    ///   draft under an empty editor instead, which saves unchanged.
+    ///
+    /// The transliteration is never read back: it is derived from the
+    /// Gurmukhi on every read, so it is regenerated on save like any other
+    /// draft.
+    ///
+    /// One record has no exact inverse: an English layer that is itself
+    /// Gurmukhi script, which only an app from before #44 could write. It
+    /// reopens as typed Gurmukhi and, if saved, moves to the Gurmukhi layer —
+    /// where Compose would have put it.
+    init(saved layers: BentiLayers) {
+        if !layers.english.isEmpty {
+            self.init(
+                typed: layers.english,
+                gurmukhi: layers.gurmukhi,
+                translatedFrom: layers.gurmukhi.isEmpty ? nil : layers.english
+            )
+        } else if BentiScriptDetector.detect(layers.gurmukhi) == .gurmukhi {
+            self.init(typed: layers.gurmukhi)
+        } else {
+            // Also the empty benti: no Gurmukhi leaves the section closed.
+            self.init(gurmukhi: layers.gurmukhi)
+        }
+    }
+}
+
 /// File-scoped so it cannot collide with another module-wide `trimmed`.
 private extension String {
     /// Whitespace-trimmed, matching how `BentiLayers` normalises every layer.

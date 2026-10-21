@@ -38,9 +38,26 @@ import SwiftUI
 /// preview cannot promise something the Reader won't render. Only the
 /// *choice* is saved (`SavedArdaas.occasionChoice`); the words come from the
 /// bundle at render time.
+///
+/// ## Editing (#154)
+///
+/// `ComposeView(editing:)` reopens a saved record: the form is prefilled by
+/// `ComposeForm(fields:)` — the exact inverse of what Save writes — and Save
+/// updates that record in place (`SavedArdaas.apply(_:)`), keeping its
+/// `createdAt`. Everything else, translation included, is the same screen.
+/// Cancel asks before discarding changes, and swipe-to-dismiss is held off
+/// while there are any; composing a new Ardaas behaves exactly as before.
 struct ComposeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+
+    /// The record being edited, or nil when composing a new one.
+    private let editing: SavedArdaas?
+
+    /// The form as it opened for editing — what Cancel compares against to
+    /// decide whether there is anything to discard. Nil when composing.
+    @State private var original: ComposeForm?
+    @State private var isConfirmingDiscard = false
 
     /// Owned by this screen: the download it may start is cancelled when the
     /// screen goes away (partial files are kept and resume), which is why the
@@ -86,8 +103,32 @@ struct ComposeView: View {
     /// the engine is released within one ORT run rather than at the end.
     @State private var translationTask: Task<Void, Never>?
 
+    /// - Parameter editing: a saved record to edit in place; nil (the
+    ///   default) composes a new one.
+    init(editing: SavedArdaas? = nil) {
+        self.editing = editing
+        let form = editing.map { ComposeForm(fields: $0.fields) } ?? ComposeForm()
+        _label = State(initialValue: form.label)
+        _draft = State(initialValue: form.benti)
+        _variantId = State(initialValue: form.variantId)
+        _occasion = State(initialValue: form.occasion)
+        _original = State(initialValue: editing == nil ? nil : form)
+    }
+
     private var trimmedLabel: String {
         label.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// The form as it stands, as the pure value Save writes from.
+    private var form: ComposeForm {
+        ComposeForm(label: label, benti: draft, variantId: variantId, occasion: occasion)
+    }
+
+    /// Editing, and saving now would change the record. Always false when
+    /// composing, which keeps Cancel and swipe-to-dismiss as they were.
+    private var hasUnsavedEdits: Bool {
+        guard let original else { return false }
+        return form.hasChanges(from: original)
     }
 
     /// A translation the user has explicitly asked for is still coming: either
@@ -225,6 +266,17 @@ struct ComposeView: View {
                 }
                 if occasionCatalog == nil {
                     occasionCatalog = try? OccasionCatalog.loadBundled()
+                    // Once, on first load, before anything can be touched: an
+                    // edited record pointing at a retired occasion opens on
+                    // "None", in the form and the baseline alike, so it is
+                    // not a change to discard.
+                    if let occasionCatalog, var opened = original {
+                        opened.dropRetiredOccasion(in: occasionCatalog)
+                        original = opened
+                        var current = form
+                        current.dropRetiredOccasion(in: occasionCatalog)
+                        occasion = current.occasion
+                    }
                 }
                 translation.refresh()
             }
@@ -261,25 +313,42 @@ struct ComposeView: View {
                 isPresented: $isConfirmingStaleSave,
                 titleVisibility: .visible
             ) {
-                Button("Save both anyway") { save(draft.layers) }
+                Button("Save both anyway") { save(draft) }
                 Button("Save the English only", role: .destructive) {
                     // Computed before the state write so the record is built
                     // from a value we hold, not from a just-mutated @State.
                     var cleared = draft
                     cleared.clearTranslation()
                     draft = cleared
-                    save(cleared.layers)
+                    save(cleared)
                 }
                 Button("Keep editing", role: .cancel) {}
             } message: {
                 Text("You edited the English after translating it, so the two layers say different things. Translate again to update the Gurmukhi — or save them as they are.")
             }
-            .navigationTitle("New Ardaas")
+            .confirmationDialog(
+                "Discard changes?",
+                isPresented: $isConfirmingDiscard,
+                titleVisibility: .visible
+            ) {
+                Button("Discard", role: .destructive) { dismiss() }
+                Button("Keep editing", role: .cancel) {}
+            } message: {
+                Text("Your changes to this Ardaas haven't been saved.")
+            }
+            // Editing only: a swipe down would otherwise throw the changes
+            // away without the question Cancel asks.
+            .interactiveDismissDisabled(hasUnsavedEdits)
+            .navigationTitle(editing == nil ? "New Ardaas" : "Edit Ardaas")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
-                        dismiss()
+                        if hasUnsavedEdits {
+                            isConfirmingDiscard = true
+                        } else {
+                            dismiss()
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -291,7 +360,7 @@ struct ComposeView: View {
                         if draft.isStale {
                             isConfirmingStaleSave = true
                         } else {
-                            save(draft.layers)
+                            save(draft)
                         }
                     }
                     .disabled(!canSave)
@@ -515,18 +584,20 @@ struct ComposeView: View {
         }
     }
 
-    private func save(_ layers: BentiLayers) {
-        guard canSave, !layers.isEmpty else { return }
-        modelContext.insert(
-            SavedArdaas(
-                label: trimmedLabel,
-                bentiText: layers.english,
-                variantId: variantId,
-                bentiGurmukhi: layers.gurmukhi,
-                bentiTransliteration: layers.transliteration,
-                occasion: occasion.choice
-            )
-        )
+    /// Saves the form with `benti` as its benti — passed in rather than read
+    /// from `draft`, so the stale dialog's cleared draft is what is written.
+    /// Editing updates the record in place; composing inserts a new one. Both
+    /// write the same `SavedArdaasFields`.
+    private func save(_ benti: BentiDraft) {
+        var submitted = form
+        submitted.benti = benti
+        let fields = submitted.fields
+        guard canSave, !fields.benti.isEmpty else { return }
+        if let editing {
+            editing.apply(fields)
+        } else {
+            modelContext.insert(SavedArdaas.make(from: fields))
+        }
         dismiss()
     }
 

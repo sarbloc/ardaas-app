@@ -27,6 +27,7 @@ struct ReaderView: View {
     @State private var occasionCatalog: OccasionCatalog?
 
     @State private var isEditingOccasion = false
+    @State private var isEditingArdaas = false
 
     private static let fontScaleRange = 0.7...1.6
     private static let fontScaleStep = 0.1
@@ -40,6 +41,9 @@ struct ReaderView: View {
             .navigationTitle(savedArdaas.label)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    editButton
+                }
                 // Its own control, ahead of the gear: what the prayer is for
                 // is content, not a display preference, and burying it in a
                 // menu of layer toggles and text size would say otherwise.
@@ -60,6 +64,11 @@ struct ReaderView: View {
                         content: loadedContent
                     )
                 }
+            }
+            // Compose, reopened on this record (#154): label, variant,
+            // occasion and benti, saved back in place.
+            .sheet(isPresented: $isEditingArdaas) {
+                ComposeView(editing: savedArdaas)
             }
             .onAppear {
                 UIApplication.shared.isIdleTimerDisabled = true
@@ -339,6 +348,16 @@ struct ReaderView: View {
     /// picker that could never change a word would be a lie.
     private var canEditOccasion: Bool {
         occasionCatalog != nil && loadedContent?.occasionSlot != nil
+    }
+
+    /// Reopens this Ardaas in Compose to change any of what it was saved
+    /// with (#154).
+    private var editButton: some View {
+        Button {
+            isEditingArdaas = true
+        } label: {
+            Label("Edit", systemImage: "square.and.pencil")
+        }
     }
 
     /// Opens the occasion picker. Kept out of `displayMenu` — that menu is
