@@ -25,3 +25,9 @@ docs/sources/**/*.png
 local.properties
 .idea/
 *.iml
+
+# Signing keys never belong in the repo (#92): CI decodes the upload key from
+# a secret into a temp file, and local builds point at it outside the tree.
+*.jks
+*.keystore
+*.p12
