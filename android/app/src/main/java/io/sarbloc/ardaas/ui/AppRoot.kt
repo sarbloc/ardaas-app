@@ -46,6 +46,7 @@ import io.sarbloc.ardaas.persistence.occasionChoice
 import io.sarbloc.ardaas.ui.navigation.Destination
 import io.sarbloc.ardaas.ui.occasion.OccasionPickerDialog
 import io.sarbloc.ardaas.ui.occasion.withPickedOccasion
+import io.sarbloc.ardaas.ui.sources.LicencesScreen
 import io.sarbloc.ardaas.ui.sources.SourcesScreen
 import io.sarbloc.ardaas.ui.sources.appVersionString
 
@@ -121,8 +122,10 @@ fun AppNavHost(
                     Destination.Sources -> SourcesScreen(
                         library = bundledContent.library,
                         version = version,
+                        onShowLicences = { backStack.push(Destination.Licences) },
                         onBack = goBack,
                     )
+                    Destination.Licences -> LicencesScreen(onBack = goBack)
                     Destination.Compose -> {
                         // Hoisted here, not inside the screen, so the occasion
                         // picker (#90) can write its choice back.

@@ -6,8 +6,8 @@ import androidx.compose.runtime.saveable.Saver
 /**
  * Every screen the app can show. iOS hosts Home in a `NavigationStack` and
  * pushes the Reader; Compose and About & Sources are sheets there. Android
- * has no sheet-shaped equivalent worth the weight, so all four are full
- * screens on one back stack, each with an Up arrow and system Back.
+ * has no sheet-shaped equivalent worth the weight, so every one is a full
+ * screen on one back stack, each with an Up arrow and system Back.
  */
 sealed interface Destination {
     /** Stable string form: the saved-state encoding and the per-screen state key. */
@@ -19,6 +19,11 @@ sealed interface Destination {
 
     data object Sources : Destination {
         override val key = "sources"
+    }
+
+    /** Open-source licences (#132), pushed from About & Sources. */
+    data object Licences : Destination {
+        override val key = "licences"
     }
 
     data object Compose : Destination {
@@ -52,6 +57,7 @@ sealed interface Destination {
         fun fromKey(key: String): Destination? = when (key) {
             Home.key -> Home
             Sources.key -> Sources
+            Licences.key -> Licences
             Compose.key -> Compose
             Diagnostics.key -> Diagnostics
             else -> key.removePrefix(READER_PREFIX)
@@ -66,7 +72,7 @@ sealed interface Destination {
  * The app's navigation: a stack of [Destination]s, always rooted at
  * [Destination.Home]. Snapshot state, so composition follows [current].
  *
- * Deliberately hand-rolled rather than navigation-compose: four screens and
+ * Deliberately hand-rolled rather than navigation-compose: a handful of screens and
  * one id argument do not justify a new dependency.
  */
 class BackStack(entries: List<Destination> = listOf(Destination.Home)) {

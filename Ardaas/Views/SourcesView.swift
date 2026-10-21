@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Info page: cites the sources behind each bundled Gurbani text, states
-/// the accuracy policy, and shows the app version. Presented as a sheet
+/// the accuracy policy, credits the on-device translation stack, links the
+/// open-source licences, and shows the app version. Presented as a sheet
 /// from the Home screen.
 struct SourcesView: View {
     @Environment(\.dismiss) private var dismiss
@@ -14,6 +15,7 @@ struct SourcesView: View {
             List {
                 textSection
                 accuracySection
+                translationSection
                 aboutSection
             }
             .themedScreen()
@@ -82,8 +84,31 @@ struct SourcesView: View {
         .listRowBackground(Theme.raisedFill)
     }
 
+    /// Credits for on-device benti translation (#132) — same wording as
+    /// Android's About & Sources (`sources_credit_*` in strings.xml).
+    private var translationSection: some View {
+        Section("Translation") {
+            ForEach(Self.translationCredits, id: \.self) { credit in
+                Text(credit)
+                    .font(.footnote)
+                    .foregroundStyle(Theme.mist)
+            }
+        }
+        .listRowBackground(Theme.raisedFill)
+    }
+
+    private static let translationCredits = [
+        "IndicTrans2 (en–indic, distilled 200M) by AI4Bharat — the model that translates a benti into Gurmukhi. MIT licence.",
+        "Int8 ONNX export of IndicTrans2 by naklitechie on Hugging Face. MIT licence.",
+        "ONNX Runtime by Microsoft — runs the model on your phone. MIT licence.",
+    ]
+
     private var aboutSection: some View {
         Section {
+            NavigationLink("Open-source licences") {
+                LicencesView()
+            }
+            .foregroundStyle(Theme.parchment)
             LabeledContent("Version", value: Self.versionString)
                 .foregroundStyle(Theme.parchment)
         }

@@ -27,6 +27,9 @@
     <string name="sources_credit_onnx_export">Int8 ONNX export of IndicTrans2 by naklitechie on Hugging Face. MIT licence.</string>
     <string name="sources_credit_onnx_runtime">ONNX Runtime by Microsoft — runs the model on your phone. MIT licence.</string>
     <string name="sources_support_header">Support</string>
+    <!-- Open-source licences (#132): full MIT notices for the translation stack. -->
+    <string name="licences_title">Open-source licences</string>
+    <string name="licences_load_failed">Could not load this licence: %1$s</string>
     <string name="sources_support_link">Help &amp; support</string>
     <string name="sources_version">Version</string>
 
