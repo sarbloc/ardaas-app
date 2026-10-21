@@ -40,6 +40,22 @@ final class ModelInstallerTests: XCTestCase {
         FileManager.default.fileExists(atPath: root.appendingPathComponent(name).path)
     }
 
+    private var ledgerURL: URL { root.appendingPathComponent(ModelInstaller.ledgerName) }
+
+    /// The verification ledger as written to disk, or empty when there is none.
+    private func ledger() throws -> [String: String] {
+        guard FileManager.default.fileExists(atPath: ledgerURL.path) else { return [:] }
+        return try JSONDecoder().decode([String: String].self, from: Data(contentsOf: ledgerURL))
+    }
+
+    /// Puts the original graphs back beside a finished cache, as if the app
+    /// was killed after the manifest landed but before retirement verified it.
+    private func restoreOriginalGraphs() throws {
+        for name in model.catalog.graphNames {
+            try model.payload(name).write(to: root.appendingPathComponent(name))
+        }
+    }
+
     /// Collects every phase the installer reports, from whatever thread.
     private final class PhaseLog: @unchecked Sendable {
         private let lock = NSLock()
@@ -165,6 +181,145 @@ final class ModelInstallerTests: XCTestCase {
         XCTAssertEqual(secondPass, ["dict.TGT.json"])
     }
 
+    /// Killed after the cache manifest landed but before the load-back check
+    /// finished: the cache was never proved loadable, so it must not read as
+    /// ready, and the next install must finish the check without re-fetching.
+    func testAnInterruptedRetirementIsNotReadyUntilVerified() async throws {
+        let installer = makeInstaller()
+        try await installer.install(allowingCellular: false) { _ in }
+        // Recreate the kill: originals back on disk, one of them parked.
+        try restoreOriginalGraphs()
+        let retired = ModelOptimizer.retiredDirectory(in: root)
+        try FileManager.default.createDirectory(at: retired, withIntermediateDirectories: true)
+        let parked = model.catalog.graphNames[0]
+        try FileManager.default.moveItem(
+            at: root.appendingPathComponent(parked), to: retired.appendingPathComponent(parked))
+        let verifiedBefore = optimizer.verifiedGraphs.count
+        let fetchedBefore = fetcher.requestCount
+
+        XCTAssertEqual(
+            installer.currentState(), .notDownloaded,
+            "a cache that was never proved loadable must not read as ready")
+
+        try await installer.install(allowingCellular: false) { _ in }
+
+        XCTAssertEqual(installer.currentState(), .ready)
+        XCTAssertEqual(
+            optimizer.verifiedGraphs.count, verifiedBefore + model.catalog.graphNames.count,
+            "every graph must be load-checked again")
+        XCTAssertEqual(fetcher.requestCount, fetchedBefore, "finishing the check must not re-download")
+        for name in model.catalog.graphNames {
+            XCTAssertFalse(exists(name), "\(name) should have been retired")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: retired.path))
+    }
+
+    /// The same interruption, but the cache does not actually load: it must
+    /// never read as ready, and the originals stay for a rebuild.
+    func testAnInterruptedRetirementThatFailsVerificationIsNeverReady() async throws {
+        let installer = makeInstaller()
+        try await installer.install(allowingCellular: false) { _ in }
+        try restoreOriginalGraphs()
+        optimizer.verifyError = TranslationError.sessionFailure("cannot load external data")
+
+        XCTAssertEqual(installer.currentState(), .notDownloaded)
+        do {
+            try await installer.install(allowingCellular: false) { _ in }
+            XCTFail("a cache that does not load must fail the install")
+        } catch let error as TranslationError {
+            guard case .optimizationFailed = error else {
+                return XCTFail("expected .optimizationFailed, got \(error)")
+            }
+        }
+        XCTAssertEqual(installer.currentState(), .notDownloaded)
+        for name in model.catalog.graphNames {
+            XCTAssertTrue(exists(name), "\(name) is kept for a rebuild")
+        }
+    }
+
+    // MARK: - Verification ledger
+
+    func testEveryVerifiedArtifactIsRecordedInTheLedger() async throws {
+        let installer = makeInstaller()
+        try await installer.install(allowingCellular: false) { _ in }
+
+        let expected = Dictionary(
+            uniqueKeysWithValues: model.catalog.files.map { ($0.name, $0.sha256) })
+        XCTAssertEqual(try ledger(), expected)
+    }
+
+    /// An app update that re-pins a file at the same byte count must not keep
+    /// the superseded bytes just because the size matches.
+    func testARepinnedFileOfTheSameSizeIsFetchedAgain() async throws {
+        try await makeInstaller().install(allowingCellular: false) { _ in }
+        let name = "dict.TGT.json"
+        let old = model.payload(name)
+        let new = Data("{\"dict\":null}".utf8)
+        XCTAssertEqual(old.count, new.count, "the scenario needs a same-size re-pin")
+
+        let repinnedFiles = model.catalog.files.map { file -> ModelCatalog.File in
+            guard file.name == name else { return file }
+            return ModelCatalog.File(
+                name: file.name, bytes: file.bytes,
+                sha256: TranslationFixtures.sha256(new), kind: file.kind)
+        }
+        let repinned = ModelCatalog(
+            files: repinnedFiles,
+            repoBase: model.catalog.repoBase,
+            directoryName: model.catalog.directoryName,
+            estimatedOptimizedCacheBytes: model.catalog.estimatedOptimizedCacheBytes)
+        fetcher.setPayload(name, new)
+        let upgraded = ModelInstaller(
+            catalog: repinned,
+            directory: root,
+            fetcher: fetcher,
+            optimizer: optimizer,
+            availableDiskBytes: { 10_000_000 })
+
+        XCTAssertEqual(upgraded.currentState(), .notDownloaded)
+        try await upgraded.install(allowingCellular: false) { _ in }
+        XCTAssertEqual(upgraded.currentState(), .ready)
+        XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent(name)), new)
+        XCTAssertEqual(try ledger()[name], TranslationFixtures.sha256(new))
+    }
+
+    /// The upgrade path (#127): an install made before the ledger existed has
+    /// every file at its pinned size but nothing recorded. It must not read as
+    /// ready on size alone, and repairing it fetches only the vocabulary — the
+    /// cache is still valid, so the graphs are never needed again.
+    func testAnInstallFromBeforeTheLedgerRefetchesOnlyTheVocabulary() async throws {
+        let installer = makeInstaller()
+        try await installer.install(allowingCellular: false) { _ in }
+        try FileManager.default.removeItem(at: ledgerURL)
+        let fetchedBefore = fetcher.requestCount
+        let optimizedBefore = optimizer.optimizedGraphs.count
+
+        XCTAssertEqual(installer.currentState(), .notDownloaded)
+
+        try await installer.install(allowingCellular: false) { _ in }
+
+        XCTAssertEqual(installer.currentState(), .ready)
+        XCTAssertEqual(
+            Set(fetcher.requests.dropFirst(fetchedBefore).map(\.name)),
+            Set(model.catalog.vocabulary.map(\.name)))
+        XCTAssertEqual(
+            optimizer.optimizedGraphs.count, optimizedBefore, "the cache is reused, not rebuilt")
+    }
+
+    /// An unreadable ledger fails closed: nothing is trusted on size alone,
+    /// and the next install repairs it.
+    func testAMalformedLedgerFailsClosed() async throws {
+        let installer = makeInstaller()
+        try await installer.install(allowingCellular: false) { _ in }
+        try Data("not json".utf8).write(to: ledgerURL)
+
+        XCTAssertEqual(installer.currentState(), .notDownloaded)
+
+        try await installer.install(allowingCellular: false) { _ in }
+        XCTAssertEqual(installer.currentState(), .ready)
+        XCTAssertEqual(try ledger().count, model.catalog.vocabulary.count)
+    }
+
     // MARK: - Hash verification
 
     func testHashMismatchFailsLoudlyAndInstallsNothing() async throws {
@@ -184,6 +339,7 @@ final class ModelInstallerTests: XCTestCase {
 
         XCTAssertFalse(
             exists("decoder_model.onnx"), "bytes that failed verification must never land")
+        XCTAssertNil(try ledger()["decoder_model.onnx"], "nor be recorded as verified")
         XCTAssertEqual(installer.currentState(), .notDownloaded)
     }
 

@@ -273,6 +273,22 @@ enum ModelOptimizer {
 
     // MARK: - Disk hygiene
 
+    /// True once `retireSourceGraphs` has finished: no original graph is left
+    /// beside the cache and none is parked. A valid manifest alone is not
+    /// enough for `.ready` — it lands in `build`, before the load-back check,
+    /// so a kill in between would otherwise advertise a cache that was never
+    /// proved loadable. The originals' presence is the durable "not yet
+    /// verified" marker: a failed check drops the cache, so they only coexist
+    /// with a valid one when verification never completed.
+    static func isRetirementComplete(in modelDirectory: URL, catalog: ModelCatalog) -> Bool {
+        let fileManager = FileManager.default
+        guard !fileManager.fileExists(atPath: retiredDirectory(in: modelDirectory).path)
+        else { return false }
+        return !catalog.graphNames.contains {
+            fileManager.fileExists(atPath: modelDirectory.appendingPathComponent($0).path)
+        }
+    }
+
     /// Deletes the original `.onnx` downloads once the optimized cache has been
     /// proved to load without them.
     ///
