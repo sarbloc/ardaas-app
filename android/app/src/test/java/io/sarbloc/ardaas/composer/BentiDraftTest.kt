@@ -4,34 +4,38 @@ import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.persistence.bentiLayers
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Port of ArdaasTests/BentiDraftTests.swift, minus the translation engine.
+ * Port of ArdaasTests/BentiDraftTests.swift: which layers a draft produces,
+ * and how they change as the user translates, edits or rewrites.
  *
- * iOS fills [BentiDraft.gurmukhi] with `applyTranslation`; Android has no
- * translator, so the user types it — the cases below set it directly. The
- * staleness and translatability cases test engine state that does not exist
- * here and are not ported; every layer rule is, with iOS's assertions.
+ * Everything here is pure — no model, no ONNX Runtime, no network — which is
+ * the point: the translation *call* cannot run in CI, but every rule around it
+ * can. [BentiDraft.applyTranslation] stands in for "the engine returned this
+ * string".
  */
 class BentiDraftTest {
 
-    // region English only
+    // region English only (the pre-translation behaviour)
 
-    /** Saving with no Gurmukhi writes the English layer and nothing else. */
+    /** Saving without translating writes the English layer and nothing else. */
     @Test
-    fun typedEnglishWithoutGurmukhiIsEnglishOnly() {
+    fun typedEnglishWithoutTranslationIsEnglishOnly() {
         val draft = BentiDraft(typed = "Please bless my family.")
         assertEquals(BentiLayers(gurmukhi = "", transliteration = "", english = "Please bless my family."), draft.layers)
         assertEquals("", draft.transliteration)
-        assertFalse(draft.hasGurmukhiEntry)
+        assertFalse(draft.hasTranslationDraft)
+        assertTrue(draft.isTranslatable)
     }
 
     /** A record built the way Compose builds it round-trips back to the same layers. */
     @Test
     fun layersSurviveASavedArdaasRoundTrip() {
-        val draft = BentiDraft(typed = "  Please bless my family.  ", gurmukhi = "ਸਿੰਘ ਅਰਦਾਸ")
+        val typed = BentiDraft(typed = "  Please bless my family.  ")
+        val draft = typed.applyTranslation("ਸਿੰਘ ਅਰਦਾਸ", typed.translationSource)
         val layers = draft.layers
         val saved = SavedArdaas(
             label = "Family",
@@ -50,7 +54,7 @@ class BentiDraftTest {
         assertTrue(BentiDraft(typed = "   \n ").isEmpty)
         assertTrue(BentiDraft().isEmpty)
         assertFalse(BentiDraft(typed = "a").isEmpty)
-        // Gurmukhi with no English is still worth saving.
+        // A translation with the English deleted is still worth saving.
         assertFalse(BentiDraft(typed = "", gurmukhi = "ਅਰਦਾਸ").isEmpty)
         // …but whitespace in both editors is not.
         assertTrue(BentiDraft(typed = " ", gurmukhi = "\n ").isEmpty)
@@ -58,22 +62,26 @@ class BentiDraftTest {
 
     // endregion
 
-    // region English plus Gurmukhi (iOS: a translated draft)
+    // region Translated English
 
     @Test
-    fun gurmukhiEntryFillsAllThreeLayers() {
-        val draft = BentiDraft(typed = "Bless the sangat.", gurmukhi = "ਸਿੰਘ ਅਰਦਾਸ")
+    fun translationFillsAllThreeLayers() {
+        val draft = translated("Bless the sangat.", "ਸਿੰਘ ਅਰਦਾਸ")
         assertEquals(
             BentiLayers(gurmukhi = "ਸਿੰਘ ਅਰਦਾਸ", transliteration = "Singh Ardaas", english = "Bless the sangat."),
             draft.layers,
         )
-        assertTrue(draft.hasGurmukhiEntry)
+        assertTrue(draft.hasTranslationDraft)
     }
 
-    /** The transliteration is derived, never stored, so editing the Gurmukhi regenerates it. */
+    /**
+     * The transliteration is derived, never stored, so editing the Gurmukhi
+     * regenerates it — the whole point of letting the user correct the
+     * machine's output before saving.
+     */
     @Test
     fun editingTheGurmukhiRegeneratesTheTransliteration() {
-        var draft = BentiDraft(typed = "Bless the sangat.", gurmukhi = "ਸਿੰਘ")
+        var draft = translated("Bless the sangat.", "ਸਿੰਘ")
         assertEquals("Singh", draft.transliteration)
 
         draft = draft.copy(gurmukhi = "ਅਰਦਾਸ")
@@ -84,29 +92,81 @@ class BentiDraftTest {
         draft = draft.copy(gurmukhi = "   ")
         assertEquals("", draft.transliteration)
         assertEquals(BentiLayers(english = "Bless the sangat."), draft.layers)
-        assertFalse(draft.hasGurmukhiEntry)
+        assertFalse(draft.hasTranslationDraft)
     }
 
-    /** Deleting the English leaves a Gurmukhi-only benti, which saves fine. */
     @Test
-    fun deletingTheEnglishKeepsTheGurmukhi() {
-        val draft = BentiDraft(typed = "  ", gurmukhi = "ਅਰਦਾਸ")
-        assertEquals(BentiLayers(gurmukhi = "ਅਰਦਾਸ", transliteration = "Ardaas", english = ""), draft.layers)
+    fun clearingTheTranslationReturnsToEnglishOnly() {
+        val draft = translated("Bless the sangat.", "ਸਿੰਘ").clearTranslation()
+        assertEquals(BentiLayers(english = "Bless the sangat."), draft.layers)
+        assertNull(draft.translatedFrom)
+        assertFalse(draft.isStale)
+    }
+
+    /** Both sides are recorded trimmed, as iOS's `applyTranslation` does. */
+    @Test
+    fun applyTranslationTrimsTheResultAndTheSource() {
+        val draft = BentiDraft(typed = "Bless us.").applyTranslation("  ਅਰਦਾਸ \n", "  Bless us. ")
+        assertEquals("ਅਰਦਾਸ", draft.gurmukhi)
+        assertEquals("Bless us.", draft.translatedFrom)
+        assertEquals("Bless us.", draft.typed)
     }
 
     // endregion
 
-    // region Gurmukhi typed in the benti editor
+    // region Staleness
+
+    @Test
+    fun draftIsStaleOnlyAfterTheEnglishChanges() {
+        var draft = translated("Bless the sangat.", "ਸਿੰਘ")
+        assertFalse(draft.isStale)
+
+        // Whitespace-only edits are not a change: both sides are trimmed.
+        draft = draft.copy(typed = "  Bless the sangat.  ")
+        assertFalse(draft.isStale)
+
+        draft = draft.copy(typed = "Bless the whole sangat.")
+        assertTrue(draft.isStale)
+
+        // Editing the Gurmukhi is not what staleness tracks — that is the user
+        // correcting the machine, and it must not be flagged as out of date.
+        draft = draft.copy(typed = "Bless the sangat.", gurmukhi = "ਅਰਦਾਸ")
+        assertFalse(draft.isStale)
+    }
 
     /**
-     * Gurmukhi in the benti editor *is* the Gurmukhi layer, the
-     * transliteration is generated from it, and the English layer stays
-     * empty — putting Gurmukhi in the English slot would mislabel it.
+     * Deleting the English is not staleness: there is nothing left for the
+     * Gurmukhi to disagree with, and a Gurmukhi-only benti saves fine.
      */
     @Test
-    fun gurmukhiInputIsTransliterated() {
+    fun deletingTheEnglishIsNotStale() {
+        val draft = translated("Bless the sangat.", "ਅਰਦਾਸ").copy(typed = "  ")
+        assertFalse(draft.isStale)
+        assertEquals(BentiLayers(gurmukhi = "ਅਰਦਾਸ", transliteration = "Ardaas", english = ""), draft.layers)
+    }
+
+    @Test
+    fun untranslatedDraftIsNeverStale() {
+        assertFalse(BentiDraft(typed = "Bless the sangat.").isStale)
+        val draft = translated("Bless the sangat.", "ਸਿੰਘ").copy(gurmukhi = "", typed = "Something else entirely.")
+        assertFalse(draft.isStale)
+    }
+
+    // endregion
+
+    // region Gurmukhi typed directly
+
+    /**
+     * Gurmukhi input skips translation entirely: the typed text *is* the
+     * Gurmukhi layer, the transliteration is generated from it, and the
+     * English layer stays empty — nothing here translates Gurmukhi back to
+     * English, and putting Gurmukhi in the English slot would mislabel it.
+     */
+    @Test
+    fun gurmukhiInputIsTransliteratedNotTranslated() {
         val draft = BentiDraft(typed = "ਸਿੰਘ ਅਰਦਾਸ")
         assertTrue(draft.isTypedInGurmukhi)
+        assertFalse(draft.isTranslatable)
         assertEquals(
             BentiLayers(gurmukhi = "ਸਿੰਘ ਅਰਦਾਸ", transliteration = "Singh Ardaas", english = ""),
             draft.layers,
@@ -114,20 +174,21 @@ class BentiDraftTest {
     }
 
     /**
-     * Rewriting the benti in Gurmukhi sets the Gurmukhi editor aside without
-     * deleting it: the typed text wins, and undoing the rewrite brings the
-     * editor's text back.
+     * Rewriting an English benti in Gurmukhi retires the old translation
+     * without deleting it: the typed text wins, so nothing stale can be saved,
+     * and undoing the rewrite brings the draft back.
      */
     @Test
-    fun gurmukhiInputOverridesTheGurmukhiEditor() {
-        var draft = BentiDraft(typed = "Bless the sangat.", gurmukhi = "ਅਰਦਾਸ")
+    fun gurmukhiInputOverridesAnyExistingTranslationDraft() {
+        var draft = translated("Bless the sangat.", "ਅਰਦਾਸ")
 
         draft = draft.copy(typed = "ਸਿੰਘ")
-        assertFalse(draft.hasGurmukhiEntry)
+        assertFalse(draft.hasTranslationDraft)
+        assertFalse(draft.isStale)
         assertEquals(BentiLayers(gurmukhi = "ਸਿੰਘ", transliteration = "Singh", english = ""), draft.layers)
 
         draft = draft.copy(typed = "Bless the sangat.")
-        assertTrue(draft.hasGurmukhiEntry)
+        assertTrue(draft.hasTranslationDraft)
         assertEquals("ਅਰਦਾਸ", draft.layers.gurmukhi)
     }
 
@@ -142,11 +203,29 @@ class BentiDraftTest {
 
     // endregion
 
-    /** Digits and punctuation are not Gurmukhi, and still save as English. */
+    // region Nothing to translate
+
+    /**
+     * Digits and punctuation are undetermined: not translatable, and there is
+     * no Gurmukhi to transliterate either. They still save as English.
+     */
     @Test
-    fun undeterminedInputSavesAsEnglish() {
+    fun undeterminedInputIsNotTranslatable() {
         val draft = BentiDraft(typed = "108 !!!")
+        assertFalse(draft.isTranslatable)
         assertFalse(draft.isTypedInGurmukhi)
         assertEquals(BentiLayers(english = "108 !!!"), draft.layers)
+    }
+
+    @Test
+    fun translationSourceIsTheTrimmedTypedText() {
+        assertEquals("Bless the sangat.", BentiDraft(typed = "  Bless the sangat.\n").translationSource)
+    }
+
+    // endregion
+
+    private fun translated(english: String, gurmukhi: String): BentiDraft {
+        val draft = BentiDraft(typed = english)
+        return draft.applyTranslation(gurmukhi, draft.translationSource)
     }
 }

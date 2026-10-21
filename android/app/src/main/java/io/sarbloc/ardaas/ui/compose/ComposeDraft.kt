@@ -26,9 +26,10 @@ data class ComposeDraft(
 
     /**
      * Something worth saving: a label and a benti with text in at least one
-     * layer. iOS's `canSave`, minus the clause that waits on a translation —
-     * there is no translator here to wait on. The occasion never gates Save:
-     * leaving the slot unfilled is normal.
+     * layer. iOS's `canSave` minus the clause that waits on a translation,
+     * which lives in [TranslationStatus.canSave] with the rest of the
+     * translation state. The occasion never gates Save: leaving the slot
+     * unfilled is normal.
      */
     val canSave: Boolean get() = trimmedLabel.isNotEmpty() && !benti.isEmpty
 

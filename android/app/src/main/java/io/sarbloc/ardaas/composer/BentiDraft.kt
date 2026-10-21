@@ -5,49 +5,62 @@ import io.sarbloc.ardaas.text.BentiScriptDetector
 import io.sarbloc.ardaas.text.trimmingWhitespaceAndNewlines
 import io.sarbloc.ardaas.transliteration.GurmukhiTransliterator
 
-// Port of Ardaas/Models/BentiDraft.swift, minus the translation engine: v1
-// Android has no translator, so iOS's `translatedFrom` / `isStale` /
-// `isTranslatable` / `translationSource` / `applyTranslation` have nothing to
-// track. What iOS fills by machine translation, the user types here directly
-// into the Gurmukhi editor; every layer rule is unchanged.
+// Port of Ardaas/Models/BentiDraft.swift, rule for rule. v1 Android shipped
+// without a translator and let the user hand-type the Gurmukhi instead; since
+// #120 the Gurmukhi editor is iOS's translation draft again — filled by
+// [BentiDraft.applyTranslation], then editable — and `translatedFrom` tracks
+// staleness exactly as on iOS. Swift's `mutating` functions are copies here,
+// because the screen keeps the draft as one immutable saveable value.
 
 /**
- * The Compose screen's benti as pure, testable data: what the user typed in
- * the benti editor, what they typed in the Gurmukhi editor, and the rules that
- * turn the two into the three layers persisted on `SavedArdaas`.
+ * The Compose screen's benti as pure, testable data: what the user typed, the
+ * Gurmukhi draft (if any), and the rules that turn the two into the three
+ * layers persisted on `SavedArdaas`.
  *
  * The screen binds its editors straight to [typed] and [gurmukhi]. Everything
- * else — the detected script, the transliteration, the layers — is
- * *derived*, never stored, so there is no second copy to keep in sync. The
- * transliteration is recomputed from the current Gurmukhi on every read,
- * which is what makes an edit to the Gurmukhi regenerate it for free.
+ * else — the detected script, the transliteration, the layers, whether the
+ * draft has gone stale — is *derived*, never stored, so there is no second
+ * copy to keep in sync. In particular the transliteration is recomputed from
+ * the current Gurmukhi on every read, which is what makes an edit to the
+ * Gurmukhi regenerate it for free (the transliterator is deterministic,
+ * offline and needs no model).
  */
 data class BentiDraft(
     /**
      * Exactly what the user typed in the benti editor — English, or Gurmukhi
-     * if they used the Punjabi keyboard there.
+     * if they used the Punjabi keyboard.
      */
     val typed: String = "",
     /**
-     * The Gurmukhi the user typed in the Gurmukhi editor. Ignored when
-     * [typed] is itself Gurmukhi: the typed text is then the Gurmukhi layer,
-     * exactly as iOS ignores its translation draft in that case.
+     * The machine-translated Gurmukhi, after any edits the user made to it.
+     * Empty when nothing has been translated. Ignored when [typed] is itself
+     * Gurmukhi (there is nothing to translate then, so the typed text is the
+     * Gurmukhi layer).
      */
     val gurmukhi: String = "",
+    /**
+     * The trimmed English that [gurmukhi] was translated from, or null when
+     * there is no translation. Used only to notice that the English has been
+     * edited since — see [isStale].
+     */
+    val translatedFrom: String? = null,
 ) {
     val script: BentiScript get() = BentiScriptDetector.detect(typed)
 
-    /** True when the benti editor already holds Gurmukhi, so only the transliteration is generated. */
+    /**
+     * True when the typed text is already Gurmukhi, so translation is skipped
+     * and only the transliteration is generated.
+     */
     val isTypedInGurmukhi: Boolean get() = script == BentiScript.GURMUKHI
 
     /**
      * The Gurmukhi that will be saved: the typed text when it is already
-     * Gurmukhi, otherwise the Gurmukhi editor's text.
+     * Gurmukhi, otherwise the translation draft.
      */
     val effectiveGurmukhi: String
         get() = (if (isTypedInGurmukhi) typed else gurmukhi).trimmingWhitespaceAndNewlines()
 
-    /** Regenerated from [effectiveGurmukhi] on every read — deterministic, offline and instant. */
+    /** Regenerated from [effectiveGurmukhi] on every read — deterministic and instant. */
     val transliteration: String
         get() {
             val source = effectiveGurmukhi
@@ -61,8 +74,9 @@ data class BentiDraft(
      *   left empty, because nothing here translates Gurmukhi back to English
      *   and putting the Gurmukhi in the English slot would mislabel it.
      * * Typed in anything else → the typed text is the English layer, and the
-     *   Gurmukhi / transliteration layers come from the Gurmukhi editor, empty
-     *   when nothing was typed there.
+     *   Gurmukhi / transliteration layers are filled in only once a
+     *   translation exists. **No translation means English only**, exactly as
+     *   before Compose could translate.
      */
     val layers: BentiLayers
         get() = BentiLayers(
@@ -75,10 +89,46 @@ data class BentiDraft(
     val isEmpty: Boolean get() = layers.isEmpty
 
     /**
-     * The Gurmukhi editor holds text that will be saved — iOS's
-     * `hasTranslationDraft`. Only meaningful while the benti editor is not
-     * itself Gurmukhi.
+     * There is a translation and the English has changed since it was made,
+     * so the Gurmukhi on screen no longer corresponds to the text above it.
+     * The draft is kept (it may hold the user's own edits) and flagged, never
+     * silently discarded or silently saved as if it still matched.
+     *
+     * Deleting the English entirely is not staleness: there is then nothing
+     * for the Gurmukhi to disagree with, and a Gurmukhi-only benti is a
+     * perfectly good thing to save.
      */
-    val hasGurmukhiEntry: Boolean
+    val isStale: Boolean
+        get() {
+            val source = translatedFrom ?: return false
+            if (!hasTranslationDraft) return false
+            val current = typed.trimmingWhitespaceAndNewlines()
+            return current.isNotEmpty() && current != source
+        }
+
+    /**
+     * A translation draft is on screen: only meaningful while the typed text
+     * is not itself Gurmukhi.
+     */
+    val hasTranslationDraft: Boolean
         get() = !isTypedInGurmukhi && gurmukhi.trimmingWhitespaceAndNewlines().isNotEmpty()
+
+    /**
+     * Text the translator can be given. [BentiScript.UNDETERMINED] (digits,
+     * punctuation, emoji) has nothing to translate, and Gurmukhi is already
+     * there.
+     */
+    val isTranslatable: Boolean get() = script == BentiScript.LATIN
+
+    /** The exact string handed to the translator, and recorded as the source of the resulting draft. */
+    val translationSource: String get() = typed.trimmingWhitespaceAndNewlines()
+
+    /** Records a fresh translation of [source]. */
+    fun applyTranslation(translated: String, source: String): BentiDraft = copy(
+        gurmukhi = translated.trimmingWhitespaceAndNewlines(),
+        translatedFrom = source.trimmingWhitespaceAndNewlines(),
+    )
+
+    /** Drops the translation draft, returning to English-only. */
+    fun clearTranslation(): BentiDraft = copy(gurmukhi = "", translatedFrom = null)
 }

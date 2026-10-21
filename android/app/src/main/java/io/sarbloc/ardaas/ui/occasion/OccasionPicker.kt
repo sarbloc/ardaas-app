@@ -137,7 +137,7 @@ fun OccasionPickerDialog(
  * level.
  */
 @Composable
-private fun DialogWindowSetup() {
+internal fun DialogWindowSetup() {
     val view = LocalView.current
     DisposableEffect(view) {
         val window = (view.parent as? DialogWindowProvider)?.window

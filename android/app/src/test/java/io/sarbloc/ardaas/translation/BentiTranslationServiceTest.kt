@@ -315,6 +315,48 @@ class BentiTranslationServiceTest {
         assertFalse(root.exists())
     }
 
+    // Warm-up
+
+    @Test
+    fun warmUpBeforeReadyLoadsNothing() = runBlocking {
+        var built = 0
+        val engine = makeEngine { built++; FakeTranslator() }
+        val service = makeService(engine)
+
+        assertFalse(service.warmUp())
+        assertEquals(0, built)
+        assertFalse(engine.isLoaded)
+        assertTrue("warm-up must never start a download", fetcher.requests.isEmpty())
+    }
+
+    @Test
+    fun warmUpOnAReadyModelPreloadsSoTheFirstTranslationSkipsTheLoad() = runBlocking {
+        var built = 0
+        val engine = makeEngine { built++; FakeTranslator() }
+        val service = readyService(engine)
+
+        assertTrue(service.warmUp())
+        assertTrue(engine.isLoaded)
+        assertFalse("already resident", service.warmUp())
+
+        assertEquals("ਅਰਦਾਸ bless us", service.translate("bless us").gurmukhi)
+        assertEquals(1, built)
+    }
+
+    /** A load failure is the translation's to report; warm-up logs it and carries on. */
+    @Test
+    fun aFailedWarmUpIsLoggedNotThrown() = runBlocking {
+        val log = RecordingLogger()
+        val engine = makeEngine { throw TranslationError.MissingModelFile("dict.TGT.json") }
+        val service = BentiTranslationService(makeInstaller(), engine, Dispatchers.IO, log).also { services += it }
+        service.download()
+        service.awaitState { it == ModelState.Ready }
+
+        assertFalse(service.warmUp())
+        assertFalse(engine.isLoaded)
+        assertTrue(log.warnings.toString(), log.warnings.any { "warm-up" in it && "dict.TGT.json" in it })
+    }
+
     // Memory pressure
 
     @Test

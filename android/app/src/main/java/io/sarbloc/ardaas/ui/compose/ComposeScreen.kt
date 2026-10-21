@@ -16,8 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,10 +36,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,14 +54,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleStartEffect
 import io.sarbloc.ardaas.R
 import io.sarbloc.ardaas.composer.BentiDraft
 import io.sarbloc.ardaas.content.ArdaasLibrary
@@ -68,22 +70,24 @@ import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.ui.ArdaasBackground
 import io.sarbloc.ardaas.ui.ArdaasColors
 import io.sarbloc.ardaas.ui.ArdaasTheme
-import io.sarbloc.ardaas.ui.ReaderTextStyles
 import io.sarbloc.ardaas.ui.components.GroupedSection
-import io.sarbloc.ardaas.ui.components.SectionDivider
 import io.sarbloc.ardaas.ui.components.ardaasTopAppBarColors
 import kotlinx.coroutines.launch
 
-// Port of Ardaas/Views/ComposeView.swift, without its translation engine (v1
-// Android has none): the user types Gurmukhi directly instead.
+// Port of Ardaas/Views/ComposeView.swift, on-device translation included
+// (#120): the translate rules live in TranslationStatus, the work in
+// ComposeTranslationSession, and the sections in ComposeTranslationSections.
 
 /**
  * Compose: enter a label and a personal benti, pick the variant and the
- * occasion, and save it as a new [SavedArdaas]. Create-only, as on iOS —
- * editing an existing record is the Reader's job.
+ * occasion, optionally translate the benti to Gurmukhi on the phone, and
+ * save it as a new [SavedArdaas]. Create-only, as on iOS — editing an
+ * existing record is the Reader's job.
  *
- * Sections in iOS order: Label, Ardaas (variant), Occasion, Benti, then
- * Gurmukhi — the direct-entry editor plus the Punjabi keyboard tip.
+ * Sections in iOS order: Label, Ardaas (variant), Occasion, Benti; then
+ * Transliteration when the benti is typed in Gurmukhi, or the translate
+ * section and its editable Gurmukhi draft when it is English; then the
+ * Punjabi keyboard tip.
  *
  * Takes already-loaded inputs; loading the bundle and persisting the record
  * belong to the host.
@@ -99,6 +103,10 @@ import kotlinx.coroutines.launch
  *   free-text field.
  * @param onEditOccasion opens the occasion picker. Null hides the "What it's
  *   for" row.
+ * @param translation this visit's translation session, retained by the host
+ *   (see [rememberComposeTranslationSession]) so a configuration change does
+ *   not cancel a download or a translation. Null hides translation entirely
+ *   (previews).
  * @param onSave inserts the record. False (after the host has logged why)
  *   keeps the screen open with the draft intact.
  * @param onClose leaves the screen: after a successful save, or Cancel. No
@@ -112,28 +120,39 @@ fun ComposeScreen(
     occasion: OccasionDraft,
     onOccasionChange: (OccasionDraft) -> Unit,
     onEditOccasion: (() -> Unit)?,
+    translation: ComposeTranslationSession?,
     onSave: suspend (record: SavedArdaas) -> Boolean,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var label by rememberSaveable { mutableStateOf("") }
-    var bentiTyped by rememberSaveable { mutableStateOf("") }
-    var bentiGurmukhi by rememberSaveable { mutableStateOf("") }
+    // One saveable value, translatedFrom included, so staleness survives a
+    // configuration change and process death along with the text.
+    var benti by rememberSaveable(stateSaver = BentiDraftSaver) { mutableStateOf(BentiDraft()) }
     var variantId by rememberSaveable { mutableStateOf(ArdaasLibrary.DEFAULT_VARIANT_ID) }
     var isSaving by remember { mutableStateOf(false) }
+    var showConsent by rememberSaveable { mutableStateOf(false) }
+    var showStaleAlert by rememberSaveable { mutableStateOf(false) }
 
-    val benti = BentiDraft(typed = bentiTyped, gurmukhi = bentiGurmukhi)
     val draft = ComposeDraft(label = label, benti = benti, variantId = variantId, occasion = occasion)
     val content = library?.resolvedVariant(variantId)?.content
+    val status = translation?.let { session ->
+        val model by session.modelState.collectAsState()
+        session.status(model)
+    }
+
+    TranslationEffects(translation, benti, onApply = { benti = it })
 
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val saveFailed = stringResource(R.string.compose_save_failed)
-    val save: () -> Unit = {
-        // `isSaving` is snapshot state read at tap time, so a second tap
-        // landing before recomposition is still refused.
-        val record = draft.toSavedArdaas()
-        if (!isSaving && record != null) {
+    val saveDraft: (ComposeDraft) -> Unit = { toSave ->
+        // Everything is re-read at tap time — `isSaving` and the session are
+        // snapshot state — so a second tap, or a translation that started a
+        // frame ago, is still refused.
+        val record = toSave.toSavedArdaas()
+        val canSave = translation?.currentStatus()?.canSave(toSave) ?: toSave.canSave
+        if (!isSaving && record != null && canSave) {
             isSaving = true
             scope.launch {
                 if (onSave(record)) {
@@ -146,6 +165,10 @@ fun ComposeScreen(
             }
         }
     }
+    // A stale draft would persist Gurmukhi that says something different
+    // from the English next to it, and nothing outside this screen can tell
+    // that later — so it is never saved without an explicit answer.
+    val onSaveTap: () -> Unit = { if (benti.isStale) showStaleAlert = true else saveDraft(draft) }
     // The write takes milliseconds; Back simply waits for it.
     BackHandler(enabled = isSaving) {}
 
@@ -163,7 +186,8 @@ fun ComposeScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = save, enabled = draft.canSave && !isSaving) {
+                    val canSave = status?.canSave(draft) ?: draft.canSave
+                    TextButton(onClick = onSaveTap, enabled = canSave && !isSaving) {
                         Text(stringResource(R.string.compose_save), fontWeight = FontWeight.SemiBold)
                     }
                 },
@@ -205,11 +229,143 @@ fun ComposeScreen(
                 )
             }
 
-            BentiSection(text = bentiTyped, onTextChange = { bentiTyped = it })
+            BentiSection(text = benti.typed, onTextChange = { benti = benti.copy(typed = it) })
 
-            GurmukhiSection(benti = benti, onGurmukhiChange = { bentiGurmukhi = it })
+            if (benti.isTypedInGurmukhi) {
+                val transliteration = remember(benti.typed) { benti.transliteration }
+                TransliterationSection(transliteration)
+            }
+
+            if (translation != null && status != null && status.showsSection(benti)) {
+                TranslateSectionView(
+                    section = status.section(benti),
+                    failure = status.failure,
+                    downloadBytes = translation.downloadBytes,
+                    actions = TranslateActions(
+                        onTranslate = { translation.translate(benti) },
+                        onShowConsent = { showConsent = true },
+                        onCancelDownload = translation::cancelDownload,
+                        onStopWaiting = translation::stopWaiting,
+                    ),
+                )
+                if (status.showsDraft(benti)) {
+                    val transliteration = remember(benti.gurmukhi) { benti.transliteration }
+                    GurmukhiDraftSection(
+                        benti = benti,
+                        transliteration = transliteration,
+                        showsPurityCaution = TranslationStatus.showsPurityCaution(benti),
+                        onGurmukhiChange = { benti = benti.copy(gurmukhi = it) },
+                        onRemove = {
+                            benti = benti.clearTranslation()
+                            translation.clearFailure()
+                        },
+                    )
+                }
+            }
+
+            GroupedSection(header = null) {
+                KeyboardTip()
+            }
         }
     }
+
+    if (translation != null && showConsent) {
+        TranslationConsentDialog(
+            downloadBytes = translation.downloadBytes,
+            peakDiskBytes = translation.peakDiskBytes,
+            installedDiskBytes = translation.installedDiskBytes,
+            onConfirm = { allowCellular ->
+                showConsent = false
+                translation.download(allowCellular)
+            },
+            onDismiss = { showConsent = false },
+        )
+    }
+
+    if (showStaleAlert) {
+        StaleTranslationAlert(
+            onSaveBoth = {
+                showStaleAlert = false
+                saveDraft(draft)
+            },
+            onSaveEnglishOnly = {
+                showStaleAlert = false
+                // Built from a value held here, not re-read from the
+                // just-written state.
+                val cleared = benti.clearTranslation()
+                benti = cleared
+                saveDraft(draft.copy(benti = cleared))
+            },
+            onKeepEditing = { showStaleAlert = false },
+        )
+    }
+}
+
+/**
+ * The screen's half of the translation lifecycle; the session holds the
+ * rest. Tells the session which draft is on screen (so a translation queued
+ * behind an install runs on the current text), writes a finished translation
+ * into the draft, and re-warms the translator whenever the screen starts —
+ * memory pressure may have released it while the app was in the background.
+ */
+@Composable
+private fun TranslationEffects(
+    translation: ComposeTranslationSession?,
+    benti: BentiDraft,
+    onApply: (BentiDraft) -> Unit,
+) {
+    if (translation == null) return
+    SideEffect { translation.updateDraft(benti) }
+
+    // The draft as of the latest composition, not as of when the effect
+    // launched: the user may type in the frame between.
+    val currentBenti by rememberUpdatedState(benti)
+    val currentOnApply by rememberUpdatedState(onApply)
+    val result = translation.pendingResult
+    // Keyed on the result, so a screen recreated by a configuration change
+    // mid-translation still applies it once it lands.
+    LaunchedEffect(result) {
+        if (result != null) {
+            currentOnApply(currentBenti.applyTranslation(result.gurmukhi, result.source))
+            translation.consumeResult(result)
+        }
+    }
+
+    LifecycleStartEffect(translation) {
+        translation.warmUp()
+        onStopOrDispose {}
+    }
+}
+
+/**
+ * iOS's stale-save confirmation, as a proper [AlertDialog]: three explicit
+ * answers, stacked so none is truncated, the destructive one in the error
+ * colour. Dismissing it (Back, outside tap) is Keep editing.
+ */
+@Composable
+private fun StaleTranslationAlert(
+    onSaveBoth: () -> Unit,
+    onSaveEnglishOnly: () -> Unit,
+    onKeepEditing: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onKeepEditing,
+        title = { Text(stringResource(R.string.translation_stale_title)) },
+        text = { Text(stringResource(R.string.translation_stale_message)) },
+        confirmButton = {
+            Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onSaveBoth) {
+                    Text(stringResource(R.string.translation_stale_save_both))
+                }
+                TextButton(onClick = onSaveEnglishOnly) {
+                    Text(stringResource(R.string.translation_stale_save_english), color = MaterialTheme.colorScheme.error)
+                }
+                TextButton(onClick = onKeepEditing) {
+                    Text(stringResource(R.string.translation_stale_keep_editing))
+                }
+            }
+        },
+    )
 }
 
 @Composable
@@ -279,57 +435,6 @@ private fun BentiSection(text: String, onTextChange: (String) -> Unit) {
             minHeight = 160.dp,
             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
         )
-    }
-}
-
-/**
- * Direct Gurmukhi entry, where iOS offers machine translation. When the benti
- * editor already holds Gurmukhi, that text *is* the Gurmukhi layer
- * ([BentiDraft.isTypedInGurmukhi]) and this editor would be ignored, so it is
- * replaced by a note saying so — iOS likewise hides its Gurmukhi draft then.
- * Either way the generated transliteration is shown, and the keyboard tip
- * closes the section.
- */
-@Composable
-private fun GurmukhiSection(benti: BentiDraft, onGurmukhiChange: (String) -> Unit) {
-    val transliteration = remember(benti) { benti.transliteration }
-    GroupedSection(header = stringResource(R.string.compose_gurmukhi_header)) {
-        if (benti.isTypedInGurmukhi) {
-            Footnote(
-                stringResource(R.string.compose_gurmukhi_typed_in_benti),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-        } else {
-            FormTextField(
-                value = benti.gurmukhi,
-                onValueChange = onGurmukhiChange,
-                placeholder = stringResource(R.string.compose_gurmukhi_placeholder),
-                minHeight = 110.dp,
-                textStyle = ReaderTextStyles.Gurmukhi.copy(fontSize = ReaderTextStyles.Gurmukhi.fontSize * 0.9f),
-                // Asks the keyboard for Punjabi; Gboard switches to it when
-                // the user has added it.
-                keyboardOptions = KeyboardOptions(hintLocales = LocaleList("pa-IN")),
-            )
-        }
-        if (transliteration.isNotEmpty()) {
-            SectionDivider()
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                SelectionContainer {
-                    Text(
-                        transliteration,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontStyle = FontStyle.Italic,
-                        color = ArdaasColors.Sand,
-                    )
-                }
-                Footnote(stringResource(R.string.compose_transliteration_note))
-            }
-        }
-        SectionDivider()
-        KeyboardTip()
     }
 }
 
@@ -417,6 +522,7 @@ private fun ComposeScreenPreview() {
                 occasion = OccasionDraft(),
                 onOccasionChange = {},
                 onEditOccasion = null,
+                translation = null,
                 onSave = { true },
                 onClose = {},
             )

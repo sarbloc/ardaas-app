@@ -83,6 +83,59 @@ class TranslationEngine(
     }
 
     /**
+     * Loads the resident translator ahead of the first translation, so the
+     * user's first tap does not pay the cold load (~3 s on a Pixel 5 — the
+     * tokenizer and target dictionary are large JSON files).
+     *
+     * Loads only what [translate] would keep between calls anyway: the
+     * tokenizer and dictionary, plus the process-wide ORT environment. It
+     * opens **no** ORT session — sessions are the expensive memory, and they
+     * are created and closed inside each translation by design.
+     *
+     * Best effort, and never a queue:
+     * - Skipped (false) when a translation holds the engine: that translation
+     *   is loading the translator itself, and waiting behind it would only
+     *   hold a coroutine for nothing.
+     * - Skipped (false) when the translator is already resident.
+     * - Skipped (false) when the memory pre-flight would refuse a translation
+     *   right now: loading ~7 MB for a translation that cannot run would make
+     *   the pressure worse for nothing.
+     * - A [release] that lands during the load wins: the translator is dropped
+     *   as soon as the load finishes, exactly as for a translation.
+     *
+     * @return true when this call loaded the translator.
+     * @throws TranslationError when loading fails (a missing or malformed
+     *   vocabulary file, ORT unable to start) — the caller decides whether
+     *   that is worth surfacing; the next translation would hit it too.
+     * @throws CancellationException when the caller is cancelled.
+     */
+    suspend fun warmUp(catalog: ModelCatalog, graphDirectory: File, vocabularyDirectory: File): Boolean {
+        if (!mutex.tryLock()) return false
+        return try {
+            dropIfReleaseRequested()
+            if (translator != null) return false
+            try {
+                MemoryGuard.check(memoryProbe.read())
+            } catch (_: TranslationError.InsufficientMemory) {
+                return false
+            }
+            withContext(dispatcher) {
+                try {
+                    loadedTranslator(catalog, graphDirectory, vocabularyDirectory)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw TranslationError.wrap(e)
+                }
+            }
+            true
+        } finally {
+            mutex.unlock()
+            honourPendingRelease()
+        }
+    }
+
+    /**
      * Drops the resident translator. Call before the model files are deleted
      * and on memory pressure (see [onTrimMemory]).
      *

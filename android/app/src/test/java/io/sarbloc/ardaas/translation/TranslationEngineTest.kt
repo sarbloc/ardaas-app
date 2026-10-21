@@ -179,6 +179,102 @@ class TranslationEngineTest {
         assertFalse(error is TranslationError)
     }
 
+    // region Warm-up
+
+    private suspend fun TranslationEngine.warmUp() = warmUp(catalog, graphs, vocabulary)
+
+    /** Warm-up builds the translator (tokenizer + dictionary) and nothing else: no translation runs. */
+    @Test
+    fun warmUpLoadsTheTranslatorWithoutTranslating() = runBlocking {
+        val translator = FakeTranslator()
+        val engine = engine(translator)
+
+        assertTrue(engine.warmUp())
+
+        assertTrue(engine.isLoaded)
+        assertEquals(1, loads.get())
+        assertEquals("warm-up must not run the pipeline", 0, translator.completedCount)
+        engine.translate()
+        assertEquals("the first translation reuses the preloaded translator", 1, loads.get())
+    }
+
+    @Test
+    fun warmUpIsANoOpOnceLoaded() = runBlocking {
+        val engine = engine()
+        engine.translate()
+
+        assertFalse(engine.warmUp())
+        assertEquals(1, loads.get())
+    }
+
+    /** Loading for a translation the pre-flight would refuse only adds to the pressure. */
+    @Test
+    fun warmUpSkipsWhenMemoryIsShort() = runBlocking {
+        val short = MemoryReading(availableBytes = 300L * 1_048_576, isLowMemory = false, isLowRamDevice = false)
+        val engine = engine(memory = short)
+
+        assertFalse(engine.warmUp())
+        assertEquals(0, loads.get())
+        assertFalse(engine.isLoaded)
+    }
+
+    /** A running translation is already loading the translator; warm-up never queues behind it. */
+    @Test
+    fun warmUpDoesNotWaitForATranslationInFlight() = runBlocking {
+        val inFlight = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        val engine = engine(FakeTranslator { inFlight.countDown(); proceed.await(5, TimeUnit.SECONDS) })
+        val pending = async(Dispatchers.Default) { engine.translate() }
+        assertTrue(inFlight.await(5, TimeUnit.SECONDS))
+
+        assertFalse(withTimeout(1_000) { engine.warmUp() })
+
+        proceed.countDown()
+        pending.await()
+        assertEquals(1, loads.get())
+    }
+
+    /** Memory pressure during the load wins: the translator is dropped as soon as the load ends. */
+    @Test
+    fun aReleaseDuringWarmUpDropsTheTranslator() = runBlocking {
+        val loading = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        val engine = TranslationEngine(
+            memoryProbe = { roomy },
+            makeTranslator = { _, _, _ ->
+                loading.countDown()
+                proceed.await(5, TimeUnit.SECONDS)
+                loads.incrementAndGet()
+                FakeTranslator()
+            },
+        )
+        val warming = async(Dispatchers.Default) { engine.warmUp() }
+        assertTrue(loading.await(5, TimeUnit.SECONDS))
+
+        engine.release() // must not block on the load
+        proceed.countDown()
+
+        assertTrue(warming.await())
+        assertFalse(engine.isLoaded)
+    }
+
+    @Test
+    fun warmUpLoadFailuresSurfaceAsTranslationErrors() {
+        val engine = TranslationEngine(
+            memoryProbe = { roomy },
+            makeTranslator = { _, _, _ -> throw IOException("disk on fire") },
+        )
+        val error = assertThrows(TranslationError.FileSystem::class.java) {
+            runBlocking { engine.warmUp() }
+        }
+        assertEquals("disk on fire", error.detail)
+        assertFalse(engine.isLoaded)
+        // The engine is not left locked.
+        assertThrows(TranslationError.FileSystem::class.java) { runBlocking { engine.translate() } }
+    }
+
+    // endregion
+
     @Test
     fun loadFailuresSurfaceAsTranslationErrors() {
         val engine = TranslationEngine(
