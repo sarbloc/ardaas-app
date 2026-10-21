@@ -7,10 +7,40 @@ name: Android release
 # workflow_dispatch can only be started by someone with write access — fork
 # PRs can never reach this job or its secrets.
 #
-# The AAB is kept as a workflow artifact for now; uploading it to Play is a
-# follow-up that needs a Play Console service account.
+# The AAB is always kept as a workflow artifact. It is then optionally
+# uploaded to Google Play with a service account; setup and how to run it are
+# in docs/play/ci-upload.md. Until the PLAY_SERVICE_ACCOUNT_JSON secret is set
+# the upload is skipped with a notice and the run still succeeds.
+#
+#   gh workflow run android-release.yml --ref main -f track=alpha -f status=draft
 on:
   workflow_dispatch:
+    inputs:
+      # Which Play track the bundle goes to.
+      #   alpha    = closed testing (Play's API name for the closed track)
+      #   internal = internal testing
+      #   none     = build and keep the artifact only, no Play upload
+      track:
+        description: 'Play track (alpha = closed testing, internal, none = artifact only)'
+        type: choice
+        options:
+          - alpha
+          - internal
+          - none
+        default: alpha
+      # What Play does with the new release on that track.
+      #   draft     = created as a draft; Sarbloc reviews it and presses
+      #               "Roll out" in Play Console
+      #   completed = rolled out to the track's testers immediately (Play
+      #               refuses this while the app itself is still a draft;
+      #               see docs/play/ci-upload.md)
+      status:
+        description: 'Release status (draft = roll out by hand in Play Console, completed = roll out now)'
+        type: choice
+        options:
+          - draft
+          - completed
+        default: draft
 
 # Read the repo, nothing else. The upload-artifact action authenticates with
 # its own runtime token, not GITHUB_TOKEN.
@@ -155,7 +185,77 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # Before the Play steps, so the third-party upload action never runs
+      # with the keystore on disk. always(): also clean up after a failure.
       - name: Remove upload keystore
         if: always()
         working-directory: .
         run: rm -f "${RUNNER_TEMP}/ardaas-upload.jks"
+
+      # Decide whether to upload. Skipping is a notice, not a failure: with
+      # track=none, or before the secret is configured, the run is exactly the
+      # artifact-only release it was before. Inputs are re-validated here
+      # (GitHub enforces choice inputs, but nothing downstream relies on that)
+      # and reach the shell only through env, never through ${{ }} in the
+      # script. Only whether the secret is set is seen here, never its value.
+      - name: Play upload gate
+        id: play
+        working-directory: .
+        env:
+          TRACK: ${{ inputs.track }}
+          STATUS: ${{ inputs.status }}
+          HAS_PLAY_KEY: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+        run: |
+          set -euo pipefail
+          case "$TRACK" in
+            alpha|internal|none) ;;
+            *) echo "::error::Unknown track input."; exit 1 ;;
+          esac
+          case "$STATUS" in
+            draft|completed) ;;
+            *) echo "::error::Unknown status input."; exit 1 ;;
+          esac
+          if [ "$TRACK" = "none" ]; then
+            echo "::notice::track=none: Play upload skipped; the AAB is in the workflow artifact."
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          elif [ "$HAS_PLAY_KEY" != "true" ]; then
+            echo "::notice::PLAY_SERVICE_ACCOUNT_JSON is not set: Play upload skipped; the AAB is in the workflow artifact. Setup: docs/play/ci-upload.md"
+            echo "upload=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Uploading to Play: track=${TRACK} status=${STATUS}"
+            {
+              echo "upload=true"
+              echo "track=${TRACK}"
+              echo "status=${STATUS}"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      # Third-party action, pinned to a full commit SHA (release tag in the
+      # comment); bump deliberately, never to a moving tag. The key reaches
+      # only this step. The action writes it to ./serviceAccountJson.json in
+      # the workspace for the Google client and deletes it when done; the
+      # step after this one removes it even if the action is killed first.
+      #
+      # No mappingFile: with R8 on, AGP stores the mapping inside the AAB
+      # (BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map) and
+      # Play reads it from there.
+      #
+      # versionCode is the commit count on main, so re-running this workflow
+      # on the same commit re-uploads a versionCode Play already has and Play
+      # rejects it ("Version code N has already been used" / "APK specifies a
+      # version code that has already been used"). Expected: land a new commit
+      # on main and release that instead.
+      - name: Upload to Google Play
+        if: steps.play.outputs.upload == 'true'
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: io.sarbloc.ardaas
+          releaseFiles: ${{ steps.verify.outputs.aab }}
+          tracks: ${{ steps.play.outputs.track }}
+          status: ${{ steps.play.outputs.status }}
+
+      - name: Remove service account key
+        if: always()
+        working-directory: .
+        run: rm -f "${GITHUB_WORKSPACE}/serviceAccountJson.json"
