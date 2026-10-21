@@ -71,7 +71,7 @@ class BackStackTest {
 
     @Test
     fun everyDestinationRoundTripsThroughItsKey() {
-        val all = listOf(Destination.Home, Destination.Sources, Destination.Compose, Destination.Diagnostics, Destination.Reader(42))
+        val all = listOf(Destination.Home, Destination.Sources, Destination.Licences, Destination.Compose, Destination.Diagnostics, Destination.Reader(42))
         for (destination in all) {
             assertEquals(destination, Destination.fromKey(destination.key))
         }

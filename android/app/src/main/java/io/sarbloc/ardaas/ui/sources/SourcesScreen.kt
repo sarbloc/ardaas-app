@@ -54,8 +54,8 @@ private const val TAG = "Ardaas"
 /**
  * About & Sources: the sources behind each bundled text — read from the
  * bundle itself, never hardcoded — the accuracy policy, credits for the
- * translation model and runtime, a link to the support page, and the app
- * version. Port of `SourcesView.swift`; a bundle that
+ * translation model and runtime, a link to the support page, the
+ * open-source licences and the app version. Port of `SourcesView.swift`; a bundle that
  * failed to load shows the failure rather than an empty page.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,6 +63,7 @@ private const val TAG = "Ardaas"
 fun SourcesScreen(
     library: LoadState<ArdaasLibrary>,
     version: String,
+    onShowLicences: () -> Unit,
     onBack: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -140,6 +141,8 @@ fun SourcesScreen(
             }
             item {
                 GroupedSection(header = null) {
+                    NavigationRow(stringResource(R.string.licences_title), onShowLicences)
+                    SectionDivider()
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -178,6 +181,22 @@ private fun LinkRow(text: String, onClick: () -> Unit) {
             tint = ArdaasColors.Kesri,
             modifier = Modifier.size(18.dp),
         )
+    }
+}
+
+/** A row that pushes another screen: label and a trailing chevron. */
+@Composable
+private fun NavigationRow(text: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(text, color = ArdaasColors.Parchment, modifier = Modifier.weight(1f))
+        Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, tint = ArdaasColors.Mist)
     }
 }
 
@@ -225,7 +244,12 @@ fun appVersionString(context: Context): String {
 private fun SourcesScreenFailedPreview() {
     ArdaasTheme {
         ArdaasBackground {
-            SourcesScreen(LoadState.Failed(IllegalStateException("variants.json is not bundled")), "1.0 (1)", onBack = {})
+            SourcesScreen(
+                LoadState.Failed(IllegalStateException("variants.json is not bundled")),
+                "1.0 (1)",
+                onShowLicences = {},
+                onBack = {},
+            )
         }
     }
 }
