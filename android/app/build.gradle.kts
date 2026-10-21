@@ -107,6 +107,10 @@ val ardaasVersionName: String = providers.gradleProperty("ardaasVersionName").or
 // quietly produce an unsigned bundle that Play would reject later.
 //
 // The keystore is PKCS12, where the key password is the store password.
+//
+// Only the keystore and its password are credentials. The alias is a public
+// identifier: jar signing names the bundle's META-INF/<ALIAS>.SF and .RSA
+// after it, so it ships inside every AAB regardless of how it is supplied.
 // ---------------------------------------------------------------------------
 data class UploadSigning(val storeFile: File, val password: String, val keyAlias: String)
 
