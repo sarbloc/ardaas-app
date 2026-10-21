@@ -176,9 +176,10 @@ jobs:
             -authenticationKeyIssuerID "${API_ISSUER_ID}" \
             2>&1 | tee build/export.log
 
-      # Diagnostic only: which identities the export signed with, from the
-      # distribution logs xcodebuild leaves behind. Expect "Apple Distribution"
-      # and no "Apple Development" — the evidence that #57 stays fixed.
+      # Diagnostic only: which certificate TYPES the export's distribution logs
+      # mention. Expect "Apple Distribution" and no "Apple Development" — the
+      # evidence that #57 stays fixed. Prints the type only, never the holder's
+      # name (this repo's Actions logs are public).
       - name: Signing summary
         if: always()
         continue-on-error: true
@@ -188,8 +189,12 @@ jobs:
             echo "No distribution logs found."
             exit 0
           fi
-          grep -rhoiE '(Apple|iPhone) (Distribution|Development)[^"<,]*|[A-Za-z ]*certificate[A-Za-z ]*' "${LOGS}" \
-            | sed 's/^ *//' | sort | uniq -c | sort -rn | head -n 40
+          TYPES=$(grep -rhoE '(Apple|iPhone) (Distribution|Development)' "${LOGS}" | sort | uniq -c || true)
+          echo "Certificate types mentioned by the export:"
+          echo "${TYPES:-  (none)}"
+          if grep -q 'Development' <<<"${TYPES}"; then
+            echo "::warning::The export mentions a Development certificate — check it did not create one (#57)."
+          fi
 
       - name: Clean up API key
         if: always()
