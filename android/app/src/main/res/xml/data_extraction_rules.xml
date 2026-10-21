@@ -13,6 +13,13 @@
   device only "through your own encrypted device backups": Google's Auto
   Backup (switched on or off by the user in Android settings) and a
   device-to-device transfer to a new phone.
+
+  Encryption: Google encrypts every backup; with a screen lock (Android 9+)
+  it is end-to-end encrypted. End-to-end is deliberately NOT required here
+  (no disableIfNoEncryptionCapabilities / requireFlags): standard iCloud
+  Backup is not end-to-end either, and the privacy policy states exactly
+  this. Requiring it would silently drop backups for users without a screen
+  lock, and cannot be enforced on API 26-27 at all.
 -->
 <data-extraction-rules>
     <cloud-backup>

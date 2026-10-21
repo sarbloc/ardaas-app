@@ -5,7 +5,7 @@ Console path: *Policy and programs → App content*. Data safety is in
 
 | Section | Answer | Why |
 |---|---|---|
-| Privacy policy | `https://sarbloc.github.io/ardaas-app/privacy.html` | Covers iPhone and Android (gh-pages). |
+| Privacy policy | `https://sarbloc.github.io/ardaas-app/privacy.html` | **Merge the gh-pages PR `chore/privacy-android` first** — until then the live page is iPhone-only and does not disclose Android Auto Backup. |
 | Ads | **No, my app does not contain ads** | No ad SDKs (`android/app/build.gradle.kts`). |
 | App access | **All functionality is available without special access** | No login, no paywall. Translation needs only a one-time model download the reviewer can trigger themselves. |
 | Advertising ID | **No** | No `AD_ID` permission, no Play services / ads libraries. |
