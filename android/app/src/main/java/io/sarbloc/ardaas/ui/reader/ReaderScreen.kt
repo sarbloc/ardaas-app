@@ -203,11 +203,6 @@ private fun ReaderContent(
                         }
                     },
                     actions = {
-                        if (onEdit != null) {
-                            IconButton(onClick = onEdit) {
-                                Icon(painterResource(R.drawable.ic_edit), contentDescription = stringResource(R.string.reader_edit))
-                            }
-                        }
                         // Its own control, ahead of the cog: what the prayer
                         // is for is content, not a display preference.
                         if (editOccasion != null) {
@@ -224,6 +219,7 @@ private fun ReaderContent(
                             onVariantChange = onVariantChange,
                             onGurmukhiChange = { preferences.setLayer(LayerKind.GURMUKHI, it) },
                             onAdjustFontScale = preferences::adjustFontScale,
+                            onEdit = onEdit,
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -433,7 +429,10 @@ private fun LayerPill(
 
 // region Display menu
 
-/** The cog: which Ardaas, the Gurmukhi layer, and text size. */
+/**
+ * The cog: Edit (#154, kept out of the crowded top bar), which Ardaas, the
+ * Gurmukhi layer, and text size. A null [onEdit] hides the Edit item.
+ */
 @Composable
 private fun DisplayMenu(
     library: ArdaasLibrary,
@@ -444,6 +443,7 @@ private fun DisplayMenu(
     onVariantChange: (String) -> Unit,
     onGurmukhiChange: (Boolean) -> Unit,
     onAdjustFontScale: (Double) -> Unit,
+    onEdit: (() -> Unit)?,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Box {
@@ -451,6 +451,17 @@ private fun DisplayMenu(
             Icon(painterResource(R.drawable.ic_settings), contentDescription = "Display Options")
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (onEdit != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.reader_edit)) },
+                    onClick = {
+                        expanded = false
+                        onEdit()
+                    },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
+                )
+                HorizontalDivider()
+            }
             if (library.variants.size > 1) {
                 MenuSectionHeader("Ardaas")
                 for (variant in library.variants) {
