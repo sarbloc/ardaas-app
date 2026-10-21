@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       On-device translation (#117): the model is fetched only when the user
@@ -10,17 +11,23 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <!--
-      allowBackup="false": the privacy policy promises saved Ardaas stay on the
-      device, which is true on iOS (no CloudKit). Android's default would copy
-      them to the user's Google Drive. Device-to-device transfer to a new phone
-      is unaffected.
+      Backup (#121): the privacy policy says data leaves the device only
+      through the user's own encrypted device backups — on iOS, the device
+      backup; on Android, Auto Backup to the user's Google account (switched
+      on or off by the user in Android settings) and device-to-device transfer.
+      Both are an explicit allowlist: saved Ardaas and Reader preferences
+      only, never the translation model (noBackupFilesDir) or caches.
+      dataExtractionRules applies on Android 12+, fullBackupContent below it.
     -->
     <application
         android:name=".ArdaasApplication"
-        android:allowBackup="false"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.NoActionBar">
+        android:theme="@android:style/Theme.Material.NoActionBar"
+        tools:targetApi="31">
 
         <!-- Portrait only, matching iOS. Phone only (#93): no tablet layouts.
              adjustResize: the keyboard arrives as an inset Compose pads for
