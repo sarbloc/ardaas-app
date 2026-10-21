@@ -1,0 +1,161 @@
+name: Android release
+
+# Builds a Play-ready AAB signed with the UPLOAD key (#92). Play App Signing
+# holds the app-signing key and re-signs what we upload.
+#
+# Manual only ("Run workflow", from main): a release is a deliberate act, and
+# workflow_dispatch can only be started by someone with write access — fork
+# PRs can never reach this job or its secrets.
+#
+# The AAB is kept as a workflow artifact for now; uploading it to Play is a
+# follow-up that needs a Play Console service account.
+on:
+  workflow_dispatch:
+
+# Read the repo, nothing else. The upload-artifact action authenticates with
+# its own runtime token, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
+# Never run two release builds at once; queue rather than cancel.
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    # Linux bills at 1x. Never move this to macOS.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android
+    env:
+      # SHA-256 of the upload certificate (public, not a secret). The bundle
+      # must be signed by exactly this key, or Play will refuse it.
+      EXPECTED_UPLOAD_CERT_SHA256: '8C:FE:2E:37:0E:9D:14:B2:0F:77:4B:F9:C0:D5:37:FD:C0:BA:DC:E4:2A:08:D5:55:6A:97:43:EB:37:45:A3:B2'
+    steps:
+      # versionCode is the commit count, which only means something on main
+      # (as for the iOS build number). A count from another branch could
+      # collide with, or leapfrog, a real release.
+      - name: Require main
+        if: github.ref != 'refs/heads/main'
+        working-directory: .
+        run: |
+          echo "::error::Run the Android release from main (got ${GITHUB_REF})."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          # Full history: versionCode is the commit count on main.
+          fetch-depth: 0
+          # The build never pushes; keep the token out of .git/config.
+          persist-credentials: false
+
+      # Same check as android-ci.yml: the wrapper jar is executable code from
+      # the repo, so prove it is Gradle's before running it with secrets set.
+      - name: Verify Gradle wrapper jar
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -oE 'gradle-[0-9.]+-bin\.zip' gradle/wrapper/gradle-wrapper.properties | sed -E 's/gradle-(.*)-bin\.zip/\1/')
+          EXPECTED=$(curl -fsSL "https://services.gradle.org/distributions/gradle-${VERSION}-wrapper.jar.sha256")
+          echo "${EXPECTED}  gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+
+      # No Gradle cache here, deliberately: a release build starts clean, and
+      # nothing produced while the signing key is present is saved into a
+      # cache that other workflows restore.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify signing secrets exist
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "::error::Android upload-key secrets are not configured (ANDROID_UPLOAD_KEYSTORE_B64 / _KEYSTORE_PASSWORD / _KEY_ALIAS)"
+            exit 1
+          fi
+
+      - name: Version
+        id: version
+        run: |
+          set -euo pipefail
+          CODE=$(git rev-list --count HEAD)
+          NAME=$(sed -n 's/^ardaasVersionName=//p' gradle.properties)
+          # NAME goes into a file name; refuse anything unexpected.
+          if ! printf '%s' "$NAME" | grep -Eq '^[0-9A-Za-z._-]+$'; then
+            echo "::error::ardaasVersionName in android/gradle.properties is missing or malformed."
+            exit 1
+          fi
+          echo "versionCode=${CODE} versionName=${NAME}"
+          echo "code=${CODE}" >> "$GITHUB_OUTPUT"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+
+      # Decoded under RUNNER_TEMP, outside the workspace, owner-only, and
+      # removed by the always() step at the end.
+      - name: Decode upload keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "${RUNNER_TEMP}/ardaas-upload.jks"
+
+      # The password and alias exist only in this step's environment. No
+      # daemon or configuration cache: nothing that saw them outlives the step.
+      - name: Build signed bundle
+        env:
+          ARDAAS_UPLOAD_KEYSTORE: ${{ runner.temp }}/ardaas-upload.jks
+          ARDAAS_UPLOAD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          ARDAAS_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          ./gradlew bundleRelease \
+            -PardaasVersionCode="${VERSION_CODE}" \
+            --no-daemon --no-build-cache --no-configuration-cache \
+            --console=plain
+
+      - name: Verify upload-key signature
+        id: verify
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          set -euo pipefail
+          AAB=app/build/outputs/bundle/release/app-release.aab
+          # Every entry's digest must check out. Not -strict: an upload key is
+          # self-signed by design, which -strict reports as a chain error.
+          # The output lists every entry, so only its verdict is printed.
+          jarsigner -verify "$AAB" > "${RUNNER_TEMP}/jarsigner.txt"
+          if ! grep -q '^jar verified\.' "${RUNNER_TEMP}/jarsigner.txt"; then
+            echo "::error::jarsigner did not verify the bundle."
+            head -n 20 "${RUNNER_TEMP}/jarsigner.txt"
+            exit 1
+          fi
+          echo "jarsigner: jar verified."
+          ACTUAL=$(keytool -printcert -jarfile "$AAB" | sed -n 's/^[[:space:]]*SHA256: //p' | sort -u)
+          if [ "$ACTUAL" != "$EXPECTED_UPLOAD_CERT_SHA256" ]; then
+            echo "::error::Bundle is not signed by the upload key. Expected ${EXPECTED_UPLOAD_CERT_SHA256}, got: ${ACTUAL:-<none>}"
+            exit 1
+          fi
+          echo "Signed by the upload key (${ACTUAL})."
+          OUT="${RUNNER_TEMP}/ardaas-${VERSION_NAME}-${VERSION_CODE}.aab"
+          cp "$AAB" "$OUT"
+          ls -l "$OUT"
+          echo "aab=${OUT}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ardaas-${{ steps.version.outputs.name }}-${{ steps.version.outputs.code }}.aab
+          path: ${{ steps.verify.outputs.aab }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Remove upload keystore
+        if: always()
+        working-directory: .
+        run: rm -f "${RUNNER_TEMP}/ardaas-upload.jks"
