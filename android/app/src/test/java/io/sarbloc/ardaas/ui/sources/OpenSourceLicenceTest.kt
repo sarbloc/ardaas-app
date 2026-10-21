@@ -1,6 +1,7 @@
 package io.sarbloc.ardaas.ui.sources
 
 import io.sarbloc.ardaas.content.BundledAssets
+import io.sarbloc.ardaas.translation.ModelOptimizer
 import java.io.File
 import java.io.FileNotFoundException
 import org.junit.Assert.assertArrayEquals
@@ -44,12 +45,45 @@ class OpenSourceLicenceTest {
 
     @Test
     fun packagedLicencesAreTheSharedFilesByteForByte() {
-        for (licence in OpenSourceLicence.all) {
-            val source = sourceDir.resolve(licence.assetName)
-            val packaged = BundledAssets.dir.resolve(licence.assetName)
-            assertTrue("${licence.assetName} is not in the packaged assets", packaged.isFile)
-            assertArrayEquals("${licence.assetName} differs from the shared copy", source.readBytes(), packaged.readBytes())
+        for (name in OpenSourceLicence.all.flatMap { listOfNotNull(it.assetName, it.thirdPartyNoticesAssetName) }) {
+            val source = sourceDir.resolve(name)
+            val packaged = BundledAssets.dir.resolve(name)
+            assertTrue("$name is not in the packaged assets", packaged.isFile)
+            assertArrayEquals("$name differs from the shared copy", source.readBytes(), packaged.readBytes())
         }
+    }
+
+    @Test
+    fun onnxRuntimeShipsItsThirdPartyNoticesForTheVersionInUse() {
+        val ort = OpenSourceLicence.all.single { it.assetName == "licence-onnxruntime.txt" }
+        assertTrue(ort.component, ort.component.endsWith(" ${ModelOptimizer.ORT_PACKAGE_VERSION}"))
+        val name = requireNotNull(ort.thirdPartyNoticesAssetName)
+        val raw = OpenSourceLicence.loadAsset(name, BundledAssets::open)
+        assertTrue(raw.startsWith("THIRD PARTY SOFTWARE NOTICES AND INFORMATION"))
+        val sections = OpenSourceLicence.noticeSections(raw)
+        // Spot-check components the native binaries link statically.
+        for (component in listOf("protocolbuffers/protobuf", "Eigen", "abseil")) {
+            assertTrue("no notice for $component", sections.any { it.contains(component) })
+        }
+    }
+
+    @Test
+    fun noticeSectionsSplitOnUnderscoreRulesOnly() {
+        val raw = "Preamble\nline two\n\n_____\n\nFirst component\n\nIts licence ___ inline\n_____\nSecond\n  _____  \n\n"
+        assertEquals(
+            listOf("Preamble\nline two", "First component\n\nIts licence ___ inline", "Second"),
+            OpenSourceLicence.noticeSections(raw),
+        )
+    }
+
+    @Test
+    fun noticeSectionsKeepEveryWordOfTheRealNotices() {
+        val name = requireNotNull(OpenSourceLicence.all.firstNotNullOfOrNull { it.thirdPartyNoticesAssetName })
+        val raw = OpenSourceLicence.loadAsset(name, BundledAssets::open)
+        val words = { s: String -> s.split(Regex("\\s+")).filter { it.isNotEmpty() && !Regex("_{5,}").matches(it) } }
+        val sections = OpenSourceLicence.noticeSections(raw)
+        assertEquals(words(raw), words(sections.joinToString("\n")))
+        assertEquals(words(raw), sections.flatMap { words(OpenSourceLicence.reflow(it)) })
     }
 
     @Test(expected = FileNotFoundException::class)
