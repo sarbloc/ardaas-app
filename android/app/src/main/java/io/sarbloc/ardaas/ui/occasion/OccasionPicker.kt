@@ -68,6 +68,7 @@ import io.sarbloc.ardaas.occasion.OccasionCopy
 import io.sarbloc.ardaas.occasion.OccasionDraft
 import io.sarbloc.ardaas.occasion.OccasionPreview
 import io.sarbloc.ardaas.occasion.OccasionSelection
+import io.sarbloc.ardaas.occasion.SlotChoice
 import io.sarbloc.ardaas.ui.ArdaasBackground
 import io.sarbloc.ardaas.ui.ArdaasColors
 import io.sarbloc.ardaas.ui.ArdaasTheme
@@ -80,22 +81,25 @@ import io.sarbloc.ardaas.ui.components.ardaasTopAppBarColors
 // OccasionEditorSheet.swift (its presentation from the Reader).
 
 /**
- * The "….." slot picker (#90): what the gap is, "None", the bundled catalog
- * grouped by category, "Other…" with free text, and the slot sentence quoted
- * back with the choice spliced in. Shared by Compose and the Reader, so both
- * offer the same rows, wording and warning.
+ * The "….." slot picker (#90): what the gap is, then two independent radio
+ * groups (#158) — a paath ("None" + the bundled paaths) and an occasion
+ * ("None" + the bundled occasions + "Other…" with free text) — and the slot
+ * sentence quoted back with both spliced in. Shared by Compose and the
+ * Reader, so both offer the same rows, wording and warning.
  *
  * A Material 3 **full-screen dialog**: a close (Cancel) button, a title and a
  * Done action over a scrolling list. Full-screen rather than a bottom sheet
- * because this is a task with a text field, not a quick pick — seventeen
+ * because this is a task with a text field, not a quick pick — eighteen
  * two-line rows plus free text fill the screen anyway, and a sheet's drag
  * gesture and IME handling fight a focused text field.
  *
- * The picker holds its own draft, seeded from [choice] (a catalog id the
- * [catalog] no longer carries opens as "None", as on iOS), and hands back
- * the result only when the user finishes:
+ * The picker holds its own draft, seeded from [choice] through
+ * [OccasionDraft.from] — normalised, so a legacy paath stored as the occasion
+ * opens on the paath, and a catalog id the [catalog] no longer carries opens
+ * as "None", as on iOS — and hands back the result only when the user
+ * finishes:
  *
- * * **Done** calls [onDone] with [OccasionDraft.choice] — trimmed free text,
+ * * **Done** calls [onDone] with [OccasionDraft.slot] — trimmed free text,
  *   and "Other…" with nothing but whitespace typed is [OccasionChoice.Unset]
  *   (an abandoned draft leaves the canonical dots as authored).
  * * **Cancel** — the close button, system back, or any other dismissal —
@@ -109,8 +113,8 @@ import io.sarbloc.ardaas.ui.components.ardaasTopAppBarColors
 @Composable
 fun OccasionPickerDialog(
     catalog: OccasionCatalog,
-    choice: OccasionChoice,
-    onDone: (OccasionChoice) -> Unit,
+    choice: SlotChoice,
+    onDone: (SlotChoice) -> Unit,
     onCancel: () -> Unit,
     ardaasContent: ArdaasContent? = null,
 ) {
@@ -157,15 +161,17 @@ internal fun DialogWindowSetup() {
 @Composable
 private fun OccasionPicker(
     catalog: OccasionCatalog,
-    choice: OccasionChoice,
+    choice: SlotChoice,
     ardaasContent: ArdaasContent?,
-    onDone: (OccasionChoice) -> Unit,
+    onDone: (SlotChoice) -> Unit,
     onCancel: () -> Unit,
 ) {
     var draft by rememberSaveable(stateSaver = OccasionDraftBundle.saver) {
         mutableStateOf(OccasionDraft.from(choice, catalog))
     }
     val groups = remember(catalog) { catalog.pickerGroups() }
+    val paathGroup = groups.firstOrNull { it.category == OccasionCategory.PAATH }
+    val occasionGroup = groups.firstOrNull { it.category == OccasionCategory.OCCASION }
     val focusManager = LocalFocusManager.current
     val customFieldFocus = remember { FocusRequester() }
     // Set when the user picks "Other…", so the field it reveals takes focus
@@ -177,6 +183,10 @@ private fun OccasionPicker(
         if (selection == OccasionSelection.Custom && !draft.isCustom) focusCustomField = true
         if (selection != OccasionSelection.Custom) focusManager.clearFocus()
         draft = draft.withSelection(selection)
+    }
+    val selectPaath = { paathId: String ->
+        focusManager.clearFocus()
+        draft = draft.copy(paathId = paathId)
     }
 
     LaunchedEffect(focusCustomField, draft.isCustom) {
@@ -203,7 +213,7 @@ private fun OccasionPicker(
                     actions = {
                         TextButton(onClick = {
                             focusManager.clearFocus()
-                            onDone(draft.choice)
+                            onDone(draft.slot)
                         }) { Text("Done") }
                     },
                     colors = ardaasTopAppBarColors(),
@@ -218,8 +228,7 @@ private fun OccasionPicker(
                     .consumeWindowInsets(innerPadding)
                     .imePadding()
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .selectableGroup(),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 Text(
@@ -229,27 +238,39 @@ private fun OccasionPicker(
                     modifier = Modifier.padding(horizontal = 16.dp),
                 )
 
-                GroupedSection(header = null) {
-                    ChoiceRow(selected = draft.selection == OccasionSelection.Unset, onSelect = {
-                        select(OccasionSelection.Unset)
-                    }) {
-                        Text(OccasionCopy.NONE, style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
-
-                for (group in groups) {
-                    GroupedSection(header = group.title) {
-                        group.entries.forEachIndexed { index, entry ->
-                            if (index > 0) SectionDivider()
-                            val selection = OccasionSelection.Catalog(entry.id)
-                            ChoiceRow(selected = draft.selection == selection, onSelect = { select(selection) }) {
+                // Two radio groups (#158), each with its own "None": picking
+                // in one never changes the other.
+                if (paathGroup != null) {
+                    GroupedSection(header = paathGroup.title, modifier = Modifier.selectableGroup()) {
+                        ChoiceRow(selected = draft.paathId.isEmpty(), onSelect = { selectPaath("") }) {
+                            Text(OccasionCopy.NONE, style = MaterialTheme.typography.bodyLarge)
+                        }
+                        for (entry in paathGroup.entries) {
+                            SectionDivider()
+                            ChoiceRow(selected = draft.paathId == entry.id, onSelect = { selectPaath(entry.id) }) {
                                 CatalogRowText(entry)
                             }
                         }
                     }
                 }
 
-                GroupedSection(header = null) {
+                GroupedSection(
+                    header = occasionGroup?.title ?: OccasionCopy.OCCASIONS_HEADER,
+                    modifier = Modifier.selectableGroup(),
+                ) {
+                    ChoiceRow(selected = draft.selection == OccasionSelection.Unset, onSelect = {
+                        select(OccasionSelection.Unset)
+                    }) {
+                        Text(OccasionCopy.NONE, style = MaterialTheme.typography.bodyLarge)
+                    }
+                    for (entry in occasionGroup?.entries.orEmpty()) {
+                        SectionDivider()
+                        val selection = OccasionSelection.Catalog(entry.id)
+                        ChoiceRow(selected = draft.selection == selection, onSelect = { select(selection) }) {
+                            CatalogRowText(entry)
+                        }
+                    }
+                    SectionDivider()
                     ChoiceRow(selected = draft.isCustom, onSelect = { select(OccasionSelection.Custom) }) {
                         Text(OccasionCopy.OTHER, style = MaterialTheme.typography.bodyLarge)
                     }
@@ -406,7 +427,7 @@ private fun OccasionPickerPreview() {
     ArdaasTheme {
         OccasionPicker(
             catalog = catalog,
-            choice = OccasionChoice.Catalog("a"),
+            choice = SlotChoice(paathId = "a", occasion = OccasionChoice.Catalog("b")),
             ardaasContent = null,
             onDone = {},
             onCancel = {},

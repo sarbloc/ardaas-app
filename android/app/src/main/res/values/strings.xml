@@ -62,9 +62,10 @@
     <string name="compose_variant_header">Ardaas</string>
     <string name="compose_variant_row">Ardaas</string>
     <string name="compose_variant_choose">Choose the Ardaas variant</string>
-    <string name="compose_occasion_header">Occasion</string>
-    <string name="compose_occasion_row">What it\'s for</string>
-    <string name="compose_occasion_choose">Choose what it\'s for</string>
+    <string name="compose_occasion_header">Paath &amp; Occasion</string>
+    <string name="compose_paath_row">Paath</string>
+    <string name="compose_occasion_row">Occasion</string>
+    <string name="compose_occasion_choose">Choose the paath and occasion</string>
     <string name="compose_occasion_none">None</string>
     <string name="compose_occasion_other">Other…</string>
     <string name="compose_occasion_custom_placeholder">e.g. my daughter\'s first birthday</string>

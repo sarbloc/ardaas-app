@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-/// Changing the "….." slot from the Reader (#67), on a record that already
-/// exists.
+/// Changing the "….." slot — paath and occasion (#158) — from the Reader
+/// (#67), on a record that already exists.
 ///
 /// Presented as a sheet rather than folded into the Reader's display menu:
 /// what the prayer is for is *content*, not a display preference, and the
@@ -49,7 +49,7 @@ struct OccasionEditorSheet: View {
         // bundle retired opens as "None" — which is what the text is actually
         // rendering, rather than a row that no longer exists.
         _draft = State(
-            initialValue: OccasionDraft(choice: savedArdaas.occasionChoice, catalog: catalog)
+            initialValue: OccasionDraft(slot: savedArdaas.slotChoice, catalog: catalog)
         )
     }
 
@@ -66,7 +66,7 @@ struct OccasionEditorSheet: View {
             }
             .themedScreen()
             .scrollDismissesKeyboard(.interactively)
-            .navigationTitle("Occasion")
+            .navigationTitle(OccasionCopy.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
@@ -81,10 +81,13 @@ struct OccasionEditorSheet: View {
                 }
             }
             // The write. Driven by the draft rather than by each control so
-            // every route to a change — a row, the free-text field, clearing
-            // it — persists through the one rule (`OccasionDraft.choice`).
+            // every route to a change — either picker, the free-text field,
+            // clearing it — persists through the one rule
+            // (`OccasionDraft.slot`). All three fields are written together,
+            // so the first change on a legacy record also moves its paath out
+            // of `occasionId` into `paathId` (`SlotChoice.normalised(in:)`).
             .onChange(of: draft) { _, updated in
-                savedArdaas.occasionChoice = updated.choice
+                savedArdaas.slotChoice = updated.slot
             }
         }
     }
@@ -98,7 +101,8 @@ struct OccasionEditorSheet: View {
     let sample = SavedArdaas(
         label: "Morning Ardaas",
         bentiText: "Please bless the family with health and chardi kala.",
-        occasion: .catalog(id: "japji-sahib")
+        occasion: .catalog(id: "birthday"),
+        paathId: "japji-sahib"
     )
     container.mainContext.insert(sample)
     return OccasionEditorSheet(

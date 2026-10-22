@@ -29,9 +29,10 @@ sealed interface OccasionSelection {
 }
 
 /**
- * The occasion slot being edited, as pure, testable data: which row is
- * selected, the words typed under "Other…", and the rules that turn the two
- * into the [OccasionChoice] that `SavedArdaas` persists.
+ * The "….." slot's pickers as pure, testable data: which occasion row is
+ * selected, the words typed under "Other…", the paath chosen (#158), and the
+ * rules that turn them into the [SlotChoice] that `SavedArdaas` persists.
+ * The two pickers are independent: changing one never touches the other.
  *
  * Immutable — the Kotlin form of iOS's value-type struct, so it can sit in
  * Compose state and every edit is a new value. Change the row with
@@ -47,6 +48,12 @@ data class OccasionDraft(
      * [OccasionSelection.Custom]; cleared by [withSelection] otherwise.
      */
     val customText: String = "",
+    /**
+     * The Paath picker's row: `""` for "None", else a bundled paath's id.
+     * Independent of the occasion rows. Last so positional construction of
+     * the occasion fields reads as it did before #158.
+     */
+    val paathId: String = "",
 ) {
     /** True when the free-text field should be on screen. */
     val isCustom: Boolean get() = selection == OccasionSelection.Custom
@@ -82,18 +89,31 @@ data class OccasionDraft(
     fun withSelection(selection: OccasionSelection): OccasionDraft = OccasionDraft(
         selection = selection,
         customText = if (selection == OccasionSelection.Custom) customText else "",
+        paathId = paathId,
     )
 
     /**
-     * The slot sentence as it will read with this choice in it, for the
+     * Both pickers as what Save persists: the paath (trimmed) beside the
+     * occasion [choice].
+     */
+    val slot: SlotChoice
+        get() = SlotChoice(paathId = paathId.trimmingWhitespaceAndNewlines(), occasion = choice)
+
+    /**
+     * The slot sentence as it will read with both choices in it, for the
      * variant the user has selected. Null when the variant declares no
      * occasion slot (nothing would ever be substituted, so there is nothing to
      * show).
      */
     fun preview(content: ArdaasContent, catalog: OccasionCatalog): OccasionPreview? =
-        OccasionPreview.of(content, choice.layers(catalog))
+        OccasionPreview.of(content, slot.layers(catalog))
 
-    /** The #72 warning for the row currently selected — see [OccasionChoice.willNotAppear]. */
+    /**
+     * The #72 warning for the occasion row currently selected — see
+     * [OccasionChoice.willNotAppear]. Asked of the occasion alone: a paath
+     * always has Gurmukhi, so beside one the sentence changes even when the
+     * occasion's own words have nowhere to go, and that is still worth saying.
+     */
     fun willNotAppear(content: ArdaasContent, catalog: OccasionCatalog): Boolean =
         choice.willNotAppear(content, catalog)
 
@@ -124,6 +144,21 @@ data class OccasionDraft(
                     OccasionDraft(selection = OccasionSelection.Catalog(choice.id))
                 }
             is OccasionChoice.Custom -> OccasionDraft(selection = OccasionSelection.Custom, customText = choice.text)
+        }
+
+        /**
+         * Both pickers' state for a saved slot — how Compose's edit (#154)
+         * and the Reader's editor open on a record.
+         *
+         * With the catalog in hand the slot is normalised first
+         * ([SlotChoice.normalised]): a legacy record's paath, stored in the
+         * occasion field before #158, opens on the Paath picker, and an id
+         * that is not a paath opens as "None". The occasion then follows
+         * [from] for a choice. Without a catalog both are kept verbatim.
+         */
+        fun from(slot: SlotChoice, catalog: OccasionCatalog? = null): OccasionDraft {
+            val resolved = if (catalog != null) slot.normalised(catalog) else slot
+            return from(resolved.occasion, catalog).copy(paathId = resolved.paathId)
         }
     }
 }

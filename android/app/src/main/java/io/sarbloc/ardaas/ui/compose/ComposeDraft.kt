@@ -6,14 +6,14 @@ import io.sarbloc.ardaas.occasion.OccasionCatalog
 import io.sarbloc.ardaas.occasion.OccasionDraft
 import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.persistence.bentiLayers
-import io.sarbloc.ardaas.persistence.occasionChoice
+import io.sarbloc.ardaas.persistence.slotChoice
 import io.sarbloc.ardaas.text.trimmingWhitespaceAndNewlines
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 /**
  * Everything the Compose screen is building, as pure data: the label, the
- * benti, the variant and the occasion. Holds iOS `ComposeView`'s Save rule
+ * benti, the variant and the slot (paath and occasion). Holds iOS `ComposeView`'s Save rule
  * ([canSave]) and its `save()` mapping ([toSavedArdaas]) so both are
  * unit-tested rather than living in the view — and, for editing a saved
  * record (#154), the inverse ([from]) and the in-place update ([updating]),
@@ -40,17 +40,19 @@ data class ComposeDraft(
 
     /**
      * The record Save inserts, built exactly as iOS's `save()` builds it —
-     * every layer from [BentiDraft.layers], the occasion through
-     * [OccasionDraft.choice] (so "Other…" with nothing typed saves as
-     * nothing chosen). Null when [canSave] is false.
+     * every layer from [BentiDraft.layers], the paath and occasion through
+     * [OccasionDraft.slot] (so "Other…" with nothing typed saves as nothing
+     * chosen). Null when [canSave] is false.
      */
     fun toSavedArdaas(createdAt: Instant = Instant.now().truncatedTo(ChronoUnit.MILLIS)): SavedArdaas? {
         if (!canSave) return null
         val layers = benti.layers
+        val slot = occasion.slot
         return SavedArdaas(
             label = trimmedLabel,
             bentiText = layers.english,
-            occasion = occasion.choice,
+            occasion = slot.occasion,
+            paathId = slot.paathId,
             createdAt = createdAt,
             variantId = variantId,
             bentiGurmukhi = layers.gurmukhi,
@@ -68,21 +70,24 @@ data class ComposeDraft(
 
     companion object {
         /**
-         * The draft that reopens [saved] in Compose: label, variant, occasion
-         * and benti as stored, the benti through [BentiDraft.from].
+         * The draft that reopens [saved] in Compose: label, variant, slot
+         * and benti as stored, the benti through [BentiDraft.from] and the
+         * slot through [OccasionDraft.from].
          * [toSavedArdaas] of it reproduces every field of [saved] except the
          * id and `createdAt` (which [updating] keeps) and a transliteration
          * the transliterator would now write differently.
          *
-         * @param catalog as for [OccasionDraft.from]: when given, an occasion
-         *   id the catalog no longer carries opens as "None", the way the
-         *   Reader's occasion picker opens it.
+         * @param catalog as for [OccasionDraft.from]: when given, the slot is
+         *   normalised the way the Reader's picker opens it — a legacy paath
+         *   stored as the occasion (before #158) opens as the paath, and ids
+         *   the catalog no longer carries (or a paath id that is not a paath)
+         *   open as "None". Save then writes that normalised form.
          */
         fun from(saved: SavedArdaas, catalog: OccasionCatalog?): ComposeDraft = ComposeDraft(
             label = saved.label,
             benti = BentiDraft.from(saved.bentiLayers),
             variantId = saved.variantId,
-            occasion = OccasionDraft.from(saved.occasionChoice, catalog),
+            occasion = OccasionDraft.from(saved.slotChoice, catalog),
         )
     }
 }

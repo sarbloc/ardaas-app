@@ -214,7 +214,10 @@ struct ReaderView: View {
     /// itself, and it opens the picker so it can be fixed where it is read.
     private var occasionWillNotAppear: Bool {
         guard let loadedContent, let occasionCatalog else { return false }
-        return savedArdaas.occasionChoice.willNotAppear(in: loadedContent, catalog: occasionCatalog)
+        // The occasion as the slot reads it — a legacy paath stored as the
+        // occasion has moved out of it (`SlotChoice.normalised(in:)`).
+        return savedArdaas.slotChoice.normalised(in: occasionCatalog).occasion
+            .willNotAppear(in: loadedContent, catalog: occasionCatalog)
     }
 
     private var strandedOccasionNote: some View {
@@ -229,7 +232,7 @@ struct ReaderView: View {
         }
         .buttonStyle(.plain)
         .padding(.top, 4)
-        .accessibilityHint("Opens the occasion picker")
+        .accessibilityHint("Opens the paath and occasion pickers")
     }
 
     /// The benti, rendered layer by layer exactly as a canonical segment is
@@ -358,7 +361,7 @@ struct ReaderView: View {
         }
     }
 
-    /// Opens the occasion picker. Kept out of `displayMenu` — that menu is
+    /// Opens the paath and occasion pickers (#158). Kept out of `displayMenu` — that menu is
     /// display preferences (which layers, how big); this changes the words of
     /// the Ardaas itself, and it is the one thing on this screen a reader may
     /// want to change between two recitations.
@@ -366,7 +369,7 @@ struct ReaderView: View {
         Button {
             isEditingOccasion = true
         } label: {
-            Label("Occasion", systemImage: "tag")
+            Label(OccasionCopy.title, systemImage: "tag")
         }
     }
 
@@ -446,7 +449,8 @@ struct ReaderView: View {
         bentiText: "Please bless the family with health and chardi kala.",
         bentiGurmukhi: "ਪਰਿਵਾਰ ਨੂੰ ਤੰਦਰੁਸਤੀ ਅਤੇ ਚੜ੍ਹਦੀ ਕਲਾ ਬਖ਼ਸ਼ੋ ਜੀ।",
         bentiTransliteration: "parivār nūṃ tandarustī ate charhdī kalā bakhsho jī.",
-        occasion: .catalog(id: "japji-sahib")
+        occasion: .catalog(id: "birthday"),
+        paathId: "japji-sahib"
     )
     container.mainContext.insert(sample)
     return NavigationStack {

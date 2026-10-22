@@ -16,13 +16,19 @@ enum OccasionSelection: Hashable {
     case custom
 }
 
-/// The Compose screen's occasion slot as pure, testable data: which row is
-/// selected, the words typed under "Other…", and the rules that turn the two
-/// into the `OccasionChoice` that `SavedArdaas` persists.
+/// The "….." slot's pickers as pure, testable data: the paath chosen, which
+/// occasion row is selected, the words typed under "Other…", and the rules
+/// that turn them into the `SlotChoice` that `SavedArdaas` persists.
 ///
-/// The view owns one of these and binds the picker to `selection` and the
-/// free-text field to `customText`. Everything else is derived.
+/// The view owns one of these and binds the Paath picker to `paathId`, the
+/// Occasion picker to `selection` and the free-text field to `customText`.
+/// Everything else is derived. The two pickers are independent (#158):
+/// changing one never touches the other.
 struct OccasionDraft: Equatable {
+    /// The Paath picker's row: `""` for "None", else a bundled paath's id.
+    /// Independent of the occasion rows below.
+    var paathId: String = ""
+
     /// The selected row.
     ///
     /// Moving off "Other…" clears `customText`, so an abandoned draft can
@@ -61,17 +67,28 @@ struct OccasionDraft: Equatable {
         }
     }
 
-    /// The slot sentence as it will read with this choice in it, for the
+    /// Both pickers as what Save persists: the paath (trimmed) beside the
+    /// occasion `choice`.
+    var slot: SlotChoice {
+        SlotChoice(
+            paathId: paathId.trimmingCharacters(in: .whitespacesAndNewlines),
+            occasion: choice
+        )
+    }
+
+    /// The slot sentence as it will read with both choices in it, for the
     /// variant the user has selected. Nil when the variant declares no
     /// occasion slot (nothing would ever be substituted, so there is nothing
     /// to show).
     func preview(in content: ArdaasContent, catalog: OccasionCatalog) -> OccasionPreview? {
-        OccasionPreview(content: content, occasion: choice.layers(in: catalog))
+        OccasionPreview(content: content, occasion: slot.layers(in: catalog))
     }
 
-    /// The #72 warning for the row currently selected — see
+    /// The #72 warning for the occasion row currently selected — see
     /// `OccasionChoice.willNotAppear(in:catalog:)`, which both pickers and the
-    /// Reader's slot share.
+    /// Reader's slot share. Asked of the occasion alone: a paath always has
+    /// Gurmukhi, so beside one the sentence changes even when the occasion's
+    /// own words have nowhere to go, and that is still worth saying.
     func willNotAppear(in content: ArdaasContent, catalog: OccasionCatalog) -> Bool {
         choice.willNotAppear(in: content, catalog: catalog)
     }
@@ -109,6 +126,20 @@ extension OccasionDraft {
         case .custom(let text):
             self.init(selection: .custom, customText: text)
         }
+    }
+
+    /// Both pickers' state for a saved slot — how Compose's edit (#154) and
+    /// the Reader's editor open on a record.
+    ///
+    /// With the catalog in hand the slot is normalised first
+    /// (`SlotChoice.normalised(in:)`): a legacy record's paath, stored in the
+    /// occasion field before #158, opens on the Paath picker, and an id that
+    /// is not a paath opens as "None". The occasion then follows
+    /// `init(choice:catalog:)`. Without a catalog both are kept verbatim.
+    init(slot: SlotChoice, catalog: OccasionCatalog? = nil) {
+        let resolved = catalog.map { slot.normalised(in: $0) } ?? slot
+        self.init(choice: resolved.occasion, catalog: catalog)
+        paathId = resolved.paathId
     }
 }
 

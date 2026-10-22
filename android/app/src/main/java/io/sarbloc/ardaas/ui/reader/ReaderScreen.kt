@@ -78,7 +78,7 @@ import io.sarbloc.ardaas.occasion.OccasionCatalog
 import io.sarbloc.ardaas.occasion.OccasionCopy
 import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.persistence.bentiLayers
-import io.sarbloc.ardaas.persistence.occasionChoice
+import io.sarbloc.ardaas.persistence.slotChoice
 import io.sarbloc.ardaas.persistence.renderItems
 import io.sarbloc.ardaas.ui.ArdaasBackground
 import io.sarbloc.ardaas.ui.ArdaasColors
@@ -182,7 +182,10 @@ private fun ReaderContent(
     // reachable by switching variants here — so the reader is looking at the
     // dots and would have no idea why. Said at the slot itself.
     val occasionStranded = remember(savedArdaas, content, occasionCatalog) {
-        occasionCatalog != null && savedArdaas.occasionChoice.willNotAppear(content, occasionCatalog)
+        // The occasion as the slot reads it — a legacy paath stored as the
+        // occasion has moved out of it ([SlotChoice.normalised]).
+        occasionCatalog != null &&
+            savedArdaas.slotChoice.normalised(occasionCatalog).occasion.willNotAppear(content, occasionCatalog)
     }
     // Only when there is something to pick *and* somewhere to put it.
     val editOccasion = onEditOccasion?.takeIf { occasionCatalog != null && content.occasionSlot != null }
@@ -207,7 +210,7 @@ private fun ReaderContent(
                         // is for is content, not a display preference.
                         if (editOccasion != null) {
                             IconButton(onClick = editOccasion) {
-                                Icon(painterResource(R.drawable.ic_tag), contentDescription = "Occasion")
+                                Icon(painterResource(R.drawable.ic_tag), contentDescription = OccasionCopy.TITLE)
                             }
                         }
                         DisplayMenu(
@@ -311,7 +314,7 @@ private fun StrandedOccasionNote(onEditOccasion: (() -> Unit)?) {
     val clickable = if (onEditOccasion == null) {
         Modifier
     } else {
-        Modifier.clickable(onClickLabel = "Open the occasion picker", role = Role.Button, onClick = onEditOccasion)
+        Modifier.clickable(onClickLabel = "Open the paath and occasion picker", role = Role.Button, onClick = onEditOccasion)
     }
     Row(
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp).then(clickable),

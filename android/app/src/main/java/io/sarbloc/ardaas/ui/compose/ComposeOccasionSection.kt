@@ -33,6 +33,7 @@ import io.sarbloc.ardaas.R
 import io.sarbloc.ardaas.content.ArdaasContent
 import io.sarbloc.ardaas.content.LayerKind
 import io.sarbloc.ardaas.occasion.OccasionCatalog
+import io.sarbloc.ardaas.occasion.OccasionCategory
 import io.sarbloc.ardaas.occasion.OccasionCopy
 import io.sarbloc.ardaas.occasion.OccasionDraft
 import io.sarbloc.ardaas.occasion.OccasionPreview
@@ -42,12 +43,12 @@ import io.sarbloc.ardaas.ui.components.GroupedSection
 import io.sarbloc.ardaas.ui.components.SectionDivider
 
 // Port of the Compose half of Ardaas/Views/OccasionSection.swift: the
-// explanation, the "What it's for" row, the "Other…" free text and the slot
-// sentence quoted back. The list itself is the occasion picker (#90), opened
-// through [onEditOccasion].
+// explanation, the Paath and Occasion rows (#158), the "Other…" free text and
+// the slot sentence quoted back. The lists themselves are the slot picker
+// (#90), opened through [onEditOccasion].
 
 /**
- * What the "What it's for" row shows for the current selection — the
+ * What the Paath or Occasion row shows for the current selection — the
  * collapsed form of the picker's rows.
  */
 sealed interface OccasionSummary {
@@ -72,6 +73,17 @@ sealed interface OccasionSummary {
                 is OccasionSelection.Catalog ->
                     catalog.occasion(selection.id)?.let { Entry(it.gurmukhi, it.english) } ?: None
             }
+
+        /**
+         * The Paath row's value for [draft]: [None], or the paath's entry. An
+         * id that is not a bundled paath reads as [None] — which is also what
+         * the text renders ([io.sarbloc.ardaas.occasion.SlotChoice.normalised]).
+         */
+        fun paath(draft: OccasionDraft, catalog: OccasionCatalog): OccasionSummary =
+            catalog.occasion(draft.paathId)
+                ?.takeIf { it.category == OccasionCategory.PAATH }
+                ?.let { Entry(it.gurmukhi, it.english) }
+                ?: None
     }
 }
 
@@ -81,8 +93,8 @@ sealed interface OccasionSummary {
  * @param content the selected variant's text, which the preview and the #72
  *   warning both follow. Null while the bundle is loading (or if it failed):
  *   both are then omitted, as on iOS.
- * @param onEditOccasion opens the occasion picker. Null hides the "What it's
- *   for" row: a row that cannot open anything would be a dead control.
+ * @param onEditOccasion opens the slot picker. Null hides the Paath and
+ *   Occasion rows: a row that cannot open anything would be a dead control.
  */
 @Composable
 internal fun ComposeOccasionSection(
@@ -103,7 +115,9 @@ internal fun ComposeOccasionSection(
 
         if (onEditOccasion != null) {
             SectionDivider()
-            OccasionRow(OccasionSummary.of(occasion, catalog), onClick = onEditOccasion)
+            SummaryRow(stringResource(R.string.compose_paath_row), OccasionSummary.paath(occasion, catalog), onEditOccasion)
+            SectionDivider()
+            SummaryRow(stringResource(R.string.compose_occasion_row), OccasionSummary.of(occasion, catalog), onEditOccasion)
         }
 
         if (occasion.isCustom) {
@@ -141,7 +155,7 @@ internal fun ComposeOccasionSection(
 }
 
 @Composable
-private fun OccasionRow(summary: OccasionSummary, onClick: () -> Unit) {
+private fun SummaryRow(title: String, summary: OccasionSummary, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -155,7 +169,7 @@ private fun OccasionRow(summary: OccasionSummary, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            stringResource(R.string.compose_occasion_row),
+            title,
             style = MaterialTheme.typography.bodyLarge,
             color = ArdaasColors.Parchment,
             modifier = Modifier.weight(1f),

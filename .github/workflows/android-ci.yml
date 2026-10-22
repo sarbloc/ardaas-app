@@ -16,6 +16,8 @@ on:
       # The transliteration parity fixture is shared with the iOS tests
       # (#84): a change to it must re-run the Kotlin engine against it too.
       - 'ArdaasTests/Fixtures/transliteration-parity.json'
+      # …and the slot's paath + occasion parity fixture (#158), likewise.
+      - 'ArdaasTests/Fixtures/slot-parity.json'
       - '.github/workflows/android-ci.yml'
 
 concurrency:

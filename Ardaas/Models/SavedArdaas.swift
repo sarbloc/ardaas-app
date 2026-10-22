@@ -45,6 +45,16 @@ final class SavedArdaas {
     /// `occasionChoice`'s setter), so it can never hold an impossible
     /// combination like an id with a stale free-text draft beside it.
     var occasionCustom: String = ""
+    /// The paath recited, which fills the slot beside the occasion (#158):
+    /// a bundled entry's id whose category is `.paath`, or **empty for "no
+    /// paath"** — which is what every earlier record migrates to.
+    ///
+    /// Defaulted, like `occasionId`, so SwiftData's lightweight migration
+    /// adds it to existing stores with no migration plan. Records saved
+    /// before #158 may still carry their paath in `occasionId`; that is
+    /// resolved at read time (`SlotChoice.normalised(in:)`), never by
+    /// rewriting the store, and the next save writes it here.
+    var paathId: String = ""
 
     init(
         label: String,
@@ -53,7 +63,8 @@ final class SavedArdaas {
         variantId: String = ArdaasLibrary.defaultVariantId,
         bentiGurmukhi: String = "",
         bentiTransliteration: String = "",
-        occasion: OccasionChoice = .unset
+        occasion: OccasionChoice = .unset,
+        paathId: String = ""
     ) {
         self.label = label
         self.bentiText = bentiText
@@ -63,6 +74,7 @@ final class SavedArdaas {
         self.bentiTransliteration = bentiTransliteration
         self.occasionId = occasion.storedId
         self.occasionCustom = occasion.storedCustomText
+        self.paathId = paathId.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -86,6 +98,18 @@ extension SavedArdaas {
         }
     }
 
+    /// All three persisted slot fields as one value, *as stored* — normalise
+    /// with `SlotChoice.normalised(in:)` before showing it in a picker.
+    /// Setting it writes all three, so the occasion pair stays consistent and
+    /// a normalised slot clears a legacy paath out of `occasionId`.
+    var slotChoice: SlotChoice {
+        get { SlotChoice(paathId: paathId, occasion: occasionChoice) }
+        set {
+            paathId = newValue.paathId.trimmingCharacters(in: .whitespacesAndNewlines)
+            occasionChoice = newValue.occasion
+        }
+    }
+
     /// The persisted layers as the value type the composer and Reader use.
     var bentiLayers: BentiLayers {
         BentiLayers(
@@ -102,12 +126,13 @@ extension SavedArdaas {
             label: label,
             variantId: variantId,
             benti: bentiLayers,
-            occasion: occasionChoice
+            occasion: occasionChoice,
+            paathId: paathId
         )
     }
 
     /// Writes Compose's fields onto this record in place: the label, the
-    /// variant, all three benti layers and the occasion. `createdAt` is not
+    /// variant, all three benti layers, the occasion and the paath. `createdAt` is not
     /// touched, so an edited Ardaas keeps its place in the list.
     ///
     /// The only writer of these fields from Compose, for a new record
@@ -118,7 +143,7 @@ extension SavedArdaas {
         bentiText = fields.benti.english
         bentiGurmukhi = fields.benti.gurmukhi
         bentiTransliteration = fields.benti.transliteration
-        occasionChoice = fields.occasion
+        slotChoice = fields.slot
     }
 
     /// A new record holding `fields`, written through `apply(_:)` so creating
@@ -129,16 +154,18 @@ extension SavedArdaas {
         return record
     }
 
-    /// The chosen occasion's words, resolved through the bundled catalog.
+    /// The slot's words — paath and occasion, joined (#158) — resolved
+    /// through the bundled catalog.
     ///
-    /// Nil — the canonical dots, untouched — for nothing chosen and for an id
-    /// a later bundle has retired (`OccasionChoice.layers(in:)`). A broken
-    /// bundle must cost the reader the substitution, never the Ardaas.
+    /// Nil — the canonical dots, untouched — for nothing chosen and for ids
+    /// a later bundle has retired (`SlotChoice.layers(in:)`, which also reads
+    /// a legacy paath out of `occasionId`). A broken bundle must cost the
+    /// reader the substitution, never the Ardaas.
     ///
     /// A **free-text** occasion is stored whole on this record and needs no
-    /// catalog, so it survives a catalog that failed to load. Dropping the
-    /// user's own words because an unrelated bundled file is missing would be
-    /// the wrong trade.
+    /// catalog, so it survives a catalog that failed to load (the paath, which
+    /// is only an id, cannot). Dropping the user's own words because an
+    /// unrelated bundled file is missing would be the wrong trade.
     func occasionLayers(in catalog: OccasionCatalog?) -> OccasionLayers? {
         guard let catalog else {
             if case .custom(let text) = occasionChoice {
@@ -146,11 +173,12 @@ extension SavedArdaas {
             }
             return nil
         }
-        return occasionChoice.layers(in: catalog)
+        return slotChoice.layers(in: catalog)
     }
 
     /// Exactly what the Reader draws: this record's benti composed into
-    /// `content`, with its chosen occasion spliced into the "….." slot.
+    /// `content`, with its chosen paath and occasion spliced into the "….."
+    /// slot.
     ///
     /// The Reader calls nothing else, so this one function is the whole
     /// composition path and the tests that cover it cannot drift from the

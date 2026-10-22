@@ -11,8 +11,8 @@ object OccasionCopy {
     /** What the gap is and that leaving it is normal — the teaching text. */
     const val EXPLANATION =
         "Partway through the Ardaas there's a gap, written as “…..”. It's where you name what the prayer " +
-            "is for — the paath (scripture reading) you've just finished, or an occasion like a birthday, a new " +
-            "home, or someone's recovery. Leaving it unfilled is completely normal; the dots stay as they are."
+            "is for — the paath (scripture reading) you've just finished, an occasion like a birthday, a new " +
+            "home, or someone's recovery, or both. Leaving it unfilled is completely normal; the dots stay as they are."
 
     /** How free text is placed: one script, no translation. */
     const val FREE_TEXT =
@@ -31,8 +31,11 @@ object OccasionCopy {
     // The picker's own labels, verbatim from `OccasionSection` /
     // `OccasionEditorSheet`, so Compose and the Reader present one picker.
 
-    /** The picker's title — iOS's section header and sheet title. */
-    const val TITLE = "Occasion"
+    /**
+     * The picker's title — iOS's section header, sheet title and Reader
+     * button label (#158): the slot takes a paath and an occasion together.
+     */
+    const val TITLE = "Paath & Occasion"
 
     /** The row that leaves the slot as authored. */
     const val NONE = "None"

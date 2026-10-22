@@ -41,6 +41,18 @@ data class Occasion(
 )
 
 /**
+ * The connective between a paath and an occasion in the slot, one string per
+ * layer. Bundled beside the entries it joins, so it is proof-read and diffed
+ * like them.
+ */
+@Serializable
+data class SlotJoiner(
+    val gurmukhi: String,
+    val transliteration: String,
+    val english: String,
+)
+
+/**
  * The bundled slot list (`occasions.json`, shared with iOS).
  *
  * The Roman layer is **generated** by `GurmukhiTransliterator`, so that a
@@ -54,6 +66,14 @@ data class OccasionCatalog(
     val version: Int,
     val sources: List<String>,
     val occasions: List<Occasion>,
+    /**
+     * The word that joins a paath and an occasion when both are chosen
+     * (#158): `ਅਤੇ` / `Ate` / `and`. Optional — the decoder below is strict
+     * about unknown keys but not about this one: a catalog without it still
+     * loads, and the slot then reads the paath alone (see
+     * [OccasionLayers.Companion.joining]).
+     */
+    val joiner: SlotJoiner? = null,
 ) {
     /** Entries of one category, in bundled order (which is display order). */
     fun occasionsIn(category: OccasionCategory): List<Occasion> = occasions.filter { it.category == category }
