@@ -10,6 +10,8 @@ import io.sarbloc.ardaas.translation.BentiTranslationService
 import io.sarbloc.ardaas.translation.ModelInstaller
 import io.sarbloc.ardaas.translation.TranslationEngine
 import java.io.FileNotFoundException
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -112,6 +114,19 @@ class AppContainer(context: Context, scope: CoroutineScope) {
     } catch (e: Exception) {
         Log.e(TAG, "Inserting a new saved Ardaas failed", e)
         false
+    }
+
+    /**
+     * Saves a copy of [source] (#159) and returns its id, or null — after
+     * logging why — if the database refused.
+     */
+    suspend fun duplicate(source: SavedArdaas): Long? = try {
+        savedArdaasDao.insertDuplicate(source, createdAt = Instant.now().truncatedTo(ChronoUnit.MILLIS))
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.e(TAG, "Duplicating saved Ardaas ${source.id} failed", e)
+        null
     }
 
     /**

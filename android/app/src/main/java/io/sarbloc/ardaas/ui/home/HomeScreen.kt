@@ -1,7 +1,7 @@
 package io.sarbloc.ardaas.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,8 +28,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,10 +67,13 @@ import kotlinx.coroutines.launch
 
 /**
  * Home: the saved Ardaas, newest first. Port of `HomeView.swift` — tap a row
- * to read it, swipe it away to delete it, "+" (or the empty state's button)
- * to compose a new one, and the info button for About & Sources.
+ * to read it, swipe it away to delete it, long-press it to duplicate it, "+"
+ * (or the empty state's button) to compose a new one, and the info button for
+ * About & Sources.
  *
  * [onDelete] returns false when the delete failed, and the row slides back.
+ * [onDuplicate] saves a copy (#159), which joins the list at the top; Home
+ * stays put.
  * [diagnosticsAction] is the debug-only Benti Lab entry (iOS: "On-device
  * translation diagnostics (#42) — debug builds only"); release supplies
  * nothing.
@@ -77,6 +86,7 @@ fun HomeScreen(
     onCompose: () -> Unit,
     onShowSources: () -> Unit,
     onDelete: suspend (SavedArdaas) -> Boolean,
+    onDuplicate: (SavedArdaas) -> Unit,
     diagnosticsAction: @Composable () -> Unit = {},
 ) {
     // iOS's large navigation title, collapsing as the list scrolls.
@@ -117,7 +127,7 @@ fun HomeScreen(
                 if (savedArdaas.value.isEmpty()) {
                     EmptyState(onCompose = onCompose, modifier = Modifier.padding(innerPadding))
                 } else {
-                    SavedArdaasList(savedArdaas.value, innerPadding, onOpen, onDelete)
+                    SavedArdaasList(savedArdaas.value, innerPadding, onOpen, onDelete, onDuplicate)
                 }
         }
     }
@@ -143,6 +153,7 @@ private fun SavedArdaasList(
     innerPadding: PaddingValues,
     onOpen: (SavedArdaas) -> Unit,
     onDelete: suspend (SavedArdaas) -> Boolean,
+    onDuplicate: (SavedArdaas) -> Unit,
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val locale = LocalConfiguration.current.locales[0]
@@ -165,6 +176,7 @@ private fun SavedArdaasList(
                 date = formatSavedDate(saved.createdAt, zone, locale),
                 onOpen = { onOpen(saved) },
                 onDelete = { onDelete(saved) },
+                onDuplicate = { onDuplicate(saved) },
                 modifier = Modifier.animateItem(),
             )
         }
@@ -178,8 +190,10 @@ private fun SavedArdaasRow(
     date: String,
     onOpen: () -> Unit,
     onDelete: suspend () -> Boolean,
+    onDuplicate: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showingActions by rememberSaveable { mutableStateOf(false) }
     val dismissState = rememberSwipeToDismissBoxState()
     val scope = rememberCoroutineScope()
     val delete: () -> Unit = {
@@ -188,6 +202,7 @@ private fun SavedArdaasRow(
         }
     }
     val deleteLabel = stringResource(R.string.home_delete)
+    val duplicateLabel = stringResource(R.string.home_duplicate)
 
     // Trailing swipe only, deleting without a confirmation — exactly iOS's
     // `.onDelete` on a List.
@@ -198,21 +213,44 @@ private fun SavedArdaasRow(
         onDismiss = { delete() },
         backgroundContent = { DeleteBackground(dismissState) },
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(ArdaasColors.RaisedFill)
-                .clickable(onClickLabel = stringResource(R.string.home_open), onClick = onOpen)
-                // A swipe is no use to a screen-reader user; iOS's onDelete
-                // offers its own accessibility action, and so does this row.
-                .semantics {
-                    customActions = listOf(CustomAccessibilityAction(deleteLabel) { delete(); true })
-                }
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(saved.label, style = MaterialTheme.typography.titleMedium, color = ArdaasColors.Parchment)
-            Text(date, style = MaterialTheme.typography.bodyMedium, color = ArdaasColors.Mist)
+        // The Box anchors the long-press menu to the row — iOS's
+        // `.contextMenu`.
+        Box {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(ArdaasColors.RaisedFill)
+                    .combinedClickable(
+                        onClickLabel = stringResource(R.string.home_open),
+                        onLongClickLabel = stringResource(R.string.home_row_actions),
+                        onLongClick = { showingActions = true },
+                        onClick = onOpen,
+                    )
+                    // A swipe is no use to a screen-reader user; iOS's
+                    // onDelete offers its own accessibility action, and so
+                    // does this row — Duplicate too, without the menu.
+                    .semantics {
+                        customActions = listOf(
+                            CustomAccessibilityAction(deleteLabel) { delete(); true },
+                            CustomAccessibilityAction(duplicateLabel) { onDuplicate(); true },
+                        )
+                    }
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(saved.label, style = MaterialTheme.typography.titleMedium, color = ArdaasColors.Parchment)
+                Text(date, style = MaterialTheme.typography.bodyMedium, color = ArdaasColors.Mist)
+            }
+            DropdownMenu(expanded = showingActions, onDismissRequest = { showingActions = false }) {
+                DropdownMenuItem(
+                    text = { Text(duplicateLabel) },
+                    onClick = {
+                        showingActions = false
+                        onDuplicate()
+                    },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_duplicate), contentDescription = null) },
+                )
+            }
         }
     }
 }
@@ -262,6 +300,7 @@ private fun HomeScreenPreview() {
                 onCompose = {},
                 onShowSources = {},
                 onDelete = { true },
+                onDuplicate = {},
             )
         }
     }
@@ -272,7 +311,7 @@ private fun HomeScreenPreview() {
 private fun HomeScreenEmptyPreview() {
     ArdaasTheme {
         ArdaasBackground {
-            HomeScreen(LoadState.Loaded(emptyList()), onOpen = {}, onCompose = {}, onShowSources = {}, onDelete = { true })
+            HomeScreen(LoadState.Loaded(emptyList()), onOpen = {}, onCompose = {}, onShowSources = {}, onDelete = { true }, onDuplicate = {})
         }
     }
 }

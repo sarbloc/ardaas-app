@@ -18,6 +18,8 @@ on:
       - 'ArdaasTests/Fixtures/transliteration-parity.json'
       # …and the slot's paath + occasion parity fixture (#158), likewise.
       - 'ArdaasTests/Fixtures/slot-parity.json'
+      # …and the duplicate-label parity fixture (#159), likewise.
+      - 'ArdaasTests/Fixtures/duplicate-label-parity.json'
       - '.github/workflows/android-ci.yml'
 
 concurrency:

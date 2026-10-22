@@ -13,6 +13,8 @@
     <string name="home_empty_description">Compose your first Ardaas with a personal benti.</string>
     <string name="home_delete">Delete</string>
     <string name="home_open">Read</string>
+    <string name="home_duplicate">Duplicate</string>
+    <string name="home_row_actions">Show actions</string>
     <string name="home_load_failed_title">Saved Ardaas Unavailable</string>
 
     <!-- About & Sources (port of SourcesView.swift) -->
@@ -47,6 +49,7 @@
     <!-- Reader -->
     <string name="reader_text_unavailable">Ardaas Text Unavailable</string>
     <string name="reader_edit">Edit</string>
+    <string name="reader_duplicate">Duplicate</string>
 
     <!-- Compose (port of ComposeView.swift) -->
     <string name="compose_title">New Ardaas</string>

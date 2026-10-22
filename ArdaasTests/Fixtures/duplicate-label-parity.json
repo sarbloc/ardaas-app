@@ -1,0 +1,191 @@
+{
+  "_comment": "Shared by ArdaasTests/DuplicateArdaasTests.swift and android DuplicateLabelTest.kt (#159): the label a copy of `label` is saved with, given every saved label (`existing`). Never edit an expected value to make one side pass.",
+  "cases": [
+    {
+      "name": "first copy",
+      "label": "Family",
+      "existing": ["Family"],
+      "expected": "Family copy"
+    },
+    {
+      "name": "nothing saved yet",
+      "label": "Family",
+      "existing": [],
+      "expected": "Family copy"
+    },
+    {
+      "name": "other labels are irrelevant",
+      "label": "Family",
+      "existing": ["Morning", "Family", "Morning copy"],
+      "expected": "Family copy"
+    },
+    {
+      "name": "second copy",
+      "label": "Family",
+      "existing": ["Family", "Family copy"],
+      "expected": "Family copy 2"
+    },
+    {
+      "name": "third copy",
+      "label": "Family",
+      "existing": ["Family", "Family copy", "Family copy 2"],
+      "expected": "Family copy 3"
+    },
+    {
+      "name": "the smallest free number fills a gap",
+      "label": "Family",
+      "existing": ["Family", "Family copy", "Family copy 3"],
+      "expected": "Family copy 2"
+    },
+    {
+      "name": "past nine",
+      "label": "Family",
+      "existing": ["Family", "Family copy", "Family copy 2", "Family copy 3", "Family copy 4", "Family copy 5", "Family copy 6", "Family copy 7", "Family copy 8", "Family copy 9"],
+      "expected": "Family copy 10"
+    },
+    {
+      "name": "a copy of a copy counts from the original",
+      "label": "Family copy",
+      "existing": ["Family", "Family copy"],
+      "expected": "Family copy 2"
+    },
+    {
+      "name": "a copy of a numbered copy counts from the original",
+      "label": "Family copy 2",
+      "existing": ["Family", "Family copy", "Family copy 2"],
+      "expected": "Family copy 3"
+    },
+    {
+      "name": "a copy whose original is gone",
+      "label": "Family copy",
+      "existing": ["Family copy"],
+      "expected": "Family copy 2"
+    },
+    {
+      "name": "a numbered copy takes the first free slot",
+      "label": "Family copy 5",
+      "existing": ["Family copy 5"],
+      "expected": "Family copy"
+    },
+    {
+      "name": "multi-digit copy number",
+      "label": "Family copy 10",
+      "existing": ["Family copy 10", "Family copy"],
+      "expected": "Family copy 2"
+    },
+    {
+      "name": "taken labels compare case-insensitively",
+      "label": "Family",
+      "existing": ["Family", "family COPY"],
+      "expected": "Family copy 2"
+    },
+    {
+      "name": "the suffix is stripped case-insensitively",
+      "label": "Family Copy",
+      "existing": ["Family Copy"],
+      "expected": "Family copy 2"
+    },
+    {
+      "name": "labels compare trimmed",
+      "label": "  Family  ",
+      "existing": ["  Family  ", " Family copy\t"],
+      "expected": "Family copy 2"
+    },
+    {
+      "name": "newlines trim too",
+      "label": "Family\n",
+      "existing": ["Family\n", "Family copy 2\n"],
+      "expected": "Family copy"
+    },
+    {
+      "name": "extra space before the suffix",
+      "label": "Family  copy",
+      "existing": ["Family  copy"],
+      "expected": "Family copy"
+    },
+    {
+      "name": "copy inside a word is not a suffix",
+      "label": "Copycat",
+      "existing": ["Copycat"],
+      "expected": "Copycat copy"
+    },
+    {
+      "name": "a longer word is not the suffix",
+      "label": "Family copying",
+      "existing": ["Family copying"],
+      "expected": "Family copying copy"
+    },
+    {
+      "name": "the suffix needs a space before it",
+      "label": "Familycopy",
+      "existing": ["Familycopy"],
+      "expected": "Familycopy copy"
+    },
+    {
+      "name": "the number needs a space before it",
+      "label": "Family copy2",
+      "existing": ["Family copy2"],
+      "expected": "Family copy2 copy"
+    },
+    {
+      "name": "a label that is only the suffix",
+      "label": "copy",
+      "existing": ["copy"],
+      "expected": "copy copy"
+    },
+    {
+      "name": "a label that is only a numbered suffix",
+      "label": "copy 2",
+      "existing": ["copy 2"],
+      "expected": "copy 2 copy"
+    },
+    {
+      "name": "a trailing year is part of the label",
+      "label": "Barsi 2024",
+      "existing": ["Barsi 2024"],
+      "expected": "Barsi 2024 copy"
+    },
+    {
+      "name": "a copy of a label ending in a year",
+      "label": "Barsi 2024 copy",
+      "existing": ["Barsi 2024", "Barsi 2024 copy"],
+      "expected": "Barsi 2024 copy 2"
+    },
+    {
+      "name": "a Gurmukhi numeral is not a copy number",
+      "label": "Family copy ੨",
+      "existing": ["Family copy ੨"],
+      "expected": "Family copy ੨ copy"
+    },
+    {
+      "name": "a Gurmukhi label",
+      "label": "ਪਰਿਵਾਰ",
+      "existing": ["ਪਰਿਵਾਰ", "ਪਰਿਵਾਰ copy"],
+      "expected": "ਪਰਿਵਾਰ copy 2"
+    },
+    {
+      "name": "canonically equivalent labels collide",
+      "label": "\u0a59",
+      "existing": ["\u0a59", "\u0a16\u0a3c copy"],
+      "expected": "\u0a59 copy 2"
+    },
+    {
+      "name": "the label keeps its own spelling",
+      "label": "\u0a16\u0a3c",
+      "existing": ["\u0a16\u0a3c", "\u0a59 copy", "\u0a59 copy 2"],
+      "expected": "\u0a16\u0a3c copy 3"
+    },
+    {
+      "name": "an empty label",
+      "label": "",
+      "existing": [""],
+      "expected": "copy"
+    },
+    {
+      "name": "a blank label with its copy taken",
+      "label": "   ",
+      "existing": ["   ", "copy"],
+      "expected": "copy 2"
+    }
+  ]
+}

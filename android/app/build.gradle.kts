@@ -412,6 +412,10 @@ val tokenizerSourceFixture: File =
 val slotParityFixture: File =
     rootDir.parentFile.resolve("ArdaasTests/Fixtures/slot-parity.json")
 
+// The duplicate-label parity fixture (#159), shared the same way.
+val duplicateLabelParityFixture: File =
+    rootDir.parentFile.resolve("ArdaasTests/Fixtures/duplicate-label-parity.json")
+
 // Room's exported schemas, so the migration test builds each old database from
 // exactly the schema that version shipped with.
 val roomSchemaDir: File = projectDir.resolve("schemas/io.sarbloc.ardaas.persistence.ArdaasDatabase")
@@ -446,6 +450,9 @@ tasks.withType<Test>().configureEach {
     // …and the slot parity test whenever its fixture does.
     systemProperty("ardaas.slotParityFixture", slotParityFixture.absolutePath)
     inputs.file(slotParityFixture).withPathSensitivity(PathSensitivity.NONE)
+    // …and the duplicate-label parity test whenever its fixture does.
+    systemProperty("ardaas.duplicateLabelParityFixture", duplicateLabelParityFixture.absolutePath)
+    inputs.file(duplicateLabelParityFixture).withPathSensitivity(PathSensitivity.NONE)
     // …and the migration test whenever an exported schema does.
     systemProperty("ardaas.roomSchemaDir", roomSchemaDir.absolutePath)
     inputs.dir(roomSchemaDir).withPathSensitivity(PathSensitivity.RELATIVE)

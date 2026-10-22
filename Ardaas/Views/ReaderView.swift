@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UIKit
+import os
 
 /// Reads a saved Ardaas in situ: the canonical segments with the personal
 /// benti composed in at the bundled slot and the chosen occasion spliced
@@ -10,6 +11,14 @@ struct ReaderView: View {
     /// record (operator decision — the switch persists, not per-session).
     /// The occasion picker in `OccasionEditorSheet` persists the same way.
     @Bindable var savedArdaas: SavedArdaas
+
+    /// Opens a just-made copy of this record in this Reader's place (#159).
+    /// Nil hides Duplicate.
+    private let onDuplicate: ((SavedArdaas) -> Void)?
+
+    @Environment(\.modelContext) private var modelContext
+    /// Every saved label, which the copy's label must not repeat.
+    @Query private var allSavedArdaas: [SavedArdaas]
 
     @AppStorage("reader.showGurmukhi") private var showGurmukhi = true
     @AppStorage("reader.showTransliteration") private var showTransliteration = true
@@ -27,13 +36,18 @@ struct ReaderView: View {
     @State private var occasionCatalog: OccasionCatalog?
 
     @State private var isEditingOccasion = false
+    /// This Reader's claim on keeping the screen awake (`ScreenAwake`).
+    @State private var screenAwakeToken = UUID()
     @State private var isEditingArdaas = false
 
     private static let fontScaleRange = 0.7...1.6
     private static let fontScaleStep = 0.1
 
-    init(savedArdaas: SavedArdaas) {
+    private static let logger = Logger(subsystem: "io.sarbloc.ardaas", category: "Reader")
+
+    init(savedArdaas: SavedArdaas, onDuplicate: ((SavedArdaas) -> Void)? = nil) {
         self.savedArdaas = savedArdaas
+        self.onDuplicate = onDuplicate
     }
 
     var body: some View {
@@ -68,7 +82,7 @@ struct ReaderView: View {
                 ComposeView(editing: savedArdaas)
             }
             .onAppear {
-                UIApplication.shared.isIdleTimerDisabled = true
+                ScreenAwake.hold(screenAwakeToken)
                 if loadResult == nil {
                     loadResult = Result { try ArdaasLibrary.loadBundled() }
                 }
@@ -84,7 +98,7 @@ struct ReaderView: View {
                 }
             }
             .onDisappear {
-                UIApplication.shared.isIdleTimerDisabled = false
+                ScreenAwake.release(screenAwakeToken)
             }
     }
 
@@ -361,6 +375,32 @@ struct ReaderView: View {
         }
     }
 
+    /// Saves a copy of this Ardaas — every field, a new label — and opens it
+    /// in this Reader's place (#159). Sits under Edit: both act on the record
+    /// rather than on how it is displayed.
+    private var duplicateButton: some View {
+        Button {
+            duplicate()
+        } label: {
+            Label("Duplicate", systemImage: "plus.square.on.square")
+        }
+    }
+
+    private func duplicate() {
+        guard let onDuplicate else { return }
+        let copy = savedArdaas.duplicate(existingLabels: allSavedArdaas.map(\.label))
+        modelContext.insert(copy)
+        // Saved before it is navigated to, so the path holds a record with
+        // its permanent identity. A failed save leaves the copy inserted for
+        // autosave to retry; it is still the record to open.
+        do {
+            try modelContext.save()
+        } catch {
+            Self.logger.error("Saving a duplicated Ardaas failed: \(String(describing: error), privacy: .public)")
+        }
+        onDuplicate(copy)
+    }
+
     /// Opens the paath and occasion pickers (#158). Kept out of `displayMenu` — that menu is
     /// display preferences (which layers, how big); this changes the words of
     /// the Ardaas itself, and it is the one thing on this screen a reader may
@@ -377,6 +417,9 @@ struct ReaderView: View {
         Menu {
             Section {
                 editButton
+                if onDuplicate != nil {
+                    duplicateButton
+                }
             }
             if case .success(let library) = loadResult, library.variants.count > 1 {
                 Section("Ardaas") {
@@ -457,4 +500,29 @@ struct ReaderView: View {
         ReaderView(savedArdaas: sample)
     }
     .modelContainer(container)
+}
+
+/// Keeps the screen awake while any Reader is showing — a reader
+/// mid-recitation must not lose the text.
+///
+/// Held per Reader rather than switched on and off by each: two overlap when
+/// a duplicate opens in its original's place (#159), and the outgoing
+/// Reader's `onDisappear` can land after the incoming one's `onAppear`.
+/// Tokens, not a count, so a repeated `onAppear` cannot leave the screen
+/// awake for good.
+@MainActor
+enum ScreenAwake {
+    private static var holders: Set<UUID> = []
+
+    static func hold(_ token: UUID) {
+        holders.insert(token)
+        UIApplication.shared.isIdleTimerDisabled = true
+    }
+
+    static func release(_ token: UUID) {
+        holders.remove(token)
+        if holders.isEmpty {
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+    }
 }

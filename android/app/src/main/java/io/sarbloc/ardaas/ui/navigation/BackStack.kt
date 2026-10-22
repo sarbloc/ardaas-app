@@ -115,6 +115,19 @@ class BackStack(entries: List<Destination> = listOf(Destination.Home)) {
         stack.add(destination)
     }
 
+    /**
+     * Shows [destination] in place of the top screen, so Back from it goes
+     * where Back from the replaced screen went — how the Reader opens a copy
+     * it has just made (#159). At Home, or for Home itself, it is a [push].
+     */
+    fun replaceTop(destination: Destination) {
+        if (!canGoBack || destination == Destination.Home) {
+            push(destination)
+            return
+        }
+        stack[stack.lastIndex] = destination
+    }
+
     /** Leaves the top screen. Returns it, or null at Home (nothing popped). */
     fun pop(): Destination? = if (canGoBack) stack.removeAt(stack.lastIndex) else null
 

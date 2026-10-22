@@ -4,7 +4,9 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
+import java.time.Instant
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -32,6 +34,21 @@ interface SavedArdaasDao {
     @Query("SELECT * FROM saved_ardaas ORDER BY createdAt DESC, id DESC")
     fun observeAll(): Flow<List<SavedArdaas>>
 
+    /** Every saved label, in no particular order — what a duplicate's label must not repeat (#159). */
+    @Query("SELECT label FROM saved_ardaas")
+    suspend fun labels(): List<String>
+
     @Query("SELECT * FROM saved_ardaas WHERE id = :id")
     suspend fun getById(id: Long): SavedArdaas?
+
+    /**
+     * Saves a copy of [source] (#159), labelled by [DuplicateLabel] against
+     * every saved label, and returns the copy's id.
+     *
+     * One transaction, so two duplicates racing each other cannot both read
+     * the same labels and save the same name.
+     */
+    @Transaction
+    suspend fun insertDuplicate(source: SavedArdaas, createdAt: Instant): Long =
+        insert(source.duplicate(DuplicateLabel.forCopyOf(source.label, labels()), createdAt))
 }

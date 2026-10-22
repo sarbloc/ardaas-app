@@ -13,7 +13,9 @@ import io.sarbloc.ardaas.R
 import io.sarbloc.ardaas.ui.components.BackTopAppBar
 import io.sarbloc.ardaas.ui.components.ContentUnavailable
 import io.sarbloc.ardaas.ui.reader.ReaderScreen
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,6 +26,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -69,6 +73,7 @@ fun AppRoot(container: AppContainer) {
         onDelete = container::delete,
         onUpdate = container::update,
         onInsert = container::insert,
+        onDuplicate = container::duplicate,
         translationService = { container.translationService },
     )
 }
@@ -88,6 +93,7 @@ fun AppNavHost(
     onDelete: suspend (SavedArdaas) -> Boolean,
     onUpdate: suspend (SavedArdaas) -> Boolean,
     onInsert: suspend (SavedArdaas) -> Boolean,
+    onDuplicate: suspend (SavedArdaas) -> Long?,
     translationService: () -> BentiTranslationService,
     diagnostics: DiagnosticsHook = BuildDiagnostics,
 ) {
@@ -95,6 +101,29 @@ fun AppNavHost(
     val screenState = rememberSaveableStateHolder()
     val goBack: () -> Unit = {
         backStack.pop()?.let { screenState.removeState(it.key) }
+    }
+    // Outlives any one screen, so a duplicate started from the Reader still
+    // lands if the Reader is left meanwhile.
+    val scope = rememberCoroutineScope()
+    val latestSavedArdaas by rememberUpdatedState(savedArdaas)
+    // Saves a copy (#159) and, once it is in the observed list, swaps
+    // [from] — the Reader it was made in — for the copy's Reader, so Back
+    // goes to Home. Waiting matters: a Reader opened before its row arrives
+    // finds no record and leaves. Nothing moves if [from] is no longer on
+    // top by then; the copy is on Home either way.
+    val duplicateAndOpen: (SavedArdaas, Destination) -> Unit = { record, from ->
+        scope.launch {
+            val id = onDuplicate(record) ?: return@launch
+            val arrived = withTimeoutOrNull(COPY_ARRIVAL_TIMEOUT_MILLIS) {
+                snapshotFlow { latestSavedArdaas }.first { state ->
+                    state is LoadState.Loaded && state.value.any { it.id == id }
+                }
+            }
+            if (arrived != null && backStack.current == from) {
+                backStack.replaceTop(Destination.Reader(id))
+                screenState.removeState(from.key)
+            }
+        }
     }
     BackHandler(enabled = backStack.canGoBack, onBack = goBack)
 
@@ -112,6 +141,8 @@ fun AppNavHost(
                         onCompose = { backStack.push(Destination.Compose) },
                         onShowSources = { backStack.push(Destination.Sources) },
                         onDelete = onDelete,
+                        // Stays on Home, where the copy leads the list.
+                        onDuplicate = { record -> scope.launch { onDuplicate(record) } },
                         diagnosticsAction = {
                             diagnostics.HomeAction(onOpen = { backStack.push(Destination.Diagnostics) })
                         },
@@ -153,6 +184,9 @@ fun AppNavHost(
                         onUpdate = onUpdate,
                         onEdit = {
                             if (backStack.current == destination) backStack.push(Destination.Edit(destination.savedArdaasId))
+                        },
+                        onDuplicate = { record ->
+                            if (backStack.current == destination) duplicateAndOpen(record, destination)
                         },
                         // Leave only if this Reader is still the top screen —
                         // never pop whatever replaced it mid-transition.
@@ -266,6 +300,7 @@ private fun ReaderDestination(
     bundledContent: BundledContent,
     onUpdate: suspend (SavedArdaas) -> Boolean,
     onEdit: () -> Unit,
+    onDuplicate: (SavedArdaas) -> Unit,
     onRecordGone: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -298,6 +333,7 @@ private fun ReaderDestination(
                         },
                         onEditOccasion = { editingOccasion = true },
                         onEdit = onEdit,
+                        onDuplicate = { onDuplicate(record) },
                     )
                     if (editingOccasion && occasionCatalog != null) {
                         OccasionPickerDialog(
@@ -340,3 +376,10 @@ private fun ReaderTextUnavailable(title: String, error: Throwable, onBack: () ->
         )
     }
 }
+
+/**
+ * How long a duplicate made in the Reader waits to appear in the observed
+ * list before the Reader gives up on opening it (it is still on Home). Room
+ * re-emits within milliseconds; this only bounds a stalled database.
+ */
+private const val COPY_ARRIVAL_TIMEOUT_MILLIS = 5_000L
