@@ -46,7 +46,7 @@ same look while being internally consistent.
 | --- | --- |
 | Stops etc. | ਕ k · ਖ kh · ਗ g · ਘ gh · ਙ ng · ਚ ch · ਛ chh · ਜ j · ਝ jh · ਞ nj · ਟ t · ਠ th · ਡ d · ਢ dh · ਣ n · ਤ t · ਥ th · ਦ d · ਧ dh · ਨ n · ਪ p · ਫ ph · ਬ b · ਭ bh · ਮ m · ਯ y · ਰ r · ਲ l · ਵ v · ੜ rh · ਸ s · ਹ h |
 | Pairin bindi | ਸ਼ sh · ਖ਼ kh · ਗ਼ gh · ਜ਼ z · ਫ਼ f · ਲ਼ l (precomposed **and** base + U+0A3C nukta) |
-| Vowels | ਅ a · ਆ/ਾ aa · ਇ/ਿ i · ਈ/ੀ i · ਉ/ੁ u · ਊ/ੂ u · ਏ/ੇ e · ਐ/ੈ ai · ਓ/ੋ o · ਔ/ੌ au · bare ੳ o |
+| Vowels | ਅ a · ਆ/ਾ aa · ਇ/ਿ i · ਈ/ੀ ee, or i word-final · ਉ/ੁ u · ਊ/ੂ u · ਏ/ੇ e · ਐ/ੈ ai · ਓ/ੋ o · ਔ/ੌ au · bare ੳ o |
 | Nasals | ੰ tippi → `n`, or `m` before a labial (ਪ ਫ ਬ ਭ ਮ ਫ਼); ਂ bindi → `(n)` |
 | Addak | doubles the next consonant's first letter (ਦਿੱਤੇ → Ditte, ਸੱਚੇ → Sacche) |
 | Conjuncts | ੍ + ਹ/ਰ/ਵ join the onset (ਪ੍ਰ → pr, ਕ੍ਰਿ → kri, ਤਿਨ੍ਹਾਂ → Tinhaan) |
@@ -56,20 +56,24 @@ Deliberate choices worth flagging:
 
 - **Retroflex and dental collapse** (ਟ and ਤ are both `t`) — plain ASCII has no
   way to write the contrast, and the SGPC layer doesn't either.
-- **Only a/aa length is written.** ਿ/ੀ both give `i` and ੁ/ੂ both give `u`,
-  because that is what the house style's commonest words do: `Ji`, `Ki`, `Sri`,
-  `Guru` — not `Jee`, `Kee`, `Sree`, `Guroo`.
+- **Long ī is `ee` unless it is the word's last sound** (Sarbloc's rule):
+  ਜੀਤ → `Jeet`, ਦੀਦਾਰ → `Deedaar`, but ਜੀ → `Ji`, ਕੀ → `Ki`, ਸ੍ਰੀ → `Sri` — not
+  `Jee`, `Kee`, `Sree`. A trailing nasal doesn't count as a sound after it
+  (ਨਹੀਂ → `Nahi(n)`). Word-final ī straight after `a`/`e` stays `ee`, because
+  `ai`/`ei` would read as a diphthong: ਲਈ → `Laee` (not "lay"), ਸੇਈ → `Seyee`;
+  after any other vowel the plain `i` reads fine (ਕੋਈ → `Koi`). ਿ is always
+  `i`. `u` length is not written: ੁ/ੂ both give `u` (`Guru`, not `Guroo`).
 - **Glides.** A vowel-initial syllable after i/u takes one: ਧਿਆਨ → `Dhiyaan`,
   ਸੁਆਸ → `Suwaas`.
 - **An independent ਉ that opens its own syllable** — i.e. one that takes a
   glide — reads `o`, and is written `ou` so it stays distinct from ਓ: ਜੀਉ →
-  `Jiyou`, where ਜੀਓ → `Jiyo`. Elsewhere ਉ is the second half of a plain vowel
+  `Jeeyou`, where ਜੀਓ → `Jeeyo`. Elsewhere ਉ is the second half of a plain vowel
   juncture (ਨਉ → `Nau`, ਨਾਉ → `Naau`, ਭਗਉਤੀ → `Bhagauti`) or a word-initial
   `u` (ਉਪਦੇਸ਼ → `Updesh`), and stays `u`.
 - **Tippi and bindi are written differently.** Tippi is a nasal *consonant*, so
   it is plain and assimilates: ਸਿੰਘ → `Singh`, ਪਿੰਡੁ → `Pind`, ਅੰਮ੍ਰਿਤਸਰ →
   `Amritsar`. Bindi marks a nasalized *vowel*, so it is parenthesised and never
-  assimilates: ਸਿੰਘਾਂ → `Singhaa(n)`, ਲਈਂ → `Lai(n)`, ਥਾਂਈ → `Thaa(n)i`. The
+  assimilates: ਸਿੰਘਾਂ → `Singhaa(n)`, ਲਈਂ → `Laee(n)`, ਥਾਂਈ → `Thaa(n)i`. The
   brackets are what keep the pair apart in Roman — `Singh` the name against
   `Singhaa(n)` its oblique plural. (The rare adak bindi ਁ counts as a bindi.)
 - **Gemination is softened twice** for readability: aspirates are not doubled
@@ -145,9 +149,6 @@ word. Three rules, per word:
   `Rehraas`, ਸਹਿਜ → `Sehaj` for `occasions.json` (#69) — so what is left on the
   rules only reaches a user-authored benti. Common benti words are lexicalized
   as they come up: ਪਹਿਲਾ → `Pehlaa` (#48).
-- A vowel-vowel juncture with no glide is written plain, so ਲਈਂ → `Lai(n)` can
-  be misread as the `ai` of ਐ. `La-i(n)` would be no clearer, and the house
-  style writes such junctures plain too ("Nau", "Bhagauti").
 
 ## Exception lexicon
 

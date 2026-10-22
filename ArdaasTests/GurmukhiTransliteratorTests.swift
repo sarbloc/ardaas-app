@@ -114,7 +114,7 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਧਿਆਨ", "Dhiyaan"),
             ("ਪਿਆਰੇ", "Piyaare"),
             ("ਸੁਆਸ", "Suwaas"),
-            ("ਜੀਓ", "Jiyo"),
+            ("ਜੀਓ", "Jeeyo"),
             ("ਹੋਇ", "Hoi"),    // no glide after o
             ("ਭਾਈ", "Bhaai"),  // no glide after aa
         ])
@@ -125,9 +125,9 @@ final class GurmukhiTransliteratorTests: XCTestCase {
     /// else ਉ is a plain `u`.
     func testIndependentOoraOpeningItsOwnSyllable() {
         expect([
-            ("ਜੀਉ", "Jiyou"),
-            ("ਜੀਓ", "Jiyo"),      // ਓ stays a bare "o": the two don't collide
-            ("ਪੀਉ", "Piyou"),
+            ("ਜੀਉ", "Jeeyou"),
+            ("ਜੀਓ", "Jeeyo"),      // ਓ stays a bare "o": the two don't collide
+            ("ਪੀਉ", "Peeyou"),
             // No glide, so no own syllable: these are plain vowel junctures.
             ("ਨਉ", "Nau"),
             ("ਨਾਉ", "Naau"),
@@ -164,7 +164,7 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਮਾਂ", "Maa(n)"),
             ("ਨਹੀਂ", "Nahi(n)"),
             ("ਦਸਾਂ", "Dasaa(n)"),
-            ("ਲਈਂ", "Lai(n)"),
+            ("ਲਈਂ", "Laee(n)"),
             ("ਥਾਂਈ", "Thaa(n)i"),        // bindi mid-word, on the kanna
             ("ਧੌਂਸਿਆਂ", "Dhau(n)siyaa(n)"),
             // A word carrying both: the tippi is the ng of "Singh", the bindi
@@ -216,7 +216,7 @@ final class GurmukhiTransliteratorTests: XCTestCase {
     func testMedialSchwaDeletion() {
         expect([
             ("ਅਰਦਾਸ", "Ardaas"),          // a·ra·daa·s → ardaas
-            ("ਪਾਤਸ਼ਾਹੀ", "Paatshaahi"),   // SGPC layer: "Paatshaahee"
+            ("ਪਾਤਸ਼ਾਹੀ", "Paatshaahi"),
             ("ਹਰਗੋਬਿੰਦ", "Hargobind"),
             ("ਜ਼ੋਰਾਵਰ", "Zoraavar"),
             ("ਪੰਜਾਬੀ", "Panjaabi"),
@@ -418,7 +418,7 @@ final class GurmukhiTransliteratorTests: XCTestCase {
             ("ਤੁਮ ਪਹਿ ਅਰਦਾਸਿ", "Tum Peh Ardaas"),
             ("ਕਹੁ ਨਾਨਕ", "Kahu Naanak"),
             ("ਸਗਲ ਸਮਗ੍ਰੀ ਤੁਮਰੈ ਸੂਤ੍ਰਿ ਧਾਰੀ", "Sagal Samagri Tumrai Sutr Dhaari"),
-            ("ਜੀਉ ਪਿੰਡੁ ਸਭੁ ਤੇਰੀ ਰਾਸਿ", "Jiyou Pind Sabh Teri Raas"),
+            ("ਜੀਉ ਪਿੰਡੁ ਸਭੁ ਤੇਰੀ ਰਾਸਿ", "Jeeyou Pind Sabh Teri Raas"),
         ])
     }
 
@@ -435,6 +435,30 @@ final class GurmukhiTransliteratorTests: XCTestCase {
         expect([
             ("ਮੇਰਾ ਨਾਮ ਸੁੱਖ ਹੈ", "Meraa Naam Sukh Hai"),
             ("ਅਰਦਾਸ ਹੈ ਜੀ — please help", "Ardaas Hai Ji — please help"),
+        ])
+    }
+
+    /// Long ī (ੀ/ਈ) is `ee` unless it is the word's last sound — Sarbloc's rule.
+    func testLongIIsWrittenEeUnlessWordFinal() {
+        expect([
+            // mid-word: a consonant follows
+            ("ਜੀਤ", "Jeet"),
+            ("ਦੀਦਾਰ", "Deedaar"),
+            ("ਕੀਰਤਨ", "Keertan"),
+            ("ਨੀਵਾਂ", "Neevaa(n)"),
+            // word-final: the word's last sound
+            ("ਕੀ", "Ki"),
+            ("ਪਾਤਸ਼ਾਹੀ", "Paatshaahi"),
+            // a trailing nasal is not a sound after it
+            ("ਨਹੀਂ", "Nahi(n)"),
+            // word-final after a/e keeps ee: "Lai" would read "lay"
+            ("ਲਈ", "Laee"),
+            ("ਸੇਈ", "Seyee"),
+            // after any other vowel, plain i
+            ("ਕੋਈ", "Koi"),
+            ("ਵਡਿਆਈ", "Vadiyaai"),
+            // short sihari is untouched
+            ("ਸਿਮਰਿ", "Simar"),
         ])
     }
 

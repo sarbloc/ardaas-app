@@ -58,16 +58,17 @@ import java.util.Locale
  * `ਓ/ੋ o · ਔ/ੌ au`. The bearers ੳ ਅ ੲ carry whichever matra follows them; a
  * bare ੳ with no matra is `o`.
  *
- * Only the `a`/`aa` length contrast is written. `i`/`u` length is not, which
- * is what the house style does in its most common forms: `Ji`, `Ki`, `Sri`,
- * `Guru` — not `Jee`, `Kee`, `Sree`, `Guroo`.
+ * Long ī (ੀ/ਈ) is written `ee` mid-word and `i` as the word's last sound —
+ * Sarbloc's rule: `ਜੀਤ` → `Jeet`, but `Ji`, `Ki`, `Sri`, not `Jee`, `Kee`,
+ * `Sree`. Word-final after `a`/`e` it stays `ee` (`ਲਈ` → `Laee`). See
+ * [longI]. `u` length is not written: `Guru`, not `Guroo`.
  *
  * A glide is inserted before a vowel-initial syllable that follows an `i` or
  * `u`: `ਧਿਆਨ` → `Dhiyaan`, `ਸੁਆਸ` → `Suwaas`.
  *
  * An independent ਉ that opens its own syllable this way — i.e. one that takes
  * a glide — is read `o` rather than `u`, and is written `ou` so that it stays
- * distinct from ਓ: `ਜੀਉ` → `Jiyou`, where `ਜੀਓ` → `Jiyo`. Elsewhere ਉ is the
+ * distinct from ਓ: `ਜੀਉ` → `Jeeyou`, where `ਜੀਓ` → `Jeeyo`. Elsewhere ਉ is the
  * second half of a plain vowel juncture (`ਨਉ` → `Nau`, `ਨਾਉ` → `Naau`,
  * `ਭਗਉਤੀ` → `Bhagauti`) or a word-initial `u` (`ਉਪਦੇਸ਼` → `Updesh`), and those
  * keep `u`.
@@ -81,7 +82,7 @@ import java.util.Locale
  *
  * Bindi (ਂ, and the rare adak bindi ਁ) marks a *nasalized vowel* rather than a
  * nasal consonant, so it is written parenthesised and never assimilates:
- * `ਸਿੰਘਾਂ` → `Singhaa(n)`, `ਲਈਂ` → `Lai(n)`, `ਥਾਂਈ` → `Thaa(n)i`. The
+ * `ਸਿੰਘਾਂ` → `Singhaa(n)`, `ਲਈਂ` → `Laee(n)`, `ਥਾਂਈ` → `Thaa(n)i`. The
  * parentheses are what keep the two signs apart in Roman — `Singh` is the
  * name, `Singhaa(n)` its oblique plural.
  *
@@ -148,9 +149,9 @@ import java.util.Locale
  * deletable schwas are adjacent only the rightmost goes, so `ਗੁਰਦਵਾਰਿਆਂ`
  * comes out `Guradvaariyaa(n)`.
  *
- * A vowel-vowel juncture with no glide is written as-is, so `ਲਈਂ` → `Lai(n)`
- * can be misread as the `ai` of ਐ. Writing it `La-i(n)` would be no clearer,
- * and the house style itself writes such junctures plain ("Nau", "Bhagauti").
+ * A vowel-vowel juncture with no glide is written as-is ("Nau", "Bhagauti"),
+ * except that a word-final long ī after `a`/`e` is written `ee` so it can't
+ * be misread as the `ai` of ਐ: `ਲਈਂ` → `Laee(n)`, not `Lai(n)`.
  *
  * ### Everything else
  *
@@ -289,6 +290,9 @@ object GurmukhiTransliterator {
          * when it opens its own syllable.
          */
         var isIndependentU = false
+
+        /** The vowel is a long ī (ੀ or ਈ), written `ee` unless word-final — see [longI]. */
+        var isLongI = false
         var nasal: Nasal? = null
 
         /**
@@ -341,6 +345,7 @@ object GurmukhiTransliterator {
                 unit.vowel = matra
                 unit.isInherent = false
                 unit.isShortMatra = value in SHORT_MATRAS
+                unit.isLongI = value == 0x0A40 // ੀ
                 continue
             }
 
@@ -350,6 +355,7 @@ object GurmukhiTransliterator {
                     Syllable().apply {
                         vowel = independent
                         isIndependentU = value == 0x0A09 // ਉ
+                        isLongI = value == 0x0A08 // ਈ
                     },
                 )
                 continue
@@ -473,11 +479,12 @@ object GurmukhiTransliterator {
                 if (!isWordFinal) onset = onset.first().toString() + onset
             }
             var vowel = unit.vowel ?: ""
+            if (unit.isLongI && vowel == "i") vowel = longI(index, units)
             if (onset.isEmpty() && index > 0) {
-                val glideLetter = glide(index, units)
+                val glideLetter = glide(index, units, vowel)
                 result.append(glideLetter)
                 // A glide means this ਉ opens its own syllable, where it reads
-                // `o`: ਜੀਉ → "Jiyou", kept distinct from ਜੀਓ → "Jiyo".
+                // `o`: ਜੀਉ → "Jeeyou", kept distinct from ਜੀਓ → "Jeeyo".
                 if (glideLetter.isNotEmpty() && unit.isIndependentU && vowel == "u") {
                     vowel = "ou"
                 }
@@ -496,15 +503,44 @@ object GurmukhiTransliterator {
 
     /**
      * `ਧਿਆਨ` → `dhiyaan`, `ਸੁਆਸ` → `suwaas`: a vowel-initial syllable after an
-     * `i`/`u` takes the matching glide.
+     * `i`/`u` takes the matching glide. A long ī written `ee` after an `e`
+     * takes one too, so the vowels don't run together: `ਸੇਈ` → `Seyee`.
      */
-    private fun glide(index: Int, units: List<Syllable>): String {
+    private fun glide(index: Int, units: List<Syllable>, vowel: String): String {
         val previous = units[index - 1]
         if (previous.nasal != null) return ""
-        val vowel = previous.vowel ?: return ""
-        if (vowel.endsWith("i")) return "y"
-        if (vowel.endsWith("u")) return "w"
+        val previousVowel = previous.vowel ?: return ""
+        if (previousVowel.endsWith("i")) return "y"
+        if (previousVowel.endsWith("u")) return "w"
+        if (previousVowel == "e" && vowel == "ee") return "y"
         return ""
+    }
+
+    /**
+     * Long ī (ੀ/ਈ) is written `ee` unless it is the word's last sound:
+     * `ਜੀਤ` → `Jeet`, `ਦੀਦਾਰ` → `Deedaar`, but `ਜੀ` → `Ji`, `ਪਾਤਸ਼ਾਹੀ` →
+     * `Paatshaahi`. A trailing nasal doesn't count as a sound after it
+     * (`ਨਹੀਂ` → `Nahi(n)`); a consonant whose schwa was deleted does.
+     *
+     * Word-final ī straight after `a` or `e` keeps `ee`, because `ai`/`ei`
+     * would read as a diphthong: `ਲਈ` → `Laee`, not `Lai` ("lay"), and `ਸੇਈ` →
+     * `Seyee`. After any other vowel the plain `i` reads fine: `ਕੋਈ` → `Koi`,
+     * `ਵਡਿਆਈ` → `Vadiyaai`.
+     */
+    private fun longI(index: Int, units: List<Syllable>): String {
+        val unit = units[index]
+        val isLastSound = index == units.size - 1 && unit.coda.isEmpty()
+        if (!isLastSound) return "ee"
+        if (unit.onset.isEmpty() && index > 0) {
+            val previous = units[index - 1]
+            val previousVowel = previous.vowel
+            if (previous.nasal == null && previous.coda.isEmpty() &&
+                (previousVowel == "a" || previousVowel == "e")
+            ) {
+                return "ee"
+            }
+        }
+        return "i"
     }
 
     /** Tippi is a nasal consonant, so it assimilates to what follows. */
