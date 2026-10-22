@@ -69,6 +69,33 @@ class BackStackTest {
         assertEquals(listOf(Destination.Home, Destination.Sources, Destination.Reader(4)), stack.entries)
     }
 
+    /** #159: the Reader opens a copy in its own place, so Back skips the original. */
+    @Test
+    fun replaceTopSwapsTheScreenOnTop() {
+        val stack = BackStack()
+        stack.push(Destination.Reader(1))
+        stack.replaceTop(Destination.Reader(2))
+        assertEquals(listOf(Destination.Home, Destination.Reader(2)), stack.entries)
+        assertEquals(Destination.Reader(2), stack.pop())
+        assertEquals(Destination.Home, stack.current)
+    }
+
+    @Test
+    fun replaceTopAtHomePushes() {
+        val stack = BackStack()
+        stack.replaceTop(Destination.Reader(2))
+        assertEquals(listOf(Destination.Home, Destination.Reader(2)), stack.entries)
+    }
+
+    @Test
+    fun replaceTopWithHomePopsBackToIt() {
+        val stack = BackStack()
+        stack.push(Destination.Reader(1))
+        stack.push(Destination.Edit(1))
+        stack.replaceTop(Destination.Home)
+        assertEquals(listOf(Destination.Home), stack.entries)
+    }
+
     @Test
     fun everyDestinationRoundTripsThroughItsKey() {
         val all = listOf(Destination.Home, Destination.Sources, Destination.Licences, Destination.Compose, Destination.Diagnostics, Destination.Reader(42), Destination.Edit(42))

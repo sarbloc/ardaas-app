@@ -1,5 +1,6 @@
 package io.sarbloc.ardaas.ui.reader
 
+import android.view.View
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -83,6 +84,7 @@ import io.sarbloc.ardaas.persistence.renderItems
 import io.sarbloc.ardaas.ui.ArdaasBackground
 import io.sarbloc.ardaas.ui.ArdaasColors
 import io.sarbloc.ardaas.ui.ArdaasTheme
+import java.util.WeakHashMap
 
 // Port of Ardaas/Views/ReaderView.swift.
 
@@ -109,6 +111,8 @@ import io.sarbloc.ardaas.ui.ArdaasTheme
  *   Occasion button and leaves the stranded-occasion note informational.
  * @param onEdit opens Compose on this record (#154). Null hides the Edit
  *   button.
+ * @param onDuplicate saves a copy of this record and opens it in this
+ *   Reader's place (#159). Null hides the Duplicate button.
  */
 @Composable
 fun ReaderScreen(
@@ -120,6 +124,7 @@ fun ReaderScreen(
     modifier: Modifier = Modifier,
     onEditOccasion: (() -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
+    onDuplicate: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val preferences = remember { ReaderPreferencesState(ReaderPreferenceStore.from(context.applicationContext)) }
@@ -139,6 +144,7 @@ fun ReaderScreen(
         onVariantChange = onVariantChange,
         onEditOccasion = onEditOccasion,
         onEdit = onEdit,
+        onDuplicate = onDuplicate,
         modifier = modifier,
     )
 }
@@ -148,8 +154,33 @@ fun ReaderScreen(
 private fun KeepScreenOn() {
     val view = LocalView.current
     DisposableEffect(view) {
+        KeepScreenOnHolds.acquire(view)
+        onDispose { KeepScreenOnHolds.release(view) }
+    }
+}
+
+/**
+ * Counts the Readers holding a view awake. Two overlap while one replaces
+ * the other — a duplicate opening in its original's place (#159) crossfades
+ * between them — and the outgoing one letting go must not switch the screen
+ * off under the incoming one. Main thread only, as composition effects are.
+ */
+internal object KeepScreenOnHolds {
+    private val holds = WeakHashMap<View, Int>()
+
+    fun acquire(view: View) {
+        holds[view] = (holds[view] ?: 0) + 1
         view.keepScreenOn = true
-        onDispose { view.keepScreenOn = false }
+    }
+
+    fun release(view: View) {
+        val remaining = (holds[view] ?: 1) - 1
+        if (remaining > 0) {
+            holds[view] = remaining
+        } else {
+            holds.remove(view)
+            view.keepScreenOn = false
+        }
     }
 }
 
@@ -164,6 +195,7 @@ private fun ReaderContent(
     onVariantChange: (String) -> Unit,
     onEditOccasion: (() -> Unit)?,
     onEdit: (() -> Unit)?,
+    onDuplicate: (() -> Unit)?,
     modifier: Modifier,
 ) {
     val variant = library.resolvedVariant(savedArdaas.variantId)
@@ -223,6 +255,7 @@ private fun ReaderContent(
                             onGurmukhiChange = { preferences.setLayer(LayerKind.GURMUKHI, it) },
                             onAdjustFontScale = preferences::adjustFontScale,
                             onEdit = onEdit,
+                            onDuplicate = onDuplicate,
                         )
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -433,8 +466,9 @@ private fun LayerPill(
 // region Display menu
 
 /**
- * The cog: Edit (#154, kept out of the crowded top bar), which Ardaas, the
- * Gurmukhi layer, and text size. A null [onEdit] hides the Edit item.
+ * The cog: Edit (#154, kept out of the crowded top bar) and Duplicate (#159),
+ * which Ardaas, the Gurmukhi layer, and text size. A null [onEdit] or
+ * [onDuplicate] hides its item.
  */
 @Composable
 private fun DisplayMenu(
@@ -447,6 +481,7 @@ private fun DisplayMenu(
     onGurmukhiChange: (Boolean) -> Unit,
     onAdjustFontScale: (Double) -> Unit,
     onEdit: (() -> Unit)?,
+    onDuplicate: (() -> Unit)?,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Box {
@@ -463,8 +498,18 @@ private fun DisplayMenu(
                     },
                     leadingIcon = { Icon(painterResource(R.drawable.ic_edit), contentDescription = null) },
                 )
-                HorizontalDivider()
             }
+            if (onDuplicate != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.reader_duplicate)) },
+                    onClick = {
+                        expanded = false
+                        onDuplicate()
+                    },
+                    leadingIcon = { Icon(painterResource(R.drawable.ic_duplicate), contentDescription = null) },
+                )
+            }
+            if (onEdit != null || onDuplicate != null) HorizontalDivider()
             if (library.variants.size > 1) {
                 MenuSectionHeader("Ardaas")
                 for (variant in library.variants) {

@@ -2,11 +2,15 @@ import SwiftData
 import SwiftUI
 
 /// Home screen: the list of saved Ardaas. Tap a row to read it,
-/// swipe to delete, "+" (or the empty-state button) to compose a new one.
+/// swipe to delete, long-press for Duplicate and Delete, "+" (or the
+/// empty-state button) to compose a new one.
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \SavedArdaas.createdAt, order: .reverse)
     private var savedArdaasList: [SavedArdaas]
+
+    /// The navigation stack's path (`ContentView`): the Readers over Home.
+    @Binding var path: [SavedArdaas]
 
     @State private var isComposing = false
     @State private var isShowingSources = false
@@ -79,11 +83,27 @@ struct HomeView: View {
                     }
                 }
                 .listRowBackground(Theme.raisedFill)
+                .contextMenu {
+                    Button {
+                        duplicate(savedArdaas)
+                    } label: {
+                        Label("Duplicate", systemImage: "plus.square.on.square")
+                    }
+                    Button(role: .destructive) {
+                        modelContext.delete(savedArdaas)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
             .onDelete(perform: delete)
         }
         .navigationDestination(for: SavedArdaas.self) { savedArdaas in
-            ReaderView(savedArdaas: savedArdaas)
+            // Duplicating from the Reader opens the copy in its place, so
+            // Back from the copy comes here rather than to the original.
+            ReaderView(savedArdaas: savedArdaas) { copy in
+                path = [copy]
+            }
         }
     }
 
@@ -97,6 +117,15 @@ struct HomeView: View {
                 isComposing = true
             }
             .buttonStyle(.borderedProminent)
+        }
+    }
+
+    /// Saves a copy of `savedArdaas` (#159) and stays here: it leads the
+    /// list, as the newest record.
+    private func duplicate(_ savedArdaas: SavedArdaas) {
+        let copy = savedArdaas.duplicate(existingLabels: savedArdaasList.map(\.label))
+        withAnimation {
+            modelContext.insert(copy)
         }
     }
 
@@ -119,7 +148,7 @@ struct HomeView: View {
         SavedArdaas(label: "For the family", bentiText: "Another benti.")
     )
     return NavigationStack {
-        HomeView()
+        HomeView(path: .constant([]))
     }
     .modelContainer(container)
 }
