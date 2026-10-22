@@ -135,7 +135,7 @@ class GurmukhiTransliteratorTest {
             "ਧਿਆਨ" to "Dhiyaan",
             "ਪਿਆਰੇ" to "Piyaare",
             "ਸੁਆਸ" to "Suwaas",
-            "ਜੀਓ" to "Jiyo",
+            "ਜੀਓ" to "Jeeyo",
             "ਹੋਇ" to "Hoi", // no glide after o
             "ਭਾਈ" to "Bhaai", // no glide after aa
         )
@@ -149,9 +149,9 @@ class GurmukhiTransliteratorTest {
     @Test
     fun independentOoraOpeningItsOwnSyllable() {
         expect(
-            "ਜੀਉ" to "Jiyou",
-            "ਜੀਓ" to "Jiyo", // ਓ stays a bare "o": the two don't collide
-            "ਪੀਉ" to "Piyou",
+            "ਜੀਉ" to "Jeeyou",
+            "ਜੀਓ" to "Jeeyo", // ਓ stays a bare "o": the two don't collide
+            "ਪੀਉ" to "Peeyou",
             // No glide, so no own syllable: these are plain vowel junctures.
             "ਨਉ" to "Nau",
             "ਨਾਉ" to "Naau",
@@ -194,7 +194,7 @@ class GurmukhiTransliteratorTest {
             "ਮਾਂ" to "Maa(n)",
             "ਨਹੀਂ" to "Nahi(n)",
             "ਦਸਾਂ" to "Dasaa(n)",
-            "ਲਈਂ" to "Lai(n)",
+            "ਲਈਂ" to "Laee(n)",
             "ਥਾਂਈ" to "Thaa(n)i", // bindi mid-word, on the kanna
             "ਧੌਂਸਿਆਂ" to "Dhau(n)siyaa(n)",
             // A word carrying both: the tippi is the ng of "Singh", the bindi
@@ -252,7 +252,7 @@ class GurmukhiTransliteratorTest {
     fun medialSchwaDeletion() {
         expect(
             "ਅਰਦਾਸ" to "Ardaas", // a·ra·daa·s → ardaas
-            "ਪਾਤਸ਼ਾਹੀ" to "Paatshaahi", // SGPC layer: "Paatshaahee"
+            "ਪਾਤਸ਼ਾਹੀ" to "Paatshaahi",
             "ਹਰਗੋਬਿੰਦ" to "Hargobind",
             "ਜ਼ੋਰਾਵਰ" to "Zoraavar",
             "ਪੰਜਾਬੀ" to "Panjaabi",
@@ -478,7 +478,7 @@ class GurmukhiTransliteratorTest {
             "ਤੁਮ ਪਹਿ ਅਰਦਾਸਿ" to "Tum Peh Ardaas",
             "ਕਹੁ ਨਾਨਕ" to "Kahu Naanak",
             "ਸਗਲ ਸਮਗ੍ਰੀ ਤੁਮਰੈ ਸੂਤ੍ਰਿ ਧਾਰੀ" to "Sagal Samagri Tumrai Sutr Dhaari",
-            "ਜੀਉ ਪਿੰਡੁ ਸਭੁ ਤੇਰੀ ਰਾਸਿ" to "Jiyou Pind Sabh Teri Raas",
+            "ਜੀਉ ਪਿੰਡੁ ਸਭੁ ਤੇਰੀ ਰਾਸਿ" to "Jeeyou Pind Sabh Teri Raas",
         )
     }
 
@@ -497,6 +497,31 @@ class GurmukhiTransliteratorTest {
         expect(
             "ਮੇਰਾ ਨਾਮ ਸੁੱਖ ਹੈ" to "Meraa Naam Sukh Hai",
             "ਅਰਦਾਸ ਹੈ ਜੀ — please help" to "Ardaas Hai Ji — please help",
+        )
+    }
+
+    /** Long ī (ੀ/ਈ) is `ee` unless it is the word's last sound — Sarbloc's rule. */
+    @Test
+    fun longIIsWrittenEeUnlessWordFinal() {
+        expect(
+            // mid-word: a consonant follows
+            "ਜੀਤ" to "Jeet",
+            "ਦੀਦਾਰ" to "Deedaar",
+            "ਕੀਰਤਨ" to "Keertan",
+            "ਨੀਵਾਂ" to "Neevaa(n)",
+            // word-final: the word's last sound
+            "ਕੀ" to "Ki",
+            "ਪਾਤਸ਼ਾਹੀ" to "Paatshaahi",
+            // a trailing nasal is not a sound after it
+            "ਨਹੀਂ" to "Nahi(n)",
+            // word-final after a/e keeps ee: "Lai" would read "lay"
+            "ਲਈ" to "Laee",
+            "ਸੇਈ" to "Seyee",
+            // after any other vowel, plain i
+            "ਕੋਈ" to "Koi",
+            "ਵਡਿਆਈ" to "Vadiyaai",
+            // short sihari is untouched
+            "ਸਿਮਰਿ" to "Simar",
         )
     }
 
