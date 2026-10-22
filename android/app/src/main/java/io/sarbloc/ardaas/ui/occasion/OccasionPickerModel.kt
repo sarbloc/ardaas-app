@@ -9,9 +9,10 @@ import io.sarbloc.ardaas.occasion.OccasionChoice
 import io.sarbloc.ardaas.occasion.OccasionCopy
 import io.sarbloc.ardaas.occasion.OccasionDraft
 import io.sarbloc.ardaas.occasion.OccasionSelection
+import io.sarbloc.ardaas.occasion.SlotChoice
 import io.sarbloc.ardaas.persistence.SavedArdaas
-import io.sarbloc.ardaas.persistence.occasionChoice
-import io.sarbloc.ardaas.persistence.withOccasionChoice
+import io.sarbloc.ardaas.persistence.slotChoice
+import io.sarbloc.ardaas.persistence.withSlotChoice
 
 // The occasion picker's decisions, kept out of the composable so they can be
 // unit-tested: which groups it lists, how its state survives recreation, and
@@ -26,9 +27,10 @@ data class OccasionPickerGroup(
 )
 
 /**
- * The catalog rows the picker lists between "None" and "Other…": one group
- * per [OccasionCategory], in the enum's order (paath, then occasion — iOS's
- * order), each holding that category's entries in catalog order. Built from
+ * The catalog rows the picker lists: one group per [OccasionCategory], in the
+ * enum's order (paath, then occasion — iOS's order), each holding that
+ * category's entries in catalog order. Since #158 each group is its own
+ * radio group with its own "None"; the occasion group ends with "Other…". Built from
  * the catalog's own categories, so a re-categorised or added entry moves with
  * the data. A category with no entries gets no empty header.
  */
@@ -50,6 +52,10 @@ val OccasionCategory.pickerTitle: String
  * Bundle form of an [OccasionDraft], so the picker's in-progress state —
  * including "Other…" with words half typed, which no [OccasionChoice] can
  * hold — survives activity recreation and process death.
+ *
+ * Four strings since #158 (kind, id, words, paath). A three-string bundle
+ * from before it — a picker left open across the app update — still restores,
+ * with no paath.
  */
 internal object OccasionDraftBundle {
     private const val UNSET = "unset"
@@ -57,15 +63,16 @@ internal object OccasionDraftBundle {
     private const val CUSTOM = "custom"
 
     fun encode(draft: OccasionDraft): List<String> = when (val selection = draft.selection) {
-        OccasionSelection.Unset -> listOf(UNSET, "", draft.customText)
-        is OccasionSelection.Catalog -> listOf(CATALOG, selection.id, draft.customText)
-        OccasionSelection.Custom -> listOf(CUSTOM, "", draft.customText)
+        OccasionSelection.Unset -> listOf(UNSET, "", draft.customText, draft.paathId)
+        is OccasionSelection.Catalog -> listOf(CATALOG, selection.id, draft.customText, draft.paathId)
+        OccasionSelection.Custom -> listOf(CUSTOM, "", draft.customText, draft.paathId)
     }
 
     /** Null for anything [encode] did not write, so a malformed bundle falls back to a fresh draft. */
     fun decode(saved: List<String>): OccasionDraft? {
-        if (saved.size != 3) return null
+        if (saved.size != 3 && saved.size != 4) return null
         val (kind, id, customText) = saved
+        val paathId = saved.getOrElse(3) { "" }
         val selection = when (kind) {
             UNSET -> OccasionSelection.Unset
             CATALOG -> OccasionSelection.Catalog(id)
@@ -73,7 +80,7 @@ internal object OccasionDraftBundle {
             else -> return null
         }
         // The constructor, not withSelection: restore exactly what was saved.
-        return OccasionDraft(selection = selection, customText = customText)
+        return OccasionDraft(selection = selection, customText = customText, paathId = paathId)
     }
 
     val saver: Saver<OccasionDraft, Any> = listSaver(save = { encode(it) }, restore = { decode(it) })
@@ -83,14 +90,15 @@ internal object OccasionDraftBundle {
  * The record the Reader writes when the picker's Done returns [picked], or
  * null when there is nothing to write.
  *
- * Compared with the choice the picker *opened on*, not the raw stored one:
+ * Compared with the slot the picker *opened on*, not the raw stored one:
  * iOS persists only on a change to its draft, so opening the picker and
  * tapping Done writes nothing. That matters for a record pointing at an entry
  * a later bundle retired — the picker opens it as "None" (see
- * [OccasionDraft.from]), and an untouched Done must not quietly rewrite the
- * stored id.
+ * [OccasionDraft.from]) — and for a legacy record whose paath is stored as
+ * its occasion: an untouched Done must not quietly rewrite either. Any real
+ * change writes all three fields, normalised.
  */
-fun SavedArdaas.withPickedOccasion(picked: OccasionChoice, catalog: OccasionCatalog): SavedArdaas? {
-    val openedOn = OccasionDraft.from(occasionChoice, catalog).choice
-    return if (picked == openedOn) null else withOccasionChoice(picked)
+fun SavedArdaas.withPickedSlot(picked: SlotChoice, catalog: OccasionCatalog): SavedArdaas? {
+    val openedOn = OccasionDraft.from(slotChoice, catalog).slot
+    return if (picked == openedOn) null else withSlotChoice(picked)
 }

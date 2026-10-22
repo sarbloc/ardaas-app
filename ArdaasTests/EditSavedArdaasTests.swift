@@ -278,18 +278,21 @@ final class EditSavedArdaasTests: XCTestCase {
         var form = ComposeForm(fields: SavedArdaasFields(
             label: "Family", variantId: "sgpc", benti: layers(english: "b"), occasion: .catalog(id: "retired-entry")
         ))
-        form.dropRetiredOccasion(in: catalog)
+        form.normaliseSlot(in: catalog)
         XCTAssertEqual(form.occasion, OccasionDraft())
     }
 
     func testOtherOccasionsAreLeftAlone() throws {
         let catalog = try OccasionCatalog.loadBundled()
-        let choices: [OccasionChoice] = [.unset, .catalog(id: "japji-sahib"), .custom(text: "a new job")]
-        for choice in choices {
-            let opened = OccasionDraft(choice: choice)
-            var form = ComposeForm(occasion: opened)
-            form.dropRetiredOccasion(in: catalog)
-            XCTAssertEqual(form.occasion, opened, "\(choice)")
+        let choices: [OccasionChoice] = [.unset, .catalog(id: "birthday"), .custom(text: "a new job")]
+        for paathId in ["", "japji-sahib"] {
+            for choice in choices {
+                var opened = OccasionDraft(choice: choice)
+                opened.paathId = paathId
+                var form = ComposeForm(occasion: opened)
+                form.normaliseSlot(in: catalog)
+                XCTAssertEqual(form.occasion, opened, "\(paathId) \(choice)")
+            }
         }
     }
 

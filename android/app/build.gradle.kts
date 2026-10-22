@@ -408,6 +408,14 @@ val tokenizerParityFixture: File =
 val tokenizerSourceFixture: File =
     rootDir.parentFile.resolve("ArdaasTests/Fixtures/tokenizer_src.json")
 
+// The slot's paath + occasion parity fixture (#158), shared the same way.
+val slotParityFixture: File =
+    rootDir.parentFile.resolve("ArdaasTests/Fixtures/slot-parity.json")
+
+// Room's exported schemas, so the migration test builds each old database from
+// exactly the schema that version shipped with.
+val roomSchemaDir: File = projectDir.resolve("schemas/io.sarbloc.ardaas.persistence.ArdaasDatabase")
+
 // The real-model translation test (#118) is opt-in: point ARDAAS_MODEL_DIR at
 // a directory holding the pinned catalog files (the three .onnx graphs plus
 // tokenizer_src.json and dict.TGT.json). CI has no 359 MB model, so it skips.
@@ -435,6 +443,12 @@ tasks.withType<Test>().configureEach {
     inputs.file(tokenizerParityFixture).withPathSensitivity(PathSensitivity.NONE)
     systemProperty("ardaas.tokenizerSourceFixture", tokenizerSourceFixture.absolutePath)
     inputs.file(tokenizerSourceFixture).withPathSensitivity(PathSensitivity.NONE)
+    // …and the slot parity test whenever its fixture does.
+    systemProperty("ardaas.slotParityFixture", slotParityFixture.absolutePath)
+    inputs.file(slotParityFixture).withPathSensitivity(PathSensitivity.NONE)
+    // …and the migration test whenever an exported schema does.
+    systemProperty("ardaas.roomSchemaDir", roomSchemaDir.absolutePath)
+    inputs.dir(roomSchemaDir).withPathSensitivity(PathSensitivity.RELATIVE)
     // …and the end-to-end translation test whenever the model directory it is
     // pointed at changes (its goldens are a test resource, already an input).
     inputs.property("ardaas.modelDir", modelDirectory)

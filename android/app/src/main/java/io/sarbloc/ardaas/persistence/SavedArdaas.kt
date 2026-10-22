@@ -12,6 +12,8 @@ import io.sarbloc.ardaas.content.ArdaasLibrary
 import io.sarbloc.ardaas.occasion.OccasionCatalog
 import io.sarbloc.ardaas.occasion.OccasionChoice
 import io.sarbloc.ardaas.occasion.OccasionLayers
+import io.sarbloc.ardaas.occasion.SlotChoice
+import io.sarbloc.ardaas.text.trimmingWhitespaceAndNewlines
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -86,6 +88,18 @@ data class SavedArdaas(
     @ColumnInfo(defaultValue = "")
     val occasionCustom: String = "",
     /**
+     * The paath recited, which fills the slot beside the occasion (#158): a
+     * bundled entry's id whose category is PAATH, or **empty for "no
+     * paath"** — which is what every earlier row reads after
+     * [ArdaasDatabase.MIGRATION_1_2] adds the column.
+     *
+     * Rows saved before #158 may still carry their paath in [occasionId];
+     * that is resolved at read time ([SlotChoice.normalised]), never by
+     * rewriting the table, and the next save writes it here.
+     */
+    @ColumnInfo(defaultValue = "")
+    val paathId: String = "",
+    /**
      * Row id, assigned by SQLite on insert; leave it 0 for a new record.
      * AUTOINCREMENT, so a deleted record's id is never handed to a new one —
      * a stale reference finds nothing rather than someone else's Ardaas.
@@ -108,6 +122,7 @@ data class SavedArdaas(
         variantId: String = ArdaasLibrary.DEFAULT_VARIANT_ID,
         bentiGurmukhi: String = "",
         bentiTransliteration: String = "",
+        paathId: String = "",
     ) : this(
         label = label,
         bentiText = bentiText,
@@ -117,6 +132,7 @@ data class SavedArdaas(
         bentiTransliteration = bentiTransliteration,
         occasionId = occasion.storedId,
         occasionCustom = occasion.storedCustomText,
+        paathId = paathId.trimmingWhitespaceAndNewlines(),
     )
 }
 
@@ -147,33 +163,50 @@ val SavedArdaas.occasionChoice: OccasionChoice
 fun SavedArdaas.withOccasionChoice(choice: OccasionChoice): SavedArdaas =
     copy(occasionId = choice.storedId, occasionCustom = choice.storedCustomText)
 
+/**
+ * All three persisted slot fields as one value, *as stored* — normalise with
+ * [SlotChoice.normalised] before showing it in a picker.
+ */
+val SavedArdaas.slotChoice: SlotChoice
+    get() = SlotChoice(paathId = paathId, occasion = occasionChoice)
+
+/**
+ * This record with a new slot — iOS's `slotChoice` setter. Writes all three
+ * fields, so the occasion pair stays consistent and a normalised slot clears
+ * a legacy paath out of [SavedArdaas.occasionId].
+ */
+fun SavedArdaas.withSlotChoice(slot: SlotChoice): SavedArdaas =
+    withOccasionChoice(slot.occasion).copy(paathId = slot.paathId.trimmingWhitespaceAndNewlines())
+
 /** The persisted layers as the value type the composer and Reader use. */
 val SavedArdaas.bentiLayers: BentiLayers
     get() = BentiLayers(gurmukhi = bentiGurmukhi, transliteration = bentiTransliteration, english = bentiText)
 
 /**
- * The chosen occasion's words, resolved through the bundled catalog.
+ * The slot's words — paath and occasion, joined (#158) — resolved through the
+ * bundled catalog.
  *
- * Null — the canonical dots, untouched — for nothing chosen and for an id a
- * later bundle has retired ([OccasionChoice.layers]). A broken bundle must
- * cost the reader the substitution, never the Ardaas.
+ * Null — the canonical dots, untouched — for nothing chosen and for ids a
+ * later bundle has retired ([SlotChoice.layers], which also reads a legacy
+ * paath out of [SavedArdaas.occasionId]). A broken bundle must cost the
+ * reader the substitution, never the Ardaas.
  *
  * A **free-text** occasion is stored whole on this record and needs no
- * catalog, so it survives a catalog that failed to load (a null [catalog]).
- * Dropping the user's own words because an unrelated bundled file is missing
- * would be the wrong trade.
+ * catalog, so it survives a catalog that failed to load (a null [catalog]);
+ * the paath, which is only an id, cannot. Dropping the user's own words
+ * because an unrelated bundled file is missing would be the wrong trade.
  */
 fun SavedArdaas.occasionLayers(catalog: OccasionCatalog?): OccasionLayers? {
     val choice = occasionChoice
     if (catalog == null) {
         return if (choice is OccasionChoice.Custom) OccasionLayers.fromFreeText(choice.text) else null
     }
-    return choice.layers(catalog)
+    return slotChoice.layers(catalog)
 }
 
 /**
  * Exactly what the Reader draws: this record's benti composed into [content],
- * with its chosen occasion spliced into the "….." slot.
+ * with its chosen paath and occasion spliced into the "….." slot.
  *
  * The Reader calls nothing else, so this one function is the whole
  * composition path and the tests that cover it cannot drift from the screen.

@@ -8,6 +8,7 @@ import io.sarbloc.ardaas.occasion.OccasionChoice
 import io.sarbloc.ardaas.occasion.OccasionCopy
 import io.sarbloc.ardaas.occasion.OccasionDraft
 import io.sarbloc.ardaas.occasion.OccasionSelection
+import io.sarbloc.ardaas.occasion.SlotChoice
 import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.persistence.occasionChoice
 import io.sarbloc.ardaas.persistence.withOccasionChoice
@@ -18,7 +19,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The occasion picker's decisions (#90): the groups it renders, its
+ * The slot picker's decisions (#90, #158): the groups it renders, its
  * selection → stored choice round trip, how its draft survives recreation,
  * and what the Reader writes on Done. The catalog's own order is pinned in
  * `OccasionCatalogTest`; this pins how the picker groups it.
@@ -137,10 +138,22 @@ class OccasionPickerModelTest {
             // Half typed: the one state no OccasionChoice can carry.
             OccasionDraft(OccasionSelection.Custom, "my daugh"),
             OccasionDraft(OccasionSelection.Custom, ""),
+            // #158: the paath travels beside every occasion shape.
+            OccasionDraft(OccasionSelection.Unset, "", paathId = "sukhmani-sahib"),
+            OccasionDraft(OccasionSelection.Custom, "my daugh", paathId = "japji-sahib"),
         )
         for (draft in drafts) {
             assertEquals(draft, OccasionDraftBundle.decode(OccasionDraftBundle.encode(draft)))
         }
+    }
+
+    @Test
+    fun aBundleFromBeforeThePaathRestoresWithNone() {
+        // A picker left open across the update that added the paath.
+        assertEquals(
+            OccasionDraft(OccasionSelection.Custom, "my daugh"),
+            OccasionDraftBundle.decode(listOf("custom", "", "my daugh")),
+        )
     }
 
     @Test
@@ -153,26 +166,42 @@ class OccasionPickerModelTest {
 
     // region What the Reader writes on Done
 
+    private fun slot(paathId: String = "", occasion: OccasionChoice = OccasionChoice.Unset) =
+        SlotChoice(paathId = paathId, occasion = occasion)
+
     @Test
     fun doneWithNoChangeWritesNothing() {
-        assertNull(record().withPickedOccasion(OccasionChoice.Unset, catalog))
-        assertNull(record(OccasionChoice.Catalog("japji-sahib")).withPickedOccasion(OccasionChoice.Catalog("japji-sahib"), catalog))
-        assertNull(record(OccasionChoice.Custom("words")).withPickedOccasion(OccasionChoice.Custom("words"), catalog))
+        assertNull(record().withPickedSlot(slot(), catalog))
+        assertNull(record(OccasionChoice.Catalog("birthday")).withPickedSlot(slot(occasion = OccasionChoice.Catalog("birthday")), catalog))
+        assertNull(record(OccasionChoice.Custom("words")).withPickedSlot(slot(occasion = OccasionChoice.Custom("words")), catalog))
+        val both = record(OccasionChoice.Catalog("birthday")).copy(paathId = "sukhmani-sahib")
+        assertNull(both.withPickedSlot(slot("sukhmani-sahib", OccasionChoice.Catalog("birthday")), catalog))
     }
 
     @Test
     fun doneWithAChangeWritesBothStoredFields() {
         val updated = written(
-            record(OccasionChoice.Custom("words")).withPickedOccasion(OccasionChoice.Catalog("japji-sahib"), catalog),
+            record(OccasionChoice.Custom("words")).withPickedSlot(slot(occasion = OccasionChoice.Catalog("birthday")), catalog),
         )
-        assertEquals("japji-sahib", updated.occasionId)
+        assertEquals("birthday", updated.occasionId)
         assertEquals("", updated.occasionCustom)
+        assertEquals("", updated.paathId)
+    }
+
+    @Test
+    fun pickingAPaathBesideAnOccasionWritesAllThreeFields() {
+        val updated = written(
+            record(OccasionChoice.Custom("words")).withPickedSlot(slot("sukhmani-sahib", OccasionChoice.Custom("words")), catalog),
+        )
+        assertEquals("sukhmani-sahib", updated.paathId)
+        assertEquals(OccasionChoice.CUSTOM_ID, updated.occasionId)
+        assertEquals("words", updated.occasionCustom)
     }
 
     @Test
     fun clearingFreeTextWritesUnset() {
         // "Other…" emptied comes back from the picker as Unset.
-        val updated = written(record(OccasionChoice.Custom("words")).withPickedOccasion(OccasionChoice.Unset, catalog))
+        val updated = written(record(OccasionChoice.Custom("words")).withPickedSlot(slot(), catalog))
         assertEquals(OccasionChoice.Unset, updated.occasionChoice)
     }
 
@@ -181,9 +210,24 @@ class OccasionPickerModelTest {
         // The picker opens a retired id as "None"; Done without a change
         // must not rewrite the stored id.
         val retired = record(OccasionChoice.Catalog("retired-entry"))
-        assertNull(retired.withPickedOccasion(OccasionChoice.Unset, catalog))
-        val replaced = written(retired.withPickedOccasion(OccasionChoice.Catalog("japji-sahib"), catalog))
-        assertEquals(OccasionChoice.Catalog("japji-sahib"), replaced.occasionChoice)
+        assertNull(retired.withPickedSlot(slot(), catalog))
+        val replaced = written(retired.withPickedSlot(slot(occasion = OccasionChoice.Catalog("birthday")), catalog))
+        assertEquals(OccasionChoice.Catalog("birthday"), replaced.occasionChoice)
+    }
+
+    @Test
+    fun anUntouchedLegacyPaathIsLeftAloneAndAnyChangeNormalisesIt() {
+        // Before #158 a paath was stored as the occasion. The picker opens it
+        // on the paath; Done untouched writes nothing, and a change writes
+        // the normalised form — paath in paathId, occasionId cleared.
+        val legacy = record(OccasionChoice.Catalog("japji-sahib"))
+        assertNull(legacy.withPickedSlot(slot("japji-sahib"), catalog))
+        val updated = written(legacy.withPickedSlot(slot("japji-sahib", OccasionChoice.Catalog("birthday")), catalog))
+        assertEquals("japji-sahib", updated.paathId)
+        assertEquals("birthday", updated.occasionId)
+        val cleared = written(legacy.withPickedSlot(slot(), catalog))
+        assertEquals("", cleared.paathId)
+        assertEquals("", cleared.occasionId)
     }
 
     // endregion

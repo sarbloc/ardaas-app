@@ -32,11 +32,12 @@ import SwiftUI
 /// ## The occasion slot (#66)
 ///
 /// The Ardaas carries one "….." the reciter fills in aloud. This screen
-/// explains what it is, offers the bundled list (#64) plus free text, and
-/// quotes the slot sentence back with the choice spliced in — through
+/// explains what it is, offers a paath and an occasion from the bundled list
+/// (#64, #158) plus free text, and quotes the slot sentence back with both
+/// spliced in — through
 /// `ArdaasComposer`, the same substitution the Reader performs (#65), so the
 /// preview cannot promise something the Reader won't render. Only the
-/// *choice* is saved (`SavedArdaas.occasionChoice`); the words come from the
+/// *choice* is saved (`SavedArdaas.slotChoice`); the words come from the
 /// bundle at render time.
 ///
 /// ## Editing (#154)
@@ -272,14 +273,16 @@ struct ComposeView: View {
                 if occasionCatalog == nil {
                     occasionCatalog = try? OccasionCatalog.loadBundled()
                     // Once, on first load, before anything can be touched: an
-                    // edited record pointing at a retired occasion opens on
-                    // "None", in the form and the baseline alike, so it is
-                    // not a change to discard.
+                    // edited record's slot is resolved against the catalog —
+                    // a legacy paath stored as the occasion opens on the
+                    // Paath picker, a retired or misfiled id on "None" — in
+                    // the form and the baseline alike, so it is not a change
+                    // to discard. Save then writes the resolved slot.
                     if let occasionCatalog, var opened = original {
-                        opened.dropRetiredOccasion(in: occasionCatalog)
+                        opened.normaliseSlot(in: occasionCatalog)
                         original = opened
                         var current = form
-                        current.dropRetiredOccasion(in: occasionCatalog)
+                        current.normaliseSlot(in: occasionCatalog)
                         occasion = current.occasion
                     }
                 }

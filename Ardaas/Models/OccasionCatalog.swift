@@ -37,6 +37,20 @@ struct OccasionCatalog: Codable, Equatable {
     let version: Int
     let sources: [String]
     let occasions: [Occasion]
+    /// The word that joins a paath and an occasion when both are chosen
+    /// (#158): `ਅਤੇ` / `Ate` / `and`. Optional and decoded leniently — a
+    /// catalog without it still loads, and the slot then reads the paath
+    /// alone (see `OccasionLayers.joining(paath:occasion:joiner:)`).
+    var joiner: SlotJoiner? = nil
+}
+
+/// The connective between a paath and an occasion in the slot, one string per
+/// layer. Bundled beside the entries it joins, so it is proof-read and
+/// diffed like them.
+struct SlotJoiner: Codable, Equatable {
+    let gurmukhi: String
+    let transliteration: String
+    let english: String
 }
 
 enum OccasionCatalogError: Error, Equatable {

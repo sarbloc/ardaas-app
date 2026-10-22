@@ -5,7 +5,11 @@ import SwiftUI
 /// thing in the same words.
 enum OccasionCopy {
     /// What the gap is and that leaving it is normal — the teaching text.
-    static let explanation = "Partway through the Ardaas there's a gap, written as “…..”. It's where you name what the prayer is for — the paath (scripture reading) you've just finished, or an occasion like a birthday, a new home, or someone's recovery. Leaving it unfilled is completely normal; the dots stay as they are."
+    static let explanation = "Partway through the Ardaas there's a gap, written as “…..”. It's where you name what the prayer is for — the paath (scripture reading) you've just finished, an occasion like a birthday, a new home, or someone's recovery, or both. Leaving it unfilled is completely normal; the dots stay as they are."
+
+    /// The section header, the Reader sheet's title and the Reader button's
+    /// label (#158): the slot now takes a paath and an occasion together.
+    static let title = "Paath & Occasion"
 
     /// How free text is placed: one script, no translation.
     static let freeText = "Write it in Gurmukhi and it goes into the Gurmukhi text; write it in English and it goes into the English. It isn't translated for you."
@@ -16,9 +20,10 @@ enum OccasionCopy {
     static let willNotAppear = "This Ardaas has no English line, so an occasion written in English has nowhere to go — the “…..” stays as it is. Write it in Gurmukhi instead, or pick one from the list."
 }
 
-/// The "….." slot as one shared control: what the gap is, the bundled list
-/// (#64) plus free text, the slot sentence quoted back with the choice
-/// spliced in, and the #72 warning.
+/// The "….." slot as one shared control: what the gap is, a Paath picker and
+/// an Occasion picker (#158; bundled lists from #64, plus free text for the
+/// occasion), the slot sentence quoted back with both spliced in, and the #72
+/// warning.
 ///
 /// Extracted from Compose (#66) when the Reader gained the same picker (#67)
 /// rather than copied: the two screens must offer the same rows, the same
@@ -33,7 +38,7 @@ enum OccasionCopy {
 /// which is the one thing the two screens genuinely differ on.
 struct OccasionSection<Focus: Hashable>: View {
     /// The picker's state. The host persists whatever it decides from
-    /// `draft.choice` — on Save in Compose, immediately in the Reader.
+    /// `draft.slot` — on Save in Compose, immediately in the Reader.
     @Binding var draft: OccasionDraft
     let catalog: OccasionCatalog
     /// The selected variant's text, which the preview and the warning both
@@ -45,21 +50,28 @@ struct OccasionSection<Focus: Hashable>: View {
     let focusValue: Focus
 
     var body: some View {
-        Section("Occasion") {
+        Section(OccasionCopy.title) {
             Text(OccasionCopy.explanation)
                 .font(.footnote)
                 .foregroundStyle(Theme.mist)
 
-            // Titled as a sentence rather than "Occasion" again: the row
-            // reads "What it's for — None" under the section header.
-            Picker("What it's for", selection: $draft.selection) {
-                Text("None").tag(OccasionSelection.unset)
+            // Two independent pickers (#158): a paath and an occasion can
+            // be chosen together, and the slot joins them.
+            Picker("Paath", selection: $draft.paathId) {
+                Text("None").tag("")
 
                 Section("After a paath") {
                     ForEach(catalog.occasions(in: .paath)) { entry in
-                        row(entry).tag(OccasionSelection.catalog(id: entry.id))
+                        row(entry).tag(entry.id)
                     }
                 }
+            }
+            // Pushed rather than a menu: a list of two-line rows (Gurmukhi
+            // over English), not a popover.
+            .pickerStyle(.navigationLink)
+
+            Picker("Occasion", selection: $draft.selection) {
+                Text("None").tag(OccasionSelection.unset)
 
                 Section("Occasions") {
                     ForEach(catalog.occasions(in: .occasion)) { entry in
@@ -69,8 +81,6 @@ struct OccasionSection<Focus: Hashable>: View {
 
                 Text("Other…").tag(OccasionSelection.custom)
             }
-            // Pushed rather than a menu: seventeen rows, each two lines
-            // (Gurmukhi over English), is a list, not a popover.
             .pickerStyle(.navigationLink)
 
             if draft.isCustom {

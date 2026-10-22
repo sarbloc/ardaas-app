@@ -43,10 +43,10 @@ import io.sarbloc.ardaas.ui.compose.OccasionDraftSaver
 import io.sarbloc.ardaas.ui.compose.rememberComposeTranslationSession
 import io.sarbloc.ardaas.ui.home.HomeScreen
 import io.sarbloc.ardaas.ui.navigation.BackStack
-import io.sarbloc.ardaas.persistence.occasionChoice
+import io.sarbloc.ardaas.persistence.slotChoice
 import io.sarbloc.ardaas.ui.navigation.Destination
 import io.sarbloc.ardaas.ui.occasion.OccasionPickerDialog
-import io.sarbloc.ardaas.ui.occasion.withPickedOccasion
+import io.sarbloc.ardaas.ui.occasion.withPickedSlot
 import io.sarbloc.ardaas.ui.sources.LicencesScreen
 import io.sarbloc.ardaas.ui.sources.SourcesScreen
 import io.sarbloc.ardaas.ui.sources.appVersionString
@@ -202,7 +202,7 @@ private fun ComposeDestination(
         // row.
         OccasionPickerDialog(
             catalog = occasionCatalog,
-            choice = occasion.choice,
+            choice = occasion.slot,
             onDone = { picked ->
                 editingOccasion = false
                 occasion = OccasionDraft.from(picked, occasionCatalog)
@@ -302,13 +302,13 @@ private fun ReaderDestination(
                     if (editingOccasion && occasionCatalog != null) {
                         OccasionPickerDialog(
                             catalog = occasionCatalog,
-                            choice = record.occasionChoice,
+                            choice = record.slotChoice,
                             ardaasContent = library.value.resolvedVariant(record.variantId).content,
                             // Persisted on Done, like the variant picker
                             // writes straight to the record; Cancel keeps it.
                             onDone = { picked ->
                                 editingOccasion = false
-                                record.withPickedOccasion(picked, occasionCatalog)?.let { updated ->
+                                record.withPickedSlot(picked, occasionCatalog)?.let { updated ->
                                     scope.launch { onUpdate(updated) }
                                 }
                             },

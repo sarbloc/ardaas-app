@@ -1,0 +1,295 @@
+{
+  "_comment": "Shared by ArdaasTests/SlotChoiceTests.swift and android SlotChoiceTest.kt (#158): a record's three stored slot fields, the form SlotChoice normalises them to against the bundled occasions.json, and the slot phrase that renders. Never edit an expected value to make one side pass.",
+  "cases": [
+    {
+      "name": "nothing chosen",
+      "stored": {
+        "paathId": "",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "slot": null
+    },
+    {
+      "name": "paath only",
+      "stored": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਸੁਖਮਨੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+        "transliteration": "Sukhmani Saahib De Paath",
+        "english": "the recitation of Sukhmani Sahib"
+      }
+    },
+    {
+      "name": "occasion only",
+      "stored": {
+        "paathId": "",
+        "occasionId": "birthday",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "",
+        "occasionId": "birthday",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਜਨਮ ਦਿਹਾੜੇ",
+        "transliteration": "Janam Dihaarhe",
+        "english": "a birthday"
+      }
+    },
+    {
+      "name": "custom occasion only, English",
+      "stored": {
+        "paathId": "",
+        "occasionId": "custom",
+        "occasionCustom": "my niece's first birthday"
+      },
+      "normalised": {
+        "paathId": "",
+        "occasionId": "custom",
+        "occasionCustom": "my niece's first birthday"
+      },
+      "slot": {
+        "gurmukhi": "",
+        "transliteration": "",
+        "english": "my niece's first birthday"
+      }
+    },
+    {
+      "name": "custom occasion only, Gurmukhi",
+      "stored": {
+        "paathId": "",
+        "occasionId": "custom",
+        "occasionCustom": "ਦਸਤਾਰਬੰਦੀ"
+      },
+      "normalised": {
+        "paathId": "",
+        "occasionId": "custom",
+        "occasionCustom": "ਦਸਤਾਰਬੰਦੀ"
+      },
+      "slot": {
+        "gurmukhi": "ਦਸਤਾਰਬੰਦੀ",
+        "transliteration": "Dastaarbandi",
+        "english": ""
+      }
+    },
+    {
+      "name": "paath and occasion",
+      "stored": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "birthday",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "birthday",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਸੁਖਮਨੀ ਸਾਹਿਬ ਦੇ ਪਾਠ ਅਤੇ ਜਨਮ ਦਿਹਾੜੇ",
+        "transliteration": "Sukhmani Saahib De Paath Ate Janam Dihaarhe",
+        "english": "the recitation of Sukhmani Sahib and a birthday"
+      }
+    },
+    {
+      "name": "paath and custom occasion, English",
+      "stored": {
+        "paathId": "rehras-sahib",
+        "occasionId": "custom",
+        "occasionCustom": "my niece's first birthday"
+      },
+      "normalised": {
+        "paathId": "rehras-sahib",
+        "occasionId": "custom",
+        "occasionCustom": "my niece's first birthday"
+      },
+      "slot": {
+        "gurmukhi": "ਰਹਿਰਾਸ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+        "transliteration": "Rehraas Saahib De Paath",
+        "english": "the recitation of Rehras Sahib and my niece's first birthday"
+      }
+    },
+    {
+      "name": "paath and custom occasion, Gurmukhi",
+      "stored": {
+        "paathId": "rehras-sahib",
+        "occasionId": "custom",
+        "occasionCustom": "ਦਸਤਾਰਬੰਦੀ"
+      },
+      "normalised": {
+        "paathId": "rehras-sahib",
+        "occasionId": "custom",
+        "occasionCustom": "ਦਸਤਾਰਬੰਦੀ"
+      },
+      "slot": {
+        "gurmukhi": "ਰਹਿਰਾਸ ਸਾਹਿਬ ਦੇ ਪਾਠ ਅਤੇ ਦਸਤਾਰਬੰਦੀ",
+        "transliteration": "Rehraas Saahib De Paath Ate Dastaarbandi",
+        "english": "the recitation of Rehras Sahib"
+      }
+    },
+    {
+      "name": "legacy: a paath stored as the occasion is read as the paath",
+      "stored": {
+        "paathId": "",
+        "occasionId": "sukhmani-sahib",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਸੁਖਮਨੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+        "transliteration": "Sukhmani Saahib De Paath",
+        "english": "the recitation of Sukhmani Sahib"
+      }
+    },
+    {
+      "name": "legacy: a stale custom draft beside a legacy paath is dropped",
+      "stored": {
+        "paathId": "",
+        "occasionId": "sukhmani-sahib",
+        "occasionCustom": "old words"
+      },
+      "normalised": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਸੁਖਮਨੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+        "transliteration": "Sukhmani Saahib De Paath",
+        "english": "the recitation of Sukhmani Sahib"
+      }
+    },
+    {
+      "name": "a paath stored as the occasion beside a paath is ignored",
+      "stored": {
+        "paathId": "japji-sahib",
+        "occasionId": "sukhmani-sahib",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "japji-sahib",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਜਪੁ ਜੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+        "transliteration": "Jap Ji Saahib De Paath",
+        "english": "the recitation of Japji Sahib"
+      }
+    },
+    {
+      "name": "an unknown paath id is ignored",
+      "stored": {
+        "paathId": "retired-paath",
+        "occasionId": "birthday",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "",
+        "occasionId": "birthday",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਜਨਮ ਦਿਹਾੜੇ",
+        "transliteration": "Janam Dihaarhe",
+        "english": "a birthday"
+      }
+    },
+    {
+      "name": "a paath id naming an occasion is ignored",
+      "stored": {
+        "paathId": "birthday",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "slot": null
+    },
+    {
+      "name": "a set but invalid paath id still makes a paath in the occasion field ignored",
+      "stored": {
+        "paathId": "birthday",
+        "occasionId": "sukhmani-sahib",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "",
+        "occasionId": "",
+        "occasionCustom": ""
+      },
+      "slot": null
+    },
+    {
+      "name": "a retired occasion id is kept but renders nothing",
+      "stored": {
+        "paathId": "",
+        "occasionId": "retired-occasion",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "",
+        "occasionId": "retired-occasion",
+        "occasionCustom": ""
+      },
+      "slot": null
+    },
+    {
+      "name": "a paath beside a retired occasion renders the paath alone",
+      "stored": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "retired-occasion",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "retired-occasion",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਸੁਖਮਨੀ ਸਾਹਿਬ ਦੇ ਪਾਠ",
+        "transliteration": "Sukhmani Saahib De Paath",
+        "english": "the recitation of Sukhmani Sahib"
+      }
+    },
+    {
+      "name": "padded ids are trimmed",
+      "stored": {
+        "paathId": " sukhmani-sahib ",
+        "occasionId": " birthday ",
+        "occasionCustom": ""
+      },
+      "normalised": {
+        "paathId": "sukhmani-sahib",
+        "occasionId": "birthday",
+        "occasionCustom": ""
+      },
+      "slot": {
+        "gurmukhi": "ਸੁਖਮਨੀ ਸਾਹਿਬ ਦੇ ਪਾਠ ਅਤੇ ਜਨਮ ਦਿਹਾੜੇ",
+        "transliteration": "Sukhmani Saahib De Paath Ate Janam Dihaarhe",
+        "english": "the recitation of Sukhmani Sahib and a birthday"
+      }
+    }
+  ]
+}
