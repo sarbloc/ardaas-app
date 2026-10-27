@@ -151,3 +151,142 @@ code {
   padding: 1px 6px;
   font-size: 0.9em;
 }
+
+/* Product page (index.html) */
+
+.wrap.wide {
+  max-width: 60rem;
+}
+
+.hero {
+  text-align: center;
+  padding-top: 64px;
+}
+
+.hero .lede {
+  max-width: 34rem;
+  margin: 0 auto;
+}
+
+.app-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.get {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin: 28px 0 14px;
+}
+
+.store-badge {
+  display: inline-block;
+  line-height: 0;
+}
+
+.store-badge img {
+  height: 50px;
+  width: auto;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  height: 50px;
+  padding: 0 22px;
+  border: 1.5px solid var(--kesri);
+  border-radius: 999px;
+  color: var(--kesri);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.button:hover {
+  background: rgba(255, 153, 51, 0.12);
+}
+
+.promise {
+  color: var(--sand);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.shots {
+  display: flex;
+  gap: 18px;
+  margin: 48px -20px 8px;
+  padding: 0 20px 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.shots figure {
+  flex: 0 0 auto;
+  width: min(62vw, 220px);
+  margin: 0;
+  scroll-snap-align: center;
+  text-align: center;
+}
+
+.shots img {
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  border: 1px solid var(--hairline);
+  display: block;
+}
+
+.shots figcaption {
+  color: var(--mist);
+  font-size: 0.85rem;
+  margin-top: 10px;
+}
+
+@media (min-width: 960px) {
+  .shots {
+    justify-content: center;
+    overflow-x: visible;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
+  }
+}
+
+.features {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px 36px;
+}
+
+@media (min-width: 720px) {
+  .features {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.features p {
+  margin-top: 4px;
+}
+
+.platforms {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 20px;
+}
+
+@media (min-width: 720px) {
+  .platforms {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.platforms .card h3 {
+  margin-top: 0;
+}
