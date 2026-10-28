@@ -915,24 +915,41 @@ private struct BentiCard: View {
 /// translucent capsule with dim text when off. Liquid Glass where the OS has
 /// it, material before that.
 private struct LayerPillToggleStyle: ToggleStyle {
-    /// Narrower, for the Duo's vertical toolbar strip.
+    /// Smaller, for the Duo's vertical toolbar strip: its item group is
+    /// ~48pt wide, and the full-size pill (52pt) spilled out of it.
     var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
         Button {
             configuration.isOn.toggle()
         } label: {
-            configuration.label
-                .font(.subheadline.weight(.bold))
+            sized(configuration.label)
                 .foregroundStyle(configuration.isOn ? Theme.navyBottom : Theme.mist)
-                .frame(minWidth: compact ? 40 : 52, minHeight: 34)
-                .padding(.horizontal, compact ? 6 : 12)
                 .background { LayerPillBackground(isOn: configuration.isOn) }
-                // A 44pt touch target around the 34pt pill.
-                .padding(.vertical, 5)
+                // A 44pt touch target around the pill.
+                .padding(.vertical, compact ? 7 : 5)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func sized(_ label: Configuration.Label) -> some View {
+        if compact {
+            // A fixed width that sits inside the strip's group; the glyph
+            // shrinks to fit rather than widening the pill.
+            label
+                .font(.caption.weight(.bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .padding(.horizontal, 4)
+                .frame(width: 38, height: 30)
+        } else {
+            label
+                .font(.subheadline.weight(.bold))
+                .frame(minWidth: 52, minHeight: 34)
+                .padding(.horizontal, 12)
+        }
     }
 }
 
