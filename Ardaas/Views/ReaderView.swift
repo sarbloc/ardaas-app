@@ -341,7 +341,18 @@ struct ReaderView: View {
                 }
             }
             .frame(maxWidth: .infinity)
+            .padding(.top, 20)
             .padding(.bottom, 6)
+            // A soft fade, not a bar: the text dims as it passes under the
+            // pills instead of competing with them.
+            .background(
+                LinearGradient(
+                    colors: [.clear, Theme.navyBottom.opacity(0.92)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea(edges: .bottom)
+            )
             .animation(.easeOut(duration: 0.2), value: layerHint)
         }
     }
