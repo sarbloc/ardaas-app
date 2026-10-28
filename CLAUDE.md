@@ -14,6 +14,10 @@ Compilation is verified by:
    (`.github/workflows/ci.yml`). CI green is the compile/test gate.
 2. **Sarbloc's MacBook** — pull, `xcodegen`, open `Ardaas.xcodeproj`, run.
 
+CI and TestFlight build with **Xcode 27.1** (`xcode-27` runner image,
+`DEVELOPER_DIR` pinned in both workflows). The iOS 27.1 SDK is what lays the
+app out full screen on the iPhone Duo; use Xcode 27.1 locally to match.
+
 Never claim "it builds" from the Linux host — point at the CI run.
 
 **Android is different: it builds on the host.** JDK 21 and the Android SDK

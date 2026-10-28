@@ -36,13 +36,20 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || vars.TESTFLIGHT_ENABLED == 'true'
     # macOS minutes bill at 10x — this job costs ~150 billed minutes per
     # main merge. Pause with the kill switch when minutes matter.
-    runs-on: macos-26
+    # Same image and pinned Xcode as ci.yml: archive with the iOS 27.1 SDK,
+    # or the app is letterboxed on the iPhone Duo's inner display (#170).
+    runs-on: xcode-27
     timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
         with:
           # Full history: the build number is the commit count on main.
           fetch-depth: 0
+
+      - name: Show Xcode
+        run: xcodebuild -version
 
       - name: Verify App Store Connect secrets exist
         env:
