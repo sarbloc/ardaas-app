@@ -109,6 +109,29 @@ jobs:
           rm -rf Ardaas.xcodeproj
           cp -R /tmp/Ardaas-onnx.xcodeproj Ardaas.xcodeproj
 
+      # TEMP (#172 screenshots, dropped before merge): boot the iOS 27.1
+      # iPhone Duo and unfold it, so the UI test sees the inner screen.
+      # hinge is pinned to a reviewed commit (MIT, no network access).
+      - name: TEMP unfold the iPhone Duo
+        run: |
+          set -euo pipefail
+          git clone -q https://github.com/artemnovichkov/hinge.git /tmp/hinge
+          git -C /tmp/hinge checkout -q afb8f0b
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if "iOS-27-1" in runtime:
+                  for d in devices:
+                      if d["name"] == "iPhone Duo":
+                          print(d["udid"]); sys.exit()
+          ')
+          echo "Duo: ${UDID}"
+          xcrun simctl boot "${UDID}" || true
+          xcrun simctl bootstatus "${UDID}" -b
+          /tmp/hinge/bin/hinge -t 10 -d "${UDID}" open || /tmp/hinge/bin/hinge -t 10 -d "${UDID}" open || true
+          /tmp/hinge/bin/hinge -d "${UDID}" posture || true
+          echo "DUO_UDID=${UDID}" >> "$GITHUB_ENV"
+
       - name: Build and test (iOS Simulator)
         run: |
           set -o pipefail
@@ -118,7 +141,9 @@ jobs:
           # Otherwise fall back to the first available iPhone. Runner images
           # rotate simulator sets (a hardcoded 'iPhone 16' broke on Xcode
           # 16.4's image), so never hardcode a fallback.
-          if xcrun simctl list devices available | grep -q 'iPhone Duo ('; then
+          if [ -n "${DUO_UDID:-}" ]; then
+            DEST="platform=iOS Simulator,id=${DUO_UDID}"
+          elif xcrun simctl list devices available | grep -q 'iPhone Duo ('; then
             DEST="platform=iOS Simulator,name=iPhone Duo,OS=latest"
           else
             DEVICE=$(xcrun simctl list devices available | grep -Eo 'iPhone [^(]+' | head -1 | xargs)
@@ -137,6 +162,54 @@ jobs:
             -destination "${DEST}" \
             CODE_SIGNING_ALLOWED=NO \
             build test
+
+      # TEMP (#172 screenshots, dropped before merge). The app is still
+      # installed from the test run; -duoShots home|reader|compose seeds samples.
+      - name: TEMP Duo screenshots
+        if: always()
+        run: |
+          set -x +e
+          H="/tmp/hinge/bin/hinge"
+          U="${DUO_UDID}"
+          APP=io.sarbloc.ardaas
+          mkdir -p ~/duo-shots
+          shoot() { sleep 5; "$H" -t 10 -d "$U" screenshot ~/duo-shots/"$1".png || true; "$H" -t 10 -d "$U" posture || true; }
+          relaunch() { xcrun simctl terminate "$U" "$APP" || true; xcrun simctl launch "$U" "$APP" -duoShots "$@"; }
+          "$H" -t 10 -d "$U" open
+          relaunch home
+          shoot 01-open-home
+          relaunch compose
+          shoot 02-open-compose
+          relaunch reader
+          shoot 03-open-reader
+          "$H" -t 10 -d "$U" rotate left
+          shoot 04-upright-reader
+          relaunch home
+          shoot 05-upright-home
+          relaunch compose
+          shoot 06-upright-compose
+          "$H" -t 10 -d "$U" rotate right
+          relaunch reader
+          "$H" -t 10 -d "$U" half
+          shoot 07-half-reader
+          "$H" -t 10 -d "$U" close
+          shoot 08-folded-reader-after-close
+          relaunch home
+          shoot 09-folded-home
+          relaunch compose
+          shoot 10-folded-compose
+          relaunch reader
+          "$H" -t 10 -d "$U" open
+          shoot 11-open-reader-after-open
+
+      # TEMP (#172 screenshots, dropped before merge).
+      - name: Upload Duo screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: duo-shots
+          path: ~/duo-shots
+          if-no-files-found: warn
 
   # The required status check (branch protection, strict: true).
   #

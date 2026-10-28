@@ -55,6 +55,13 @@ struct HomeView: View {
                 }
             }
         }
+        // TEMP (#172 screenshots, dropped before merge).
+        .onAppear {
+            let args = ProcessInfo.processInfo.arguments
+            if let i = args.firstIndex(of: "-duoShots"), args.indices.contains(i + 1), args[i + 1] == "compose" {
+                isComposing = true
+            }
+        }
         .sheet(isPresented: $isComposing) {
             ComposeView()
                 .formSheet()

@@ -14,6 +14,7 @@ struct ContentView: View {
     /// Back still goes to Home.
     @State private var selection: SavedArdaas?
     @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -33,6 +34,31 @@ struct ContentView: View {
                     description: Text("Pick one from the list to read it.")
                 )
                 .themedScreen()
+            }
+        }
+        // TEMP (#172 screenshots, dropped before merge): seed samples once;
+        // `-duoShots reader` opens the first.
+        .onAppear {
+            let args = ProcessInfo.processInfo.arguments
+            guard let i = args.firstIndex(of: "-duoShots"), selection == nil else { return }
+            var all = (try? modelContext.fetch(FetchDescriptor<SavedArdaas>())) ?? []
+            if all.isEmpty {
+                let sample = SavedArdaas(
+                    label: "Morning Ardaas",
+                    bentiText: "Please bless the family with health and chardi kala.",
+                    bentiGurmukhi: "ਪਰਿਵਾਰ ਨੂੰ ਤੰਦਰੁਸਤੀ ਅਤੇ ਚੜ੍ਹਦੀ ਕਲਾ ਬਖ਼ਸ਼ੋ ਜੀ।",
+                    bentiTransliteration: "parivaar noo(n) tandarustee ate charhdee kalaa bakhsho jee.",
+                    occasion: .catalog(id: "birthday"),
+                    paathId: "japji-sahib"
+                )
+                modelContext.insert(SavedArdaas(label: "For the family", bentiText: "Another benti."))
+                modelContext.insert(SavedArdaas(label: "Gurpurab", bentiText: "A third benti."))
+                modelContext.insert(sample)
+                try? modelContext.save()
+                all = [sample]
+            }
+            if args.indices.contains(i + 1), args[i + 1] == "reader" {
+                selection = all.first { $0.label == "Morning Ardaas" } ?? all.first
             }
         }
         .onChange(of: selection) { _, newSelection in
