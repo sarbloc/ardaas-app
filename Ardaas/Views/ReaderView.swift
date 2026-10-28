@@ -47,9 +47,11 @@ struct ReaderView: View {
     /// The whole window, safe areas included, in global coordinates. Its
     /// shape picks the layout, and its midline is the Duo's fold.
     @State private var windowFrame: CGRect = .zero
-    /// Where the reading rows sit (inside the margins, left of any side
-    /// bar), in global coordinates. The side-by-side columns split this.
-    @State private var rowArea: CGRect = .zero
+    /// Where the reading rows sit horizontally (inside the margins, left of
+    /// any side bar), in global x. The side-by-side columns split this.
+    /// Horizontal only: the vertical position moves on every scroll frame,
+    /// and tracking it would rebuild the Reader the whole time.
+    @State private var rowSpan: ClosedRange<CGFloat> = 0...0
     /// The row at the top of the screen, so a change of layout (folding,
     /// unfolding, turning the open Duo) keeps the reader's place.
     @State private var topRow: Int?
@@ -156,8 +158,8 @@ struct ReaderView: View {
         case .sideBySide:
             guard showsTwoColumns else { return .readable }
             return .columns(ReaderColumns.split(
-                areaMinX: rowArea.minX,
-                areaMaxX: rowArea.maxX,
+                areaMinX: rowSpan.lowerBound,
+                areaMaxX: rowSpan.upperBound,
                 foldX: windowFrame.midX
             ))
         }
@@ -247,10 +249,11 @@ struct ReaderView: View {
                     }
                     .scrollTargetLayout()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .onGeometryChange(for: CGRect.self) { geometry in
-                        geometry.frame(in: .global)
-                    } action: { frame in
-                        rowArea = frame
+                    .onGeometryChange(for: ClosedRange<CGFloat>.self) { geometry in
+                        let frame = geometry.frame(in: .global)
+                        return frame.minX...frame.maxX
+                    } action: { span in
+                        rowSpan = span
                     }
                     .padding(.horizontal, horizontalMargin)
                     .padding(.vertical, 16)
