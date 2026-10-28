@@ -49,7 +49,8 @@ struct ReaderView: View {
     /// crease is at the physical centre of the inner screen).
     @State private var windowFrame: CGRect = .zero
     /// Where the reading rows sit horizontally (inside the margins, left of
-    /// any side bar), in global x. The side-by-side columns split this.
+    /// any vertical toolbar strip), in global x. The side-by-side columns
+    /// split this.
     /// Horizontal only: the vertical position moves on every scroll frame,
     /// and tracking it would rebuild the Reader the whole time.
     @State private var rowSpan: ClosedRange<CGFloat> = 0...0
@@ -63,7 +64,6 @@ struct ReaderView: View {
     /// A comfortable line length for the single-column layouts on the open
     /// Duo. The phone layout is narrower than this anyway.
     private static let readableWidth: CGFloat = 620
-    private static let sideBarWidth: CGFloat = 64
 
     private static let logger = Logger(subsystem: "io.sarbloc.ardaas", category: "Reader")
 
@@ -73,11 +73,12 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        content
+        sideBySideToolbar(on: content)
             .navigationTitle(savedArdaas.label)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // On the open Duo these move into the side bar or the dock.
+                // Open, these move to the vertical strip (sideways) or the
+                // dock (upright).
                 if layout == .phone {
                     // Its own control, ahead of the gear: what the prayer is
                     // for is content, not a display preference, and burying
@@ -238,60 +239,54 @@ struct ReaderView: View {
         // One ScrollView in every layout, so the scroll position (and the
         // rows' identity) survives a change of layout; only the rows inside
         // it rearrange.
-        return HStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: layout == .phone ? 20 : 24) {
-                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                            switch item {
-                            case .canonical(let segment):
-                                segmentView(
-                                    segment,
-                                    isOccasionSlot: segment.id == occasionSlotId,
-                                    arrangement: arrangement
-                                )
-                            case .benti(let layers):
-                                bentiView(layers, arrangement: arrangement)
-                            }
+        return ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: layout == .phone ? 20 : 24) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                        switch item {
+                        case .canonical(let segment):
+                            segmentView(
+                                segment,
+                                isOccasionSlot: segment.id == occasionSlotId,
+                                arrangement: arrangement
+                            )
+                        case .benti(let layers):
+                            bentiView(layers, arrangement: arrangement)
                         }
                     }
-                    .scrollTargetLayout()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onGeometryChange(for: ClosedRange<CGFloat>.self) { geometry in
-                        let frame = geometry.frame(in: .global)
-                        return frame.minX...frame.maxX
-                    } action: { span in
-                        rowSpan = span
-                    }
-                    .padding(.horizontal, horizontalMargin)
-                    .padding(.vertical, 16)
                 }
-                .scrollPosition(id: $topRow, anchor: .top)
-                // Rows above the fold change height when the layout does;
-                // put the row that was at the top back there.
-                .onChange(of: layout) {
-                    if let topRow {
-                        proxy.scrollTo(topRow, anchor: .top)
-                    }
+                .scrollTargetLayout()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .onGeometryChange(for: ClosedRange<CGFloat>.self) { geometry in
+                    let frame = geometry.frame(in: .global)
+                    return frame.minX...frame.maxX
+                } action: { span in
+                    rowSpan = span
+                }
+                .padding(.horizontal, horizontalMargin)
+                .padding(.vertical, 16)
+            }
+            .scrollPosition(id: $topRow, anchor: .top)
+            // Rows above the fold change height when the layout does;
+            // put the row that was at the top back there.
+            .onChange(of: layout) {
+                if let topRow {
+                    proxy.scrollTo(topRow, anchor: .top)
                 }
             }
-            .safeAreaInset(edge: .bottom) {
-                switch layout {
-                case .phone: layerToggles
-                case .stacked: dock
-                case .sideBySide: EmptyView()
-                }
+        }
+        .safeAreaInset(edge: .bottom) {
+            switch layout {
+            case .phone: layerToggles
+            case .stacked: dock
+            case .sideBySide: EmptyView()
             }
-            .overlay(alignment: .bottom) {
-                if layout == .sideBySide {
-                    layerHintView
-                        .padding(.bottom, 16)
-                        .animation(.easeOut(duration: 0.2), value: layerHint)
-                }
-            }
-
+        }
+        .overlay(alignment: .bottom) {
             if layout == .sideBySide {
-                sideBar
+                layerHintView
+                    .padding(.bottom, 16)
+                    .animation(.easeOut(duration: 0.2), value: layerHint)
             }
         }
         .themedScreen()
@@ -498,7 +493,7 @@ struct ReaderView: View {
     }
 
     /// The pills themselves, for the caller's stack: a row on the phone and
-    /// in the dock, a column in the side bar (`compact`, to fit its width).
+    /// in the dock. (The open Duo's vertical strip builds its own, `compact`.)
     @ViewBuilder
     private func layerPills(compact: Bool) -> some View {
         if screenAvailability.transliteration {
@@ -579,7 +574,9 @@ struct ReaderView: View {
             layerHintView
             HStack(spacing: 12) {
                 HStack(spacing: 2) {
-                    textSizeMenu
+                    textSizeMenu {
+                        toolLabel("Text Size", systemImage: "textformat.size")
+                    }
                     if canEditOccasion {
                         toolButton(OccasionCopy.title, systemImage: "tag") {
                             isEditingOccasion = true
@@ -611,51 +608,57 @@ struct ReaderView: View {
         .animation(.easeOut(duration: 0.2), value: layerHint)
     }
 
-    /// The side-by-side layout's controls (the Duo open sideways): a bar
-    /// down the right-hand edge with everything at the bottom — clear of the
-    /// status bar, and under the thumb. Settings, edit, occasion and text
-    /// size, then the layer pills.
-    private var sideBar: some View {
-        VStack(spacing: 4) {
-            Spacer(minLength: 0)
-            displayMenu(includesShortcuts: false) {
-                toolLabel("Display Options", systemImage: "gearshape")
-            }
-            toolButton("Edit", systemImage: "pencil") {
-                isEditingArdaas = true
-            }
-            if canEditOccasion {
-                toolButton(OccasionCopy.title, systemImage: "tag") {
-                    isEditingOccasion = true
+    /// The side-by-side layout's controls (the Duo open sideways). There,
+    /// iOS 27.1 turns the navigation bar and toolbar into one vertical strip
+    /// down the right-hand edge, the status bar and Back at its top. The
+    /// bottom toolbar's items go to the strip's bottom, under the thumb:
+    /// settings, edit, occasion and text size, a fixed gap, then the layer
+    /// pills. The pills are custom views, so they opt in to the vertical
+    /// strip (`axisBehavior`); the compact pill fits its fixed width.
+    ///
+    /// iOS 27.1 or later only: nothing earlier runs on the Duo, and nothing
+    /// else gets this layout.
+    @ViewBuilder
+    private func sideBySideToolbar<Content: View>(on view: Content) -> some View {
+        if #available(iOS 27.1, *) {
+            view.toolbar {
+                if layout == .sideBySide {
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        displayMenu(includesShortcuts: false) {
+                            Label("Display Options", systemImage: "gearshape")
+                        }
+                        editButton
+                        if canEditOccasion {
+                            occasionButton
+                        }
+                        textSizeMenu {
+                            Label("Text Size", systemImage: "textformat.size")
+                        }
+                    }
+                    if hasLayerPills {
+                        ToolbarSpacer(.fixed, placement: .bottomBar)
+                    }
+                    if screenAvailability.transliteration {
+                        ToolbarItem(placement: .bottomBar) {
+                            layerToggle(.transliteration, isOn: $showTransliteration, compact: true)
+                        }
+                        .axisBehavior(.verticalPreferred)
+                    }
+                    if screenAvailability.english {
+                        ToolbarItem(placement: .bottomBar) {
+                            layerToggle(.english, isOn: $showEnglish, compact: true)
+                        }
+                        .axisBehavior(.verticalPreferred)
+                    }
                 }
             }
-            textSizeMenu
-            if hasLayerPills {
-                Rectangle()
-                    .fill(Theme.mist.opacity(0.3))
-                    .frame(width: 28, height: 1)
-                    .padding(.vertical, 8)
-                VStack(spacing: 2) {
-                    layerPills(compact: true)
-                }
-            }
-        }
-        .padding(.bottom, 12)
-        .frame(width: Self.sideBarWidth)
-        .frame(maxHeight: .infinity)
-        .background {
-            Theme.navyBottom.opacity(0.55)
-                .overlay(alignment: .leading) {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.08))
-                        .frame(width: 1)
-                }
-                .ignoresSafeArea()
+        } else {
+            view
         }
     }
 
-    /// An icon-only control for the dock and the side bar, with a 44pt
-    /// touch target. The title is what VoiceOver reads.
+    /// An icon-only control for the dock, with a 44pt touch target. The
+    /// title is what VoiceOver reads.
     private func toolLabel(_ title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .labelStyle(.iconOnly)
@@ -678,11 +681,13 @@ struct ReaderView: View {
 
     /// Text size as its own control on the open Duo, where there's room;
     /// on the phone it lives in the display menu.
-    private var textSizeMenu: some View {
+    private func textSizeMenu<MenuLabel: View>(
+        @ViewBuilder label: () -> MenuLabel
+    ) -> some View {
         Menu {
             textSizeButtons
         } label: {
-            toolLabel("Text Size", systemImage: "textformat.size")
+            label()
         }
     }
 
@@ -884,7 +889,7 @@ private struct BentiCard: View {
 /// translucent capsule with dim text when off. Liquid Glass where the OS has
 /// it, material before that.
 private struct LayerPillToggleStyle: ToggleStyle {
-    /// Narrower, for the open Duo's 64pt side bar.
+    /// Narrower, for the open Duo's vertical toolbar strip.
     var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
