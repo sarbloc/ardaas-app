@@ -71,10 +71,20 @@ jobs:
     if: needs.changes.outputs.ios == 'true'
     # macOS minutes bill at 10x — keep this job lean, and only reach it when
     # something it compiles has actually changed.
-    runs-on: macos-26
+    # xcode-27: the Apple Silicon image with Xcode 27.1, whose iOS 27.1 SDK
+    # is what lays the app out full screen on the iPhone Duo's inner display
+    # (pre-27 SDK builds are letterboxed there) (#170).
+    runs-on: xcode-27
     timeout-minutes: 30
+    env:
+      # Pinned, not the image default: a default bump must not silently move
+      # the SDK we build against. Keep in sync with deploy-testflight.yml.
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
+
+      - name: Show Xcode
+        run: xcodebuild -version
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -102,19 +112,29 @@ jobs:
       - name: Build and test (iOS Simulator)
         run: |
           set -o pipefail
-          # Runner images rotate simulator sets (a hardcoded 'iPhone 16'
-          # broke on Xcode 16.4's image) — pick the first available iPhone.
-          DEVICE=$(xcrun simctl list devices available | grep -Eo 'iPhone [^(]+' | head -1 | xargs)
-          if [ -z "$DEVICE" ]; then
-            echo "::error::No available iPhone simulator on this runner image"
-            xcrun simctl list devices available
-            exit 1
+          # Prefer the iPhone Duo: it is the only simulator the iOS 27.1
+          # runtime ships, and the device the 27.1 SDK exists for.
+          # OS=latest pins it to that runtime, not an older one on the image.
+          # Otherwise fall back to the first available iPhone. Runner images
+          # rotate simulator sets (a hardcoded 'iPhone 16' broke on Xcode
+          # 16.4's image), so never hardcode a fallback.
+          if xcrun simctl list devices available | grep -q 'iPhone Duo ('; then
+            DEST="platform=iOS Simulator,name=iPhone Duo,OS=latest"
+          else
+            DEVICE=$(xcrun simctl list devices available | grep -Eo 'iPhone [^(]+' | head -1 | xargs)
+            if [ -z "$DEVICE" ]; then
+              echo "::error::No available iPhone simulator on this runner image"
+              xcrun simctl list devices available
+              exit 1
+            fi
+            echo "::warning::No iPhone Duo simulator; falling back to ${DEVICE}"
+            DEST="platform=iOS Simulator,name=${DEVICE}"
           fi
-          echo "Using simulator: ${DEVICE}"
+          echo "Using destination: ${DEST}"
           xcodebuild \
             -project Ardaas.xcodeproj \
             -scheme Ardaas \
-            -destination "platform=iOS Simulator,name=${DEVICE}" \
+            -destination "${DEST}" \
             CODE_SIGNING_ALLOWED=NO \
             build test
 
