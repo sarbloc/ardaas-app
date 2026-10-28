@@ -128,7 +128,7 @@ jobs:
           echo "Duo: ${UDID}"
           xcrun simctl boot "${UDID}" || true
           xcrun simctl bootstatus "${UDID}" -b
-          /tmp/hinge/bin/hinge -d "${UDID}" open
+          /tmp/hinge/bin/hinge -t 10 -d "${UDID}" open || /tmp/hinge/bin/hinge -t 10 -d "${UDID}" open || true
           /tmp/hinge/bin/hinge -d "${UDID}" posture || true
           echo "DUO_UDID=${UDID}" >> "$GITHUB_ENV"
 
@@ -168,28 +168,28 @@ jobs:
       - name: TEMP Duo screenshots
         if: always()
         run: |
-          set -x
-          H=/tmp/hinge/bin/hinge
+          set -x +e
+          H="/tmp/hinge/bin/hinge"
           U="${DUO_UDID}"
           APP=io.sarbloc.ardaas
           mkdir -p ~/duo-shots
-          shoot() { sleep 5; "$H" -d "$U" screenshot ~/duo-shots/"$1".png || true; "$H" -d "$U" posture || true; }
+          shoot() { sleep 5; "$H" -t 10 -d "$U" screenshot ~/duo-shots/"$1".png || true; "$H" -t 10 -d "$U" posture || true; }
           relaunch() { xcrun simctl terminate "$U" "$APP" || true; xcrun simctl launch "$U" "$APP" -duoShots "$@"; }
-          "$H" -d "$U" open
+          "$H" -t 10 -d "$U" open
           relaunch
           shoot 1-open
-          "$H" -d "$U" rotate left
+          "$H" -t 10 -d "$U" rotate left
           shoot 2-open-rotated-left
-          "$H" -d "$U" rotate right
+          "$H" -t 10 -d "$U" rotate right
           shoot 3-open-rotated-back
           relaunch -reader.showEnglish NO
           shoot 4-open-english-off
-          "$H" -d "$U" rotate left
+          "$H" -t 10 -d "$U" rotate left
           shoot 5-rotated-english-off
-          "$H" -d "$U" rotate right
-          "$H" -d "$U" half
+          "$H" -t 10 -d "$U" rotate right
+          "$H" -t 10 -d "$U" half
           shoot 6-half-folded
-          "$H" -d "$U" close
+          "$H" -t 10 -d "$U" close
           shoot 7-folded
 
       # TEMP (#171 screenshots, dropped before merge).
