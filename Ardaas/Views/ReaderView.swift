@@ -43,8 +43,24 @@ struct ReaderView: View {
     @State private var layerHint: String?
     @State private var layerHintTask: Task<Void, Never>?
 
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// The whole window, safe areas included, in global coordinates. Its
+    /// shape picks the layout, and its midline is the Duo's fold.
+    @State private var windowFrame: CGRect = .zero
+    /// Where the reading rows sit (inside the margins, left of any side
+    /// bar), in global coordinates. The side-by-side columns split this.
+    @State private var rowArea: CGRect = .zero
+    /// The row at the top of the screen, so a change of layout (folding,
+    /// unfolding, turning the open Duo) keeps the reader's place.
+    @State private var topRow: Int?
+
     private static let fontScaleRange = 0.7...1.6
     private static let fontScaleStep = 0.1
+
+    /// A comfortable line length for the single-column layouts on the open
+    /// Duo. The phone layout is narrower than this anyway.
+    private static let readableWidth: CGFloat = 620
+    private static let sideBarWidth: CGFloat = 64
 
     private static let logger = Logger(subsystem: "io.sarbloc.ardaas", category: "Reader")
 
@@ -58,17 +74,32 @@ struct ReaderView: View {
             .navigationTitle(savedArdaas.label)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                // Its own control, ahead of the gear: what the prayer is for
-                // is content, not a display preference, and burying it in a
-                // menu of layer toggles and text size would say otherwise.
-                if canEditOccasion {
+                // On the open Duo these move into the side bar or the dock.
+                if layout == .phone {
+                    // Its own control, ahead of the gear: what the prayer is
+                    // for is content, not a display preference, and burying
+                    // it in a menu of layer toggles and text size would say
+                    // otherwise.
+                    if canEditOccasion {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            occasionButton
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
-                        occasionButton
+                        displayMenu(includesShortcuts: true) {
+                            Label("Display Options", systemImage: "gearshape")
+                        }
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    displayMenu
-                }
+            }
+            .background {
+                Color.clear
+                    .ignoresSafeArea()
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .global)
+                    } action: { frame in
+                        windowFrame = frame
+                    }
             }
             .sheet(isPresented: $isEditingOccasion) {
                 if let occasionCatalog {
@@ -109,6 +140,36 @@ struct ReaderView: View {
     private var loadedContent: ArdaasContent? {
         guard case .success(let library) = loadResult else { return nil }
         return library.resolvedVariant(id: savedArdaas.variantId).content
+    }
+
+    private var layout: ReaderLayout {
+        .choose(isRegularWidth: horizontalSizeClass == .regular, windowSize: windowFrame.size)
+    }
+
+    /// How each row lays out its lines under the current layout.
+    private var arrangement: RowArrangement {
+        switch layout {
+        case .phone:
+            return .full
+        case .stacked:
+            return .readable
+        case .sideBySide:
+            guard showsTwoColumns else { return .readable }
+            return .columns(ReaderColumns.split(
+                areaMinX: rowArea.minX,
+                areaMaxX: rowArea.maxX,
+                foldX: windowFrame.midX
+            ))
+        }
+    }
+
+    /// Two columns only when both have something in them: English on
+    /// screen, and Gurmukhi or transliteration beside it. Otherwise one
+    /// centred column, rather than a page with an empty half.
+    private var showsTwoColumns: Bool {
+        guard toggles.english, screenAvailability.english else { return false }
+        let rendered = canonicalAvailability.renderedLayers(under: toggles)
+        return rendered.contains(.gurmukhi) || rendered.contains(.transliteration)
     }
 
     /// The persisted toggles as one value, so the visibility rules can be
@@ -163,30 +224,94 @@ struct ReaderView: View {
         // assert (`SavedArdaas.renderItems(in:catalog:)`).
         let items = savedArdaas.renderItems(in: content, catalog: occasionCatalog)
         let occasionSlotId = content.occasionSlot?.inSegmentId
-        return ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20) {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                    switch item {
-                    case .canonical(let segment):
-                        segmentView(segment, isOccasionSlot: segment.id == occasionSlotId)
-                    case .benti(let layers):
-                        bentiView(layers)
+        let arrangement = self.arrangement
+        // One ScrollView in every layout, so the scroll position (and the
+        // rows' identity) survives a change of layout; only the rows inside
+        // it rearrange.
+        return HStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: layout == .phone ? 20 : 24) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                            switch item {
+                            case .canonical(let segment):
+                                segmentView(
+                                    segment,
+                                    isOccasionSlot: segment.id == occasionSlotId,
+                                    arrangement: arrangement
+                                )
+                            case .benti(let layers):
+                                bentiView(layers, arrangement: arrangement)
+                            }
+                        }
+                    }
+                    .scrollTargetLayout()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .onGeometryChange(for: CGRect.self) { geometry in
+                        geometry.frame(in: .global)
+                    } action: { frame in
+                        rowArea = frame
+                    }
+                    .padding(.horizontal, horizontalMargin)
+                    .padding(.vertical, 16)
+                }
+                .scrollPosition(id: $topRow, anchor: .top)
+                // Rows above the fold change height when the layout does;
+                // put the row that was at the top back there.
+                .onChange(of: layout) {
+                    if let topRow {
+                        proxy.scrollTo(topRow, anchor: .top)
                     }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            .safeAreaInset(edge: .bottom) {
+                switch layout {
+                case .phone: layerToggles
+                case .stacked: dock
+                case .sideBySide: EmptyView()
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if layout == .sideBySide {
+                    layerHintView
+                        .padding(.bottom, 16)
+                        .animation(.easeOut(duration: 0.2), value: layerHint)
+                }
+            }
+
+            if layout == .sideBySide {
+                sideBar
+            }
         }
         .themedScreen()
-        .safeAreaInset(edge: .bottom) {
-            layerToggles
+    }
+
+    private var horizontalMargin: CGFloat {
+        switch layout {
+        case .phone: 20
+        case .stacked: 32
+        case .sideBySide: 24
         }
     }
 
     // MARK: - Rows
 
     @ViewBuilder
-    private func segmentView(_ segment: ArdaasSegment, isOccasionSlot: Bool) -> some View {
+    private func segmentView(
+        _ segment: ArdaasSegment,
+        isOccasionSlot: Bool,
+        arrangement: RowArrangement
+    ) -> some View {
+        arranged(segmentLines(segment), arrangement: arrangement) {
+            if isOccasionSlot, occasionWillNotAppear {
+                strandedOccasionNote
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: arrangement.rowAlignment)
+    }
+
+    /// The segment's lines under the toggles, in layer order.
+    private func segmentLines(_ segment: ArdaasSegment) -> [BentiLine] {
         // `renderedLayers` carries the never-blank guard: if the persisted
         // toggles leave this variant with nothing to show (e.g. Gurmukhi off
         // + only layers it lacks on), Gurmukhi renders anyway. It reasons
@@ -194,31 +319,56 @@ struct ReaderView: View {
         // layer keeps the screen non-empty but does nothing for a segment
         // that has no English.
         let rendered = canonicalAvailability.renderedLayers(under: toggles)
-        VStack(alignment: .leading, spacing: 6) {
-            if rendered.contains(.gurmukhi) {
-                Text(segment.gurmukhi)
-                    .font(.system(size: 22 * fontScale))
-                    .lineSpacing(8 * fontScale)
-                    .foregroundStyle(Theme.parchment)
-            }
-            if rendered.contains(.transliteration), let transliteration = segment.transliteration {
-                Text(transliteration)
-                    .font(.system(size: 15 * fontScale))
-                    .italic()
-                    .lineSpacing(5 * fontScale)
-                    .foregroundStyle(Theme.sand)
-            }
-            if rendered.contains(.english), let english = segment.english {
-                Text(english)
-                    .font(.system(size: 15 * fontScale, design: .serif))
-                    .lineSpacing(5 * fontScale)
-                    .foregroundStyle(Theme.mist)
-            }
-            if isOccasionSlot, occasionWillNotAppear {
-                strandedOccasionNote
-            }
+        var lines: [BentiLine] = []
+        if rendered.contains(.gurmukhi) {
+            lines.append(BentiLine(kind: .gurmukhi, text: segment.gurmukhi))
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        if rendered.contains(.transliteration), let transliteration = segment.transliteration {
+            lines.append(BentiLine(kind: .transliteration, text: transliteration))
+        }
+        if rendered.contains(.english), let english = segment.english {
+            lines.append(BentiLine(kind: .english, text: english))
+        }
+        return lines
+    }
+
+    /// The row's lines in the arrangement's shape. Columns put the reading
+    /// layers on the left and English on the right, each at its fixed width,
+    /// so every row's English starts level with its own Gurmukhi. `footer`
+    /// goes under the left-hand (or only) column.
+    @ViewBuilder
+    private func arranged<Footer: View>(
+        _ lines: [BentiLine],
+        arrangement: RowArrangement,
+        @ViewBuilder footer: () -> Footer
+    ) -> some View {
+        switch arrangement {
+        case .columns(let columns):
+            HStack(alignment: .top, spacing: ReaderColumns.gap) {
+                lineStack(lines.filter { $0.kind != .english }, footer: footer)
+                    .frame(width: columns.left, alignment: .leading)
+                lineStack(lines.filter { $0.kind == .english }) { EmptyView() }
+                    .frame(width: columns.right, alignment: .leading)
+            }
+        case .full:
+            lineStack(lines, footer: footer)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        case .readable:
+            lineStack(lines, footer: footer)
+                .frame(maxWidth: Self.readableWidth, alignment: .leading)
+        }
+    }
+
+    private func lineStack<Footer: View>(
+        _ lines: [BentiLine],
+        @ViewBuilder footer: () -> Footer
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(lines) { line in
+                lineText(line)
+            }
+            footer()
+        }
     }
 
     /// The chosen occasion lands in no layer this variant carries, so the
@@ -257,30 +407,30 @@ struct ReaderView: View {
     /// that marks it out as the user's own words. Which layers appear is the
     /// pure decision in `BentiLayers.visibleLines`, including its never-blank
     /// fallback, so the card is never drawn empty.
-    private func bentiView(_ layers: BentiLayers) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach(layers.visibleLines(under: toggles)) { line in
-                bentiLine(line)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            Color.accentColor.opacity(0.12),
-            in: RoundedRectangle(cornerRadius: 10)
-        )
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.accentColor.opacity(0.6))
-                .frame(width: 3)
-                .padding(.vertical, 6)
+    @ViewBuilder
+    private func bentiView(_ layers: BentiLayers, arrangement: RowArrangement) -> some View {
+        let lines = layers.visibleLines(under: toggles)
+        switch arrangement {
+        case .full:
+            // The phone: the card inset within the margins, as it always was.
+            arranged(lines, arrangement: arrangement) { EmptyView() }
+                .padding(12)
+                .background { BentiCard() }
+        case .readable, .columns:
+            // The card grows outwards into the margin instead, so the
+            // benti's lines stay level with the columns of every other row
+            // and the card spans both columns.
+            arranged(lines, arrangement: arrangement) { EmptyView() }
+                .padding(.vertical, 12)
+                .background { BentiCard().padding(.horizontal, -12) }
+                .frame(maxWidth: .infinity, alignment: arrangement.rowAlignment)
         }
     }
 
-    /// One benti layer, styled to match its canonical counterpart in
-    /// `segmentView` so the two read as one continuous text.
+    /// One line of a row, styled by its layer. Canonical segments and the
+    /// benti share it, so the two read as one continuous text.
     @ViewBuilder
-    private func bentiLine(_ line: BentiLine) -> some View {
+    private func lineText(_ line: BentiLine) -> some View {
         switch line.kind {
         case .gurmukhi:
             Text(line.text)
@@ -307,57 +457,74 @@ struct ReaderView: View {
     /// separate floating capsules, solid kesri when on, so each reads as its
     /// own switch rather than one two-way control. No bar behind them — the
     /// text scrolls underneath, and the inset keeps the last line clear.
-    /// Gurmukhi's toggle stays in the toolbar menu: it's the anchor layer,
-    /// switched rarely.
+    /// Gurmukhi's toggle stays in the display menu: it's the anchor layer,
+    /// switched rarely. The phone layout's bottom chrome.
     @ViewBuilder
     private var layerToggles: some View {
-        // Pills only for layers something on screen actually carries — the
-        // variant or the benti. Using the screen-wide availability (not the
-        // variant's) is what keeps the user's own words controllable on a
-        // variant with no attested English: the benti's English renders
-        // there, so its pill has to be there to switch it off. No pills at
-        // all when neither the variant nor the benti has either layer.
-        let availability = screenAvailability
-        if availability.transliteration || availability.english {
+        if hasLayerPills {
             VStack(spacing: 8) {
-                if let layerHint {
-                    Text(layerHint)
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Theme.parchment)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .transition(.opacity)
-                        // VoiceOver already announces the toggle's new state.
-                        .accessibilityHidden(true)
-                }
+                layerHintView
                 HStack(spacing: 10) {
-                    if availability.transliteration {
-                        layerToggle(.transliteration, isOn: $showTransliteration)
-                    }
-                    if availability.english {
-                        layerToggle(.english, isOn: $showEnglish)
-                    }
+                    layerPills(compact: false)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 20)
             .padding(.bottom, 6)
-            // A soft fade, not a bar: the text dims as it passes under the
-            // pills instead of competing with them.
-            .background(
-                LinearGradient(
-                    colors: [.clear, Theme.navyBottom.opacity(0.92)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea(edges: .bottom)
-            )
+            .background(bottomFade)
             .animation(.easeOut(duration: 0.2), value: layerHint)
         }
     }
 
-    private func layerToggle(_ kind: LayerKind, isOn: Binding<Bool>) -> some View {
+    /// Pills only for layers something on screen actually carries — the
+    /// variant or the benti. Using the screen-wide availability (not the
+    /// variant's) is what keeps the user's own words controllable on a
+    /// variant with no attested English: the benti's English renders there,
+    /// so its pill has to be there to switch it off. No pills at all when
+    /// neither the variant nor the benti has either layer.
+    private var hasLayerPills: Bool {
+        screenAvailability.transliteration || screenAvailability.english
+    }
+
+    /// The pills themselves, for the caller's stack: a row on the phone and
+    /// in the dock, a column in the side bar (`compact`, to fit its width).
+    @ViewBuilder
+    private func layerPills(compact: Bool) -> some View {
+        if screenAvailability.transliteration {
+            layerToggle(.transliteration, isOn: $showTransliteration, compact: compact)
+        }
+        if screenAvailability.english {
+            layerToggle(.english, isOn: $showEnglish, compact: compact)
+        }
+    }
+
+    @ViewBuilder
+    private var layerHintView: some View {
+        if let layerHint {
+            Text(layerHint)
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Theme.parchment)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.ultraThinMaterial, in: Capsule())
+                .transition(.opacity)
+                // VoiceOver already announces the toggle's new state.
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// A soft fade, not a bar: the text dims as it passes under the
+    /// controls instead of competing with them.
+    private var bottomFade: some View {
+        LinearGradient(
+            colors: [.clear, Theme.navyBottom.opacity(0.92)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    private func layerToggle(_ kind: LayerKind, isOn: Binding<Bool>, compact: Bool) -> some View {
         let isPinned = isPinnedLayer(kind)
         let binding = Binding(
             get: { isOn.wrappedValue },
@@ -369,7 +536,7 @@ struct ReaderView: View {
         return Toggle(isOn: binding) {
             Text(kind.pillGlyph)
         }
-        .toggleStyle(LayerPillToggleStyle())
+        .toggleStyle(LayerPillToggleStyle(compact: compact))
         .disabled(isPinned)
         .opacity(isPinned ? 0.55 : 1)
         // The glyph is shorthand; VoiceOver gets the full name as a switch.
@@ -388,6 +555,123 @@ struct ReaderView: View {
             try? await Task.sleep(for: .seconds(1.5))
             guard !Task.isCancelled else { return }
             layerHint = nil
+        }
+    }
+
+    // MARK: - Open Duo controls (#171)
+
+    /// The stacked layout's bottom chrome (the Duo open upright): the tools
+    /// in a capsule on the left, the layer pills on the right, across the
+    /// width of the reading column.
+    private var dock: some View {
+        VStack(spacing: 8) {
+            layerHintView
+            HStack(spacing: 12) {
+                HStack(spacing: 2) {
+                    textSizeMenu
+                    if canEditOccasion {
+                        toolButton(OccasionCopy.title, systemImage: "tag") {
+                            isEditingOccasion = true
+                        }
+                    }
+                    toolButton("Edit", systemImage: "pencil") {
+                        isEditingArdaas = true
+                    }
+                    displayMenu(includesShortcuts: false) {
+                        toolLabel("Display Options", systemImage: "gearshape")
+                    }
+                }
+                .padding(.horizontal, 6)
+                .background(.ultraThinMaterial, in: Capsule())
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 10) {
+                    layerPills(compact: false)
+                }
+            }
+            .frame(maxWidth: Self.readableWidth)
+            .padding(.horizontal, horizontalMargin)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 20)
+        .padding(.bottom, 6)
+        .background(bottomFade)
+        .animation(.easeOut(duration: 0.2), value: layerHint)
+    }
+
+    /// The side-by-side layout's controls (the Duo open sideways): a bar
+    /// down the right-hand edge with everything at the bottom — clear of the
+    /// status bar, and under the thumb. Settings, edit, occasion and text
+    /// size, then the layer pills.
+    private var sideBar: some View {
+        VStack(spacing: 4) {
+            Spacer(minLength: 0)
+            displayMenu(includesShortcuts: false) {
+                toolLabel("Display Options", systemImage: "gearshape")
+            }
+            toolButton("Edit", systemImage: "pencil") {
+                isEditingArdaas = true
+            }
+            if canEditOccasion {
+                toolButton(OccasionCopy.title, systemImage: "tag") {
+                    isEditingOccasion = true
+                }
+            }
+            textSizeMenu
+            if hasLayerPills {
+                Rectangle()
+                    .fill(Theme.mist.opacity(0.3))
+                    .frame(width: 28, height: 1)
+                    .padding(.vertical, 8)
+                VStack(spacing: 2) {
+                    layerPills(compact: true)
+                }
+            }
+        }
+        .padding(.bottom, 12)
+        .frame(width: Self.sideBarWidth)
+        .frame(maxHeight: .infinity)
+        .background {
+            Theme.navyBottom.opacity(0.55)
+                .overlay(alignment: .leading) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 1)
+                }
+                .ignoresSafeArea()
+        }
+    }
+
+    /// An icon-only control for the dock and the side bar, with a 44pt
+    /// touch target. The title is what VoiceOver reads.
+    private func toolLabel(_ title: String, systemImage: String) -> some View {
+        Label(title, systemImage: systemImage)
+            .labelStyle(.iconOnly)
+            .font(.title3)
+            .foregroundStyle(Theme.parchment)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+    }
+
+    private func toolButton(
+        _ title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            toolLabel(title, systemImage: systemImage)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Text size as its own control on the open Duo, where there's room;
+    /// on the phone it lives in the display menu.
+    private var textSizeMenu: some View {
+        Menu {
+            textSizeButtons
+        } label: {
+            toolLabel("Text Size", systemImage: "textformat.size")
         }
     }
 
@@ -449,10 +733,18 @@ struct ReaderView: View {
         }
     }
 
-    private var displayMenu: some View {
+    /// The gear menu. `includesShortcuts` on the phone, where Edit and text
+    /// size have nowhere else to go; on the open Duo they have their own
+    /// buttons, so the menu drops them rather than offer them twice.
+    private func displayMenu<MenuLabel: View>(
+        includesShortcuts: Bool,
+        @ViewBuilder label: () -> MenuLabel
+    ) -> some View {
         Menu {
             Section {
-                editButton
+                if includesShortcuts {
+                    editButton
+                }
                 if onDuplicate != nil {
                     duplicateButton
                 }
@@ -470,24 +762,31 @@ struct ReaderView: View {
                 Toggle("Gurmukhi", isOn: $showGurmukhi)
                     .disabled(isPinnedLayer(.gurmukhi))
             }
-            Section("Text Size") {
-                Button {
-                    adjustFontScale(by: Self.fontScaleStep)
-                } label: {
-                    Label("Larger Text", systemImage: "textformat.size.larger")
+            if includesShortcuts {
+                Section("Text Size") {
+                    textSizeButtons
                 }
-                .disabled(fontScale >= Self.fontScaleRange.upperBound)
-
-                Button {
-                    adjustFontScale(by: -Self.fontScaleStep)
-                } label: {
-                    Label("Smaller Text", systemImage: "textformat.size.smaller")
-                }
-                .disabled(fontScale <= Self.fontScaleRange.lowerBound)
             }
         } label: {
-            Label("Display Options", systemImage: "gearshape")
+            label()
         }
+    }
+
+    @ViewBuilder
+    private var textSizeButtons: some View {
+        Button {
+            adjustFontScale(by: Self.fontScaleStep)
+        } label: {
+            Label("Larger Text", systemImage: "textformat.size.larger")
+        }
+        .disabled(fontScale >= Self.fontScaleRange.upperBound)
+
+        Button {
+            adjustFontScale(by: -Self.fontScaleStep)
+        } label: {
+            Label("Smaller Text", systemImage: "textformat.size.smaller")
+        }
+        .disabled(fontScale <= Self.fontScaleRange.lowerBound)
     }
 
     /// True when `kind`'s toggle is on but switching it off would achieve
@@ -538,10 +837,45 @@ struct ReaderView: View {
     .modelContainer(container)
 }
 
+/// How a Reader row lays out its lines (#171).
+private enum RowArrangement {
+    /// The phone: one column, the full width between the margins.
+    case full
+    /// One column at a readable width, centred: the Duo open upright, or
+    /// open sideways with nothing to put in a second column.
+    case readable
+    /// The Duo open sideways: reading layers left, English right.
+    case columns(ReaderColumns)
+
+    var rowAlignment: Alignment {
+        switch self {
+        case .readable: .center
+        case .full, .columns: .leading
+        }
+    }
+}
+
+/// The kesri-tinted card behind the benti, with its leading stripe.
+private struct BentiCard: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 10)
+            .fill(Color.accentColor.opacity(0.12))
+            .overlay(alignment: .leading) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.accentColor.opacity(0.6))
+                    .frame(width: 3)
+                    .padding(.vertical, 6)
+            }
+    }
+}
+
 /// The Reader's layer pill (#169): solid kesri with navy text when on, a
 /// translucent capsule with dim text when off. Liquid Glass where the OS has
 /// it, material before that.
 private struct LayerPillToggleStyle: ToggleStyle {
+    /// Narrower, for the open Duo's 64pt side bar.
+    var compact = false
+
     func makeBody(configuration: Configuration) -> some View {
         Button {
             configuration.isOn.toggle()
@@ -549,8 +883,8 @@ private struct LayerPillToggleStyle: ToggleStyle {
             configuration.label
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(configuration.isOn ? Theme.navyBottom : Theme.mist)
-                .frame(minWidth: 52, minHeight: 34)
-                .padding(.horizontal, 12)
+                .frame(minWidth: compact ? 40 : 52, minHeight: 34)
+                .padding(.horizontal, compact ? 6 : 12)
                 .background { LayerPillBackground(isOn: configuration.isOn) }
                 // A 44pt touch target around the 34pt pill.
                 .padding(.vertical, 5)
