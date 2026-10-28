@@ -5,16 +5,26 @@ import SwiftUI
 ///
 /// A split view throughout. On every iPhone, and the iPhone Duo folded, it
 /// collapses to a stack: the list, and the Reader pushed over it. On the
-/// open Duo the list is a sidebar that hides once an Ardaas opens, so the
-/// Reader has the whole screen for its own layouts (#171); the system's
-/// sidebar button brings the list back.
+/// open Duo the list is a sidebar over the Reader: showing when nothing is
+/// open, put away once an Ardaas opens, so the Reader has the whole screen
+/// for its own layouts (#171). The system's sidebar button brings it back.
 struct ContentView: View {
     /// The Ardaas open in the Reader, nil for none. Held here, not left to
     /// the list, so a Reader can replace itself with a duplicate (#159) and
     /// Back still goes to Home.
     @State private var selection: SavedArdaas?
-    @State private var columnVisibility: NavigationSplitViewVisibility = .automatic
+    /// Starts with the list showing: on the open Duo the system's default
+    /// hides it, leaving only the empty Reader placeholder.
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.modelContext) private var modelContext
+
+    /// Reading wants the whole screen; with nothing open, the list is the
+    /// screen. Collapsed (compact width) the split view ignores this, so it
+    /// only acts on the open Duo.
+    private static func visibility(selection: SavedArdaas?) -> NavigationSplitViewVisibility {
+        selection == nil ? .all : .detailOnly
+    }
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -61,13 +71,18 @@ struct ContentView: View {
                 selection = all.first { $0.label == "Morning Ardaas" } ?? all.first
             }
         }
-        .onChange(of: selection) { _, newSelection in
-            // Reading wants the whole screen. Collapsed (compact width) the
-            // visibility is ignored, so this only acts on the open Duo.
-            guard newSelection != nil else { return }
+        // The list slides over the Reader rather than squeezing it, so the
+        // Reader's own layouts (#171) always measure the whole screen.
+        .navigationSplitViewStyle(.prominentDetail)
+        .onChange(of: selection) {
             withAnimation {
-                columnVisibility = .detailOnly
+                columnVisibility = Self.visibility(selection: selection)
             }
+        }
+        // Unfolding expands the split view, and it brings the list back
+        // over an open Reader; put it away again.
+        .onChange(of: horizontalSizeClass) {
+            columnVisibility = Self.visibility(selection: selection)
         }
     }
 }
