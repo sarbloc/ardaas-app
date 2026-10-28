@@ -5,7 +5,7 @@ import os
 
 /// Reads a saved Ardaas in situ: the canonical segments with the personal
 /// benti composed in at the bundled slot and the chosen occasion spliced
-/// into the "….." (#67). Pushed inside the Home screen's NavigationStack.
+/// into the "….." (#67). The detail of `ContentView`'s split view.
 struct ReaderView: View {
     /// Bindable: the Reader's variant picker writes straight back to the
     /// record (operator decision — the switch persists, not per-session).
@@ -127,12 +127,14 @@ struct ReaderView: View {
                         catalog: occasionCatalog,
                         content: loadedContent
                     )
+                    .formSheet()
                 }
             }
             // Compose, reopened on this record (#154): label, variant,
             // occasion and benti, saved back in place.
             .sheet(isPresented: $isEditingArdaas) {
                 ComposeView(editing: savedArdaas)
+                    .formSheet()
             }
             .onAppear {
                 ScreenAwake.hold(screenAwakeToken)
@@ -752,7 +754,7 @@ struct ReaderView: View {
         guard let onDuplicate else { return }
         let copy = savedArdaas.duplicate(existingLabels: allSavedArdaas.map(\.label))
         modelContext.insert(copy)
-        // Saved before it is navigated to, so the path holds a record with
+        // Saved before it is navigated to, so the selection holds a record with
         // its permanent identity. A failed save leaves the copy inserted for
         // autosave to retry; it is still the record to open.
         do {

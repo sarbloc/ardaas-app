@@ -43,8 +43,26 @@ private struct ThemedScreen: ViewModifier {
     }
 }
 
+/// A sheet's content at form size (#172): a centred card of readable width
+/// on a regular-width screen (the open iPhone Duo), the usual full-width
+/// sheet on every other iPhone. iOS 18 or later; iOS 17 keeps the default.
+private struct FormSheet: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 18, *) {
+            content.presentationSizing(.form)
+        } else {
+            content
+        }
+    }
+}
+
 extension View {
     func themedScreen() -> some View {
         modifier(ThemedScreen())
+    }
+
+    /// Apply to the root view of a sheet's content.
+    func formSheet() -> some View {
+        modifier(FormSheet())
     }
 }

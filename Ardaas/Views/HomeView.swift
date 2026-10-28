@@ -9,8 +9,8 @@ struct HomeView: View {
     @Query(sort: \SavedArdaas.createdAt, order: .reverse)
     private var savedArdaasList: [SavedArdaas]
 
-    /// The navigation stack's path (`ContentView`): the Readers over Home.
-    @Binding var path: [SavedArdaas]
+    /// The Ardaas open in the Reader (`ContentView`), nil for none.
+    @Binding var selection: SavedArdaas?
 
     @State private var isComposing = false
     @State private var isShowingSources = false
@@ -57,19 +57,22 @@ struct HomeView: View {
         }
         .sheet(isPresented: $isComposing) {
             ComposeView()
+                .formSheet()
         }
         .sheet(isPresented: $isShowingSources) {
             SourcesView()
+                .formSheet()
         }
         #if DEBUG
         .sheet(isPresented: $isShowingBentiLab) {
             BentiLabView()
+                .formSheet()
         }
         #endif
     }
 
     private var list: some View {
-        List {
+        List(selection: $selection) {
             ForEach(savedArdaasList) { savedArdaas in
                 NavigationLink(value: savedArdaas) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -90,20 +93,13 @@ struct HomeView: View {
                         Label("Duplicate", systemImage: "plus.square.on.square")
                     }
                     Button(role: .destructive) {
-                        modelContext.delete(savedArdaas)
+                        delete(savedArdaas)
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
                 }
             }
             .onDelete(perform: delete)
-        }
-        .navigationDestination(for: SavedArdaas.self) { savedArdaas in
-            // Duplicating from the Reader opens the copy in its place, so
-            // Back from the copy comes here rather than to the original.
-            ReaderView(savedArdaas: savedArdaas) { copy in
-                path = [copy]
-            }
         }
     }
 
@@ -131,8 +127,18 @@ struct HomeView: View {
 
     private func delete(at offsets: IndexSet) {
         for index in offsets {
-            modelContext.delete(savedArdaasList[index])
+            delete(savedArdaasList[index])
         }
+    }
+
+    /// The open Duo can show the list over the Reader, so the record being
+    /// deleted can be the one open: close it first, rather than leave the
+    /// Reader on a deleted record.
+    private func delete(_ savedArdaas: SavedArdaas) {
+        if selection == savedArdaas {
+            selection = nil
+        }
+        modelContext.delete(savedArdaas)
     }
 }
 
@@ -148,7 +154,7 @@ struct HomeView: View {
         SavedArdaas(label: "For the family", bentiText: "Another benti.")
     )
     return NavigationStack {
-        HomeView(path: .constant([]))
+        HomeView(selection: .constant(nil))
     }
     .modelContainer(container)
 }
