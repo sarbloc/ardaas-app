@@ -30,31 +30,33 @@ final class DuoShotsUITests: XCTestCase {
     }
 
     func testReaderShots() {
-        XCUIDevice.shared.orientation = .portrait
         app.launchArguments = ["-duoShots"]
         app.launch()
-        shot("1-portrait-top")
+        shot("1-launch")
 
         app.swipeUp()
         app.swipeUp()
-        shot("2-portrait-scrolled")
+        shot("2-scrolled")
 
         XCUIDevice.shared.orientation = .landscapeLeft
-        shot("3-landscape-after-rotate")
+        shot("3-rotated-left")
 
         app.swipeDown()
         app.swipeDown()
         app.swipeDown()
-        shot("4-landscape-top")
+        shot("4-rotated-top")
 
         let english = app.switches["Translation"]
         if english.exists {
             english.tap()
-            shot("5-landscape-english-off")
+            shot("5-rotated-english-off")
             english.tap()
         }
 
         XCUIDevice.shared.orientation = .portrait
-        shot("6-portrait-again")
+        shot("6-portrait")
+
+        XCUIDevice.shared.orientation = .landscapeRight
+        shot("7-rotated-right")
     }
 }
