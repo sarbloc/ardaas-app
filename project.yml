@@ -43,16 +43,28 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.sarbloc.ardaas-tests
+  # TEMP (#171 screenshots, dropped before merge).
+  ArdaasUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [ArdaasUITests]
+    dependencies:
+      - target: Ardaas
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.sarbloc.ardaas-uitests
 schemes:
   Ardaas:
     build:
       targets:
         Ardaas: all
         ArdaasTests: [test]
+        ArdaasUITests: [test]
     test:
       gatherCoverageData: true
       targets:
         - ArdaasTests
+        - ArdaasUITests
     # Archive in Release. This does NOT affect signing: automatic signing
     # always signs an archive with an Apple Development identity, whatever the
     # configuration (#63 tried this as a fix for #57 and it was a no-op). The
