@@ -1,8 +1,11 @@
 package io.sarbloc.ardaas.ui.reader
 
 import android.view.View
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,11 +19,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -34,7 +40,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -48,6 +53,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -56,9 +63,12 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -79,12 +89,13 @@ import io.sarbloc.ardaas.occasion.OccasionCatalog
 import io.sarbloc.ardaas.occasion.OccasionCopy
 import io.sarbloc.ardaas.persistence.SavedArdaas
 import io.sarbloc.ardaas.persistence.bentiLayers
-import io.sarbloc.ardaas.persistence.slotChoice
 import io.sarbloc.ardaas.persistence.renderItems
+import io.sarbloc.ardaas.persistence.slotChoice
 import io.sarbloc.ardaas.ui.ArdaasBackground
 import io.sarbloc.ardaas.ui.ArdaasColors
 import io.sarbloc.ardaas.ui.ArdaasTheme
 import java.util.WeakHashMap
+import kotlinx.coroutines.delay
 
 // Port of Ardaas/Views/ReaderView.swift.
 
@@ -393,15 +404,19 @@ private fun BentiCard(lines: List<BentiLine>, styles: ScaledReaderStyles) {
 
 // endregion
 
-// region Footer
+// region Layer toggles
 
 /**
- * Quick, independent toggles for the two secondary layers. Gurmukhi's toggle
- * stays in the display menu — it's the anchor layer, switched rarely.
+ * Independent on/off pills for the two secondary layers (#169): two separate
+ * floating capsules, solid kesri when on, so each reads as its own switch
+ * rather than one two-way control. No bar behind them — the text scrolls
+ * underneath, and the Scaffold's inner padding keeps the last line clear.
+ * Gurmukhi's toggle stays in the display menu: it's the anchor layer,
+ * switched rarely.
  *
  * Pills only for layers something on screen actually carries — the variant or
  * the benti — so the user's own words stay controllable on a variant without
- * that layer. No bar at all when neither carries either layer.
+ * that layer. No pills at all when neither carries either layer.
  */
 @Composable
 private fun LayerPillBar(
@@ -411,28 +426,59 @@ private fun LayerPillBar(
     onToggle: (LayerKind, Boolean) -> Unit,
 ) {
     if (!availability.transliteration && !availability.english) return
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    // "Transliteration off" etc., for a moment: the glyphs are compact, and
+    // this is how a first-time reader learns which is which. A counter, not
+    // the text, keys the timer so a repeat of the same toggle restarts it.
+    var hint by remember { mutableStateOf<Pair<Int, String>?>(null) }
+    LaunchedEffect(hint?.first) {
+        if (hint != null) {
+            delay(1500)
+            hint = null
+        }
+    }
+    val toggle = { kind: LayerKind, on: Boolean ->
+        onToggle(kind, on)
+        hint = ((hint?.first ?: 0) + 1) to "${kind.pillTitle} ${if (on) "on" else "off"}"
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            // A soft fade, not a bar: the text dims as it passes under the
+            // pills instead of competing with them.
+            .background(Brush.verticalGradient(listOf(Color.Transparent, ArdaasColors.NavyBottom.copy(alpha = 0.92f))))
+            .navigationBarsPadding()
+            .padding(top = 20.dp, bottom = 10.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AnimatedVisibility(visible = hint != null, enter = fadeIn(), exit = fadeOut()) {
+            Text(
+                text = hint?.second.orEmpty(),
+                style = MaterialTheme.typography.labelMedium,
+                color = ArdaasColors.Parchment,
+                modifier = Modifier
+                    .background(PillOffFill, CircleShape)
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    // TalkBack already announces the toggle's new state.
+                    .clearAndSetSemantics {},
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             if (availability.transliteration) {
-                LayerPill("Transliteration", LayerKind.TRANSLITERATION, toggles, isPinned, onToggle)
+                LayerPill(LayerKind.TRANSLITERATION, toggles, isPinned, toggle)
             }
             if (availability.english) {
-                LayerPill("Translation", LayerKind.ENGLISH, toggles, isPinned, onToggle)
+                LayerPill(LayerKind.ENGLISH, toggles, isPinned, toggle)
             }
         }
     }
 }
 
+/** The off pill's fill: translucent navy, so the text shows through faintly. */
+private val PillOffFill = Color(0xD9283454)
+
 @Composable
 private fun LayerPill(
-    title: String,
     kind: LayerKind,
     toggles: LayerToggles,
     isPinned: (LayerKind) -> Boolean,
@@ -440,26 +486,57 @@ private fun LayerPill(
 ) {
     val isOn = toggles[kind]
     val enabled = !isPinned(kind)
-    val accent = MaterialTheme.colorScheme.primary
-    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
-    Surface(
-        checked = isOn,
-        onCheckedChange = { onToggle(kind, it) },
-        enabled = enabled,
-        // Disabled reads as dimmed, as a disabled iOS button does.
-        modifier = Modifier.alpha(if (enabled) 1f else 0.5f),
-        shape = CircleShape,
-        color = if (isOn) accent.copy(alpha = 0.15f) else Color.Transparent,
-        contentColor = if (isOn) accent else secondary,
-        border = BorderStroke(1.dp, if (isOn) accent else secondary.copy(alpha = 0.4f)),
+    Box(
+        modifier = Modifier
+            // A 48dp touch target around the 34dp pill.
+            .sizeIn(minHeight = 48.dp)
+            // The glyph is shorthand; TalkBack gets the full name. Ahead of
+            // the toggleable so both land on the one focusable node.
+            .semantics { contentDescription = kind.pillTitle }
+            .toggleable(value = isOn, enabled = enabled, role = Role.Switch, onValueChange = { onToggle(kind, it) })
+            // Disabled reads as dimmed, as a disabled iOS button does.
+            .alpha(if (enabled) 1f else 0.55f),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            text = kind.pillGlyph,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+            color = if (isOn) ArdaasColors.NavyBottom else ArdaasColors.Mist,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .shadow(8.dp, CircleShape)
+                .then(
+                    if (isOn) {
+                        Modifier.background(ArdaasColors.Kesri, CircleShape)
+                    } else {
+                        Modifier
+                            .background(PillOffFill, CircleShape)
+                            .border(1.dp, Color.White.copy(alpha = 0.14f), CircleShape)
+                    },
+                )
+                .sizeIn(minWidth = 52.dp, minHeight = 34.dp)
+                .wrapContentHeight(Alignment.CenterVertically)
+                .padding(horizontal = 12.dp)
+                .clearAndSetSemantics {},
         )
     }
 }
+
+/** The pill's compact face. */
+private val LayerKind.pillGlyph: String
+    get() = when (this) {
+        LayerKind.GURMUKHI -> "ੳ"
+        LayerKind.TRANSLITERATION -> "ਅ→A"
+        LayerKind.ENGLISH -> "EN"
+    }
+
+/** The full name, for TalkBack and the on/off hint. */
+private val LayerKind.pillTitle: String
+    get() = when (this) {
+        LayerKind.GURMUKHI -> "Gurmukhi"
+        LayerKind.TRANSLITERATION -> "Transliteration"
+        LayerKind.ENGLISH -> "Translation"
+    }
 
 // endregion
 
