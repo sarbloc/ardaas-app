@@ -57,6 +57,9 @@ struct ReaderView: View {
     /// The row at the top of the screen, so a change of layout (folding,
     /// unfolding, turning the open Duo) keeps the reader's place.
     @State private var topRow: Int?
+    /// Whether this screen turns the bars into a vertical strip (iOS 27.1:
+    /// the Duo, folded or open). Set by `VerticalBarProbe`.
+    @State private var usesVerticalBars = false
 
     private static let fontScaleRange = 0.7...1.6
     private static let fontScaleStep = 0.1
@@ -73,7 +76,12 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        sideBySideToolbar(on: content)
+        verticalStripToolbar(on: content)
+            .background {
+                if #available(iOS 27.1, *) {
+                    VerticalBarProbe(usesVerticalBars: $usesVerticalBars)
+                }
+            }
             .navigationTitle(savedArdaas.label)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -277,13 +285,13 @@ struct ReaderView: View {
         }
         .safeAreaInset(edge: .bottom) {
             switch layout {
-            case .phone: layerToggles
+            case .phone: if !pillsInStrip { layerToggles }
             case .stacked: dock
             case .sideBySide: EmptyView()
             }
         }
         .overlay(alignment: .bottom) {
-            if layout == .sideBySide {
+            if pillsInStrip {
                 layerHintView
                     .padding(.bottom, 16)
                     .animation(.easeOut(duration: 0.2), value: layerHint)
@@ -493,7 +501,7 @@ struct ReaderView: View {
     }
 
     /// The pills themselves, for the caller's stack: a row on the phone and
-    /// in the dock. (The open Duo's vertical strip builds its own, `compact`.)
+    /// in the dock. (The Duo's vertical strip builds its own, `compact`.)
     @ViewBuilder
     private func layerPills(compact: Bool) -> some View {
         if screenAvailability.transliteration {
@@ -608,18 +616,34 @@ struct ReaderView: View {
         .animation(.easeOut(duration: 0.2), value: layerHint)
     }
 
-    /// The side-by-side layout's controls (the Duo open sideways). There,
-    /// iOS 27.1 turns the navigation bar and toolbar into one vertical strip
-    /// down the right-hand edge, the status bar and Back at its top. The
-    /// bottom toolbar's items go to the strip's bottom, under the thumb:
-    /// settings, edit, occasion and text size, a fixed gap, then the layer
-    /// pills. The pills are custom views, so they opt in to the vertical
-    /// strip (`axisBehavior`); the compact pill fits its fixed width.
+    /// The layer pills go in the Duo's vertical strip rather than floating
+    /// over the text: open sideways, and folded (the outer screen's bars are
+    /// vertical too). Open upright they stay in the dock; on every other
+    /// iPhone, floating.
+    private var pillsInStrip: Bool {
+        switch layout {
+        case .sideBySide: true
+        case .phone: usesVerticalBars
+        case .stacked: false
+        }
+    }
+
+    /// The Duo's controls in its vertical strip. iOS 27.1 turns the
+    /// navigation bar and toolbar into one strip down the right-hand edge,
+    /// the status bar and Back at its top. The bottom toolbar's items go to
+    /// the strip's bottom, under the thumb.
     ///
-    /// iOS 27.1 or later only: nothing earlier runs on the Duo, and nothing
-    /// else gets this layout.
+    /// - Open sideways: settings, edit, occasion and text size, a fixed gap,
+    ///   then the layer pills.
+    /// - Folded: just the pills; the phone layout's occasion and gear sit
+    ///   under Back already.
+    ///
+    /// The pills are custom views, so they opt in to the vertical strip
+    /// (`axisBehavior`); the compact pill fits its fixed width.
+    ///
+    /// iOS 27.1 or later only: nothing earlier runs on the Duo.
     @ViewBuilder
-    private func sideBySideToolbar<Content: View>(on view: Content) -> some View {
+    private func verticalStripToolbar<Content: View>(on view: Content) -> some View {
         if #available(iOS 27.1, *) {
             view.toolbar {
                 if layout == .sideBySide {
@@ -638,6 +662,8 @@ struct ReaderView: View {
                     if hasLayerPills {
                         ToolbarSpacer(.fixed, placement: .bottomBar)
                     }
+                }
+                if pillsInStrip {
                     if screenAvailability.transliteration {
                         ToolbarItem(placement: .bottomBar) {
                             layerToggle(.transliteration, isOn: $showTransliteration, compact: true)
@@ -889,7 +915,7 @@ private struct BentiCard: View {
 /// translucent capsule with dim text when off. Liquid Glass where the OS has
 /// it, material before that.
 private struct LayerPillToggleStyle: ToggleStyle {
-    /// Narrower, for the open Duo's vertical toolbar strip.
+    /// Narrower, for the Duo's vertical toolbar strip.
     var compact = false
 
     func makeBody(configuration: Configuration) -> some View {
@@ -907,6 +933,23 @@ private struct LayerPillToggleStyle: ToggleStyle {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Reports whether the screen uses vertical bars. `toolbarVerticalEdge` is
+/// nil on devices, size classes and orientations without them, so this is
+/// true on the Duo and false on every other iPhone. A view of its own because
+/// the environment value is iOS 27.1 only.
+@available(iOS 27.1, *)
+private struct VerticalBarProbe: View {
+    @Binding var usesVerticalBars: Bool
+    @Environment(\.toolbarVerticalEdge) private var edge
+
+    var body: some View {
+        Color.clear
+            .onChange(of: edge != nil, initial: true) { _, hasEdge in
+                usesVerticalBars = hasEdge
+            }
     }
 }
 

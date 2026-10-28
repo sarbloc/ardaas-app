@@ -6,7 +6,8 @@ import CoreGraphics
 /// model, so it covers the iPhone Duo without naming it:
 ///
 /// - **phone:** compact width. Every iPhone, and the Duo folded (its 5.4"
-///   outer screen). One column, the floating layer pills.
+///   outer screen). One column, the floating layer pills (in the vertical
+///   toolbar strip on the Duo, whose outer screen has one).
 /// - **sideBySide:** regular width and wider than tall. The Duo open with the
 ///   fold vertical. Gurmukhi and transliteration on the left, English on the
 ///   right, the controls in the system's vertical strip on the right.
