@@ -45,7 +45,8 @@ struct ReaderView: View {
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// The whole window, safe areas included, in global coordinates. Its
-    /// shape picks the layout, and its midline is the Duo's fold.
+    /// shape picks the layout, and its midline is the Duo's fold (the
+    /// crease is at the physical centre of the inner screen).
     @State private var windowFrame: CGRect = .zero
     /// Where the reading rows sit horizontally (inside the margins, left of
     /// any side bar), in global x. The side-by-side columns split this.
@@ -94,14 +95,21 @@ struct ReaderView: View {
                     }
                 }
             }
-            .background {
-                Color.clear
-                    .ignoresSafeArea()
-                    .onGeometryChange(for: CGRect.self) { proxy in
-                        proxy.frame(in: .global)
-                    } action: { frame in
-                        windowFrame = frame
-                    }
+            // The view's frame grown by its safe-area insets is the window.
+            // The insets matter: the open Duo reserves a status-bar strip
+            // down the right-hand edge (~83pt), and without it the measured
+            // midline lands ~40pt left of the fold.
+            .onGeometryChange(for: CGRect.self) { proxy in
+                let frame = proxy.frame(in: .global)
+                let insets = proxy.safeAreaInsets
+                return CGRect(
+                    x: frame.minX - insets.leading,
+                    y: frame.minY - insets.top,
+                    width: frame.width + insets.leading + insets.trailing,
+                    height: frame.height + insets.top + insets.bottom
+                )
+            } action: { frame in
+                windowFrame = frame
             }
             .sheet(isPresented: $isEditingOccasion) {
                 if let occasionCatalog {
