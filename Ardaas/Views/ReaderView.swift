@@ -39,6 +39,9 @@ struct ReaderView: View {
     /// This Reader's claim on keeping the screen awake (`ScreenAwake`).
     @State private var screenAwakeToken = UUID()
     @State private var isEditingArdaas = false
+    /// "Transliteration off" etc., shown for a moment above the layer pills.
+    @State private var layerHint: String?
+    @State private var layerHintTask: Task<Void, Never>?
 
     private static let fontScaleRange = 0.7...1.6
     private static let fontScaleStep = 0.1
@@ -176,7 +179,7 @@ struct ReaderView: View {
         }
         .themedScreen()
         .safeAreaInset(edge: .bottom) {
-            footerBar
+            layerToggles
         }
     }
 
@@ -298,61 +301,94 @@ struct ReaderView: View {
         }
     }
 
-    // MARK: - Footer
+    // MARK: - Layer toggles
 
-    /// Quick, independent toggles for the two secondary layers. Gurmukhi's
-    /// toggle stays in the toolbar menu — it's the anchor layer, switched
-    /// rarely.
+    /// Independent on/off pills for the two secondary layers (#169): two
+    /// separate floating capsules, solid kesri when on, so each reads as its
+    /// own switch rather than one two-way control. No bar behind them — the
+    /// text scrolls underneath, and the inset keeps the last line clear.
+    /// Gurmukhi's toggle stays in the toolbar menu: it's the anchor layer,
+    /// switched rarely.
     @ViewBuilder
-    private var footerBar: some View {
+    private var layerToggles: some View {
         // Pills only for layers something on screen actually carries — the
         // variant or the benti. Using the screen-wide availability (not the
         // variant's) is what keeps the user's own words controllable on a
         // variant with no attested English: the benti's English renders
-        // there, so its pill has to be there to switch it off. No footer at
+        // there, so its pill has to be there to switch it off. No pills at
         // all when neither the variant nor the benti has either layer.
         let availability = screenAvailability
-        let hasTransliteration = availability.transliteration
-        let hasEnglish = availability.english
-        if hasTransliteration || hasEnglish {
-            HStack(spacing: 12) {
-                if hasTransliteration {
-                    layerPill("Transliteration", kind: .transliteration, isOn: $showTransliteration)
+        if availability.transliteration || availability.english {
+            VStack(spacing: 8) {
+                if let layerHint {
+                    Text(layerHint)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Theme.parchment)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .transition(.opacity)
+                        // VoiceOver already announces the toggle's new state.
+                        .accessibilityHidden(true)
                 }
-                if hasEnglish {
-                    layerPill("Translation", kind: .english, isOn: $showEnglish)
+                HStack(spacing: 10) {
+                    if availability.transliteration {
+                        layerToggle(.transliteration, isOn: $showTransliteration)
+                    }
+                    if availability.english {
+                        layerToggle(.english, isOn: $showEnglish)
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(.bar)
+            .padding(.top, 20)
+            .padding(.bottom, 6)
+            // A soft fade, not a bar: the text dims as it passes under the
+            // pills instead of competing with them.
+            .background(
+                LinearGradient(
+                    colors: [.clear, Theme.navyBottom.opacity(0.92)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea(edges: .bottom)
+            )
+            .animation(.easeOut(duration: 0.2), value: layerHint)
         }
     }
 
-    private func layerPill(_ title: String, kind: LayerKind, isOn: Binding<Bool>) -> some View {
-        Button {
-            isOn.wrappedValue.toggle()
-        } label: {
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 7)
-                .background(
-                    isOn.wrappedValue ? Color.accentColor.opacity(0.15) : .clear,
-                    in: Capsule()
-                )
-                .overlay(
-                    Capsule().strokeBorder(
-                        isOn.wrappedValue ? Color.accentColor : Color.secondary.opacity(0.4),
-                        lineWidth: 1
-                    )
-                )
-                .foregroundStyle(isOn.wrappedValue ? Color.accentColor : Color.secondary)
+    private func layerToggle(_ kind: LayerKind, isOn: Binding<Bool>) -> some View {
+        let isPinned = isPinnedLayer(kind)
+        let binding = Binding(
+            get: { isOn.wrappedValue },
+            set: { newValue in
+                isOn.wrappedValue = newValue
+                flashLayerHint("\(kind.pillTitle) \(newValue ? "on" : "off")")
+            }
+        )
+        return Toggle(isOn: binding) {
+            Text(kind.pillGlyph)
         }
-        .buttonStyle(.plain)
-        .disabled(isPinnedLayer(kind))
-        .accessibilityAddTraits(isOn.wrappedValue ? .isSelected : [])
+        .toggleStyle(LayerPillToggleStyle())
+        .disabled(isPinned)
+        .opacity(isPinned ? 0.55 : 1)
+        // The glyph is shorthand; VoiceOver gets the full name as a switch.
+        .accessibilityRepresentation {
+            Toggle(kind.pillTitle, isOn: binding)
+                .disabled(isPinned)
+        }
+    }
+
+    /// Names the layer just switched, briefly — the glyphs are compact, and
+    /// this is how a first-time reader learns which is which.
+    private func flashLayerHint(_ text: String) {
+        layerHintTask?.cancel()
+        layerHint = text
+        layerHintTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            layerHint = nil
+        }
     }
 
     // MARK: - Toolbar
@@ -500,6 +536,68 @@ struct ReaderView: View {
         ReaderView(savedArdaas: sample)
     }
     .modelContainer(container)
+}
+
+/// The Reader's layer pill (#169): solid kesri with navy text when on, a
+/// translucent capsule with dim text when off. Liquid Glass where the OS has
+/// it, material before that.
+private struct LayerPillToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            configuration.isOn.toggle()
+        } label: {
+            configuration.label
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(configuration.isOn ? Theme.navyBottom : Theme.mist)
+                .frame(minWidth: 52, minHeight: 34)
+                .padding(.horizontal, 12)
+                .background { LayerPillBackground(isOn: configuration.isOn) }
+                // A 44pt touch target around the 34pt pill.
+                .padding(.vertical, 5)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct LayerPillBackground: View {
+    let isOn: Bool
+
+    var body: some View {
+        if isOn {
+            Capsule()
+                .fill(Theme.kesri)
+                .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+        } else if #available(iOS 26, *) {
+            Color.clear
+                .glassEffect(.regular, in: Capsule())
+        } else {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.14), lineWidth: 1))
+                .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
+        }
+    }
+}
+
+private extension LayerKind {
+    /// The pill's compact face.
+    var pillGlyph: String {
+        switch self {
+        case .gurmukhi: "ੳ"
+        case .transliteration: "ਅ→A"
+        case .english: "EN"
+        }
+    }
+
+    /// The full name, for VoiceOver and the on/off hint.
+    var pillTitle: String {
+        switch self {
+        case .gurmukhi: "Gurmukhi"
+        case .transliteration: "Transliteration"
+        case .english: "Translation"
+        }
+    }
 }
 
 /// Keeps the screen awake while any Reader is showing — a reader
