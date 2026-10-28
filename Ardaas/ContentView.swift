@@ -1,6 +1,5 @@
 import SwiftData
 import SwiftUI
-import os
 
 /// Root view: Home's list of saved Ardaas beside the Reader (#172).
 ///
@@ -18,7 +17,6 @@ struct ContentView: View {
     /// hides it, leaving only the empty Reader placeholder.
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.modelContext) private var modelContext
 
     /// Reading wants the whole screen; with nothing open, the list is the
     /// screen. Collapsed (compact width) the split view ignores this, so it
@@ -30,8 +28,6 @@ struct ContentView: View {
     /// Wide enough for Home's toolbar (About, +, the sidebar button) and
     /// its title.
     private static let listWidth: CGFloat = 360
-
-    private static let logger = Logger(subsystem: "io.sarbloc.ardaas", category: "Navigation")
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -57,31 +53,6 @@ struct ContentView: View {
                 .themedScreen()
             }
         }
-        // TEMP (#172 screenshots, dropped before merge): seed samples once;
-        // `-duoShots reader` opens the first.
-        .onAppear {
-            let args = ProcessInfo.processInfo.arguments
-            guard let i = args.firstIndex(of: "-duoShots"), selection == nil else { return }
-            var all = (try? modelContext.fetch(FetchDescriptor<SavedArdaas>())) ?? []
-            if all.isEmpty {
-                let sample = SavedArdaas(
-                    label: "Morning Ardaas",
-                    bentiText: "Please bless the family with health and chardi kala.",
-                    bentiGurmukhi: "ਪਰਿਵਾਰ ਨੂੰ ਤੰਦਰੁਸਤੀ ਅਤੇ ਚੜ੍ਹਦੀ ਕਲਾ ਬਖ਼ਸ਼ੋ ਜੀ।",
-                    bentiTransliteration: "parivaar noo(n) tandarustee ate charhdee kalaa bakhsho jee.",
-                    occasion: .catalog(id: "birthday"),
-                    paathId: "japji-sahib"
-                )
-                modelContext.insert(SavedArdaas(label: "For the family", bentiText: "Another benti."))
-                modelContext.insert(SavedArdaas(label: "Gurpurab", bentiText: "A third benti."))
-                modelContext.insert(sample)
-                try? modelContext.save()
-                all = [sample]
-            }
-            if args.indices.contains(i + 1), args[i + 1] == "reader" {
-                selection = all.first { $0.label == "Morning Ardaas" } ?? all.first
-            }
-        }
         // The list slides over the Reader rather than squeezing it, so the
         // Reader's own layouts (#171) always measure the whole screen.
         .navigationSplitViewStyle(.prominentDetail)
@@ -93,23 +64,21 @@ struct ContentView: View {
         .onChange(of: horizontalSizeClass) {
             settleColumns()
         }
-        // TEMP (#172, dropped before merge): who moves the list.
-        .onChange(of: columnVisibility) { old, new in
-            Self.logger.info("columns \(String(describing: old), privacy: .public) -> \(String(describing: new), privacy: .public), sizeClass \(String(describing: horizontalSizeClass), privacy: .public)")
-        }
     }
 
     /// Shows or puts away the list for what's open. Set twice: the split
     /// view applies its own visibility as it first lays out or expands
-    /// (unfolding), after a change made in the same update, and that put
-    /// the list back over the Reader in the simulator.
+    /// (unfolding), after a change made in the same update. In the iOS 27.1
+    /// simulator it reset `.detailOnly` to `.all` ~140ms later, putting the
+    /// list back over the Reader; the second set, well after that, wins.
+    /// Both sets follow the current selection, so a late one can't undo a
+    /// newer choice.
     private func settleColumns() {
         withAnimation {
             columnVisibility = Self.visibility(selection: selection)
         }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(400))
-            Self.logger.info("settle again: \(String(describing: columnVisibility), privacy: .public)")
             withAnimation {
                 columnVisibility = Self.visibility(selection: selection)
             }

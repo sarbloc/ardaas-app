@@ -55,13 +55,6 @@ struct HomeView: View {
                 }
             }
         }
-        // TEMP (#172 screenshots, dropped before merge).
-        .onAppear {
-            let args = ProcessInfo.processInfo.arguments
-            if let i = args.firstIndex(of: "-duoShots"), args.indices.contains(i + 1), args[i + 1] == "compose" {
-                isComposing = true
-            }
-        }
         .sheet(isPresented: $isComposing) {
             ComposeView()
                 .formSheet()
@@ -138,7 +131,7 @@ struct HomeView: View {
         }
     }
 
-    /// The open Duo shows the list beside the Reader, so the record being
+    /// The open Duo can show the list over the Reader, so the record being
     /// deleted can be the one open: close it first, rather than leave the
     /// Reader on a deleted record.
     private func delete(_ savedArdaas: SavedArdaas) {
