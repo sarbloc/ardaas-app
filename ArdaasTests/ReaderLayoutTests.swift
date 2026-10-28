@@ -36,8 +36,8 @@ final class ReaderLayoutTests: XCTestCase {
 /// The side-by-side column split: the gap straddles the fold.
 final class ReaderColumnsTests: XCTestCase {
     func testGapIsCentredOnTheFold() {
-        // Duo open sideways: fold at 445, 24pt margin, 64pt bar + 24pt margin
-        // on the right.
+        // Duo open sideways: fold at 445, a 24pt margin on the left, the
+        // system's control strip and a 24pt margin on the right.
         let columns = ReaderColumns.split(areaMinX: 24, areaMaxX: 802, foldX: 445, gap: 48)
         XCTAssertEqual(columns.left, 397) // 24 ... 421
         XCTAssertEqual(columns.right, 333) // 469 ... 802

@@ -9,7 +9,7 @@ import CoreGraphics
 ///   outer screen). One column, the floating layer pills.
 /// - **sideBySide:** regular width and wider than tall. The Duo open with the
 ///   fold vertical. Gurmukhi and transliteration on the left, English on the
-///   right, the controls in a bar down the right-hand edge.
+///   right, the controls in the system's vertical strip on the right.
 /// - **stacked:** regular width and taller than wide. The Duo open with the
 ///   fold horizontal. One column of readable width, a dock at the bottom.
 ///
@@ -35,7 +35,7 @@ enum ReaderLayout: Equatable {
 /// The two column widths of the side-by-side Reader.
 ///
 /// The gap between the columns straddles the fold, so no line of text sits
-/// on the crease. That makes the columns unequal: the control bar takes
+/// on the crease. That makes the columns unequal: the system's control strip takes
 /// width from the right-hand half only.
 struct ReaderColumns: Equatable {
     var left: CGFloat
