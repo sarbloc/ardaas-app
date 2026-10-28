@@ -315,6 +315,7 @@ struct ComposeView: View {
                     translateWhenReady = true
                     translation.download(allowingCellular: allowCellular)
                 }
+                .formSheet()
             }
             .confirmationDialog(
                 "The Gurmukhi no longer matches your English",
