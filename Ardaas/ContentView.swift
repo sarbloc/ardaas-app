@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import os
 
 /// Root view: Home's list of saved Ardaas beside the Reader (#172).
 ///
@@ -26,9 +27,16 @@ struct ContentView: View {
         selection == nil ? .all : .detailOnly
     }
 
+    /// Wide enough for Home's toolbar (About, +, the sidebar button) and
+    /// its title.
+    private static let listWidth: CGFloat = 360
+
+    private static let logger = Logger(subsystem: "io.sarbloc.ardaas", category: "Navigation")
+
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             HomeView(selection: $selection)
+                .navigationSplitViewColumnWidth(Self.listWidth)
         } detail: {
             if let selection {
                 ReaderView(savedArdaas: selection) { copy in
@@ -43,6 +51,9 @@ struct ContentView: View {
                     systemImage: "text.book.closed",
                     description: Text("Pick one from the list to read it.")
                 )
+                // The list slides over this screen; keep the prompt clear
+                // of it.
+                .padding(.leading, columnVisibility == .detailOnly ? 0 : Self.listWidth)
                 .themedScreen()
             }
         }
@@ -75,14 +86,33 @@ struct ContentView: View {
         // Reader's own layouts (#171) always measure the whole screen.
         .navigationSplitViewStyle(.prominentDetail)
         .onChange(of: selection) {
-            withAnimation {
-                columnVisibility = Self.visibility(selection: selection)
-            }
+            settleColumns()
         }
         // Unfolding expands the split view, and it brings the list back
         // over an open Reader; put it away again.
         .onChange(of: horizontalSizeClass) {
+            settleColumns()
+        }
+        // TEMP (#172, dropped before merge): who moves the list.
+        .onChange(of: columnVisibility) { old, new in
+            Self.logger.info("columns \(String(describing: old), privacy: .public) -> \(String(describing: new), privacy: .public), sizeClass \(String(describing: horizontalSizeClass), privacy: .public)")
+        }
+    }
+
+    /// Shows or puts away the list for what's open. Set twice: the split
+    /// view applies its own visibility as it first lays out or expands
+    /// (unfolding), after a change made in the same update, and that put
+    /// the list back over the Reader in the simulator.
+    private func settleColumns() {
+        withAnimation {
             columnVisibility = Self.visibility(selection: selection)
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(400))
+            Self.logger.info("settle again: \(String(describing: columnVisibility), privacy: .public)")
+            withAnimation {
+                columnVisibility = Self.visibility(selection: selection)
+            }
         }
     }
 }

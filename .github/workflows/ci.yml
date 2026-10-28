@@ -201,6 +201,7 @@ jobs:
           relaunch reader
           "$H" -t 10 -d "$U" open
           shoot 11-open-reader-after-open
+          xcrun simctl spawn "$U" log show --last 20m --info --debug --style compact --predicate 'subsystem == "io.sarbloc.ardaas"' > ~/duo-shots/app-log.txt 2>&1 || true
 
       # TEMP (#172 screenshots, dropped before merge).
       - name: Upload Duo screenshots
