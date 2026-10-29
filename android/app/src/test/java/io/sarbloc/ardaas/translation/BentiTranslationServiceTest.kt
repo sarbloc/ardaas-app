@@ -2,6 +2,7 @@ package io.sarbloc.ardaas.translation
 
 import android.content.ComponentCallbacks2
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineStart
@@ -9,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
@@ -117,11 +119,23 @@ class BentiTranslationServiceTest {
     @Test
     fun downloadDrivesTheStateMachineToReady() = runBlocking {
         val service = makeService()
+        // Every state, as it is set. Reading `state.value` right after
+        // download() raced the install (#151): on a fast runner it had
+        // already moved past Downloading(0.0). Unconfined + UNDISPATCHED
+        // subscribes before download() and records inline, so the state
+        // download() sets synchronously is always caught.
+        val seen = CopyOnWriteArrayList<ModelState>()
+        val recorder = launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) {
+            service.state.collect { seen += it }
+        }
 
         service.download()
-        assertEquals(ModelState.Downloading(0.0), service.state.value)
+        assertEquals(ModelState.Downloading(0.0), seen.getOrNull(1))
 
         service.awaitState { it == ModelState.Ready }
+        recorder.cancel()
+        assertEquals(ModelState.NotDownloaded, seen.first())
+        assertTrue("no failure on the way: $seen", seen.none { it.error != null })
         assertTrue(service.installedBytes.value > 0)
         assertTrue("cellular stays off unless asked for", fetcher.requests.none { it.allowsCellular })
     }
